@@ -20,7 +20,7 @@ enum AppNotifier {
             }
         }
 
-        Notify.handler = { title, body in
+        Notify.setHandler { title, body in
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body

@@ -132,7 +132,7 @@ final class GuardController {
 
         // The permission callback arrives on an arbitrary queue; the store
         // itself is only ever touched back on the main actor.
-        Calendar2.requestAccess(store) { granted in
+        Meetings.requestAccess(store) { granted in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.calendarAccess = granted ? .granted : .denied
@@ -261,7 +261,7 @@ final class GuardController {
 
         // Surface the next meeting even when the guard cannot act on it, so the
         // popover explains itself instead of just looking idle.
-        let meeting = Calendar2.nextMeeting(store, within: horizonMinutes, config: config)
+        let meeting = Meetings.nextMeeting(store, within: horizonMinutes, config: config)
         nextMeeting = meeting
 
         guard config.isActive, !guardedVolumes.isEmpty, let meeting,
@@ -297,7 +297,7 @@ final class GuardController {
         // Re-validate rather than trusting the schedule: the meeting may have
         // been cancelled or declined since the timer was armed.
         guard config.isActive,
-              let meeting = Calendar2.nextMeeting(
+              let meeting = Meetings.nextMeeting(
                   store, within: config.leadMinutes + 1, config: config),
               !handledMeetings.contains(key(for: meeting))
         else {

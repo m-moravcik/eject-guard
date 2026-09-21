@@ -1,2 +1,12 @@
+# Our own build output (build.sh) and SwiftPM's (swift test / swift build).
 build/
+.build/
+.swiftpm/
+.index-build/
+
+# Review artefacts live outside the repo; this is a backstop in case one is
+# ever copied in.
+*audit*.md
+!README.md
+
 .DS_Store

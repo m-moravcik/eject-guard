@@ -161,7 +161,7 @@ case "unskip", "unskip-all":
 
 case "calendars", "watch-cal", "unwatch-cal":
     let store = EKEventStore()
-    guard Calendar2.requestAccess(store) else {
+    guard Meetings.requestAccess(store) else {
         FileHandle.standardError.write("calendar access denied\n".data(using: .utf8)!)
         exit(3)
     }
@@ -207,7 +207,7 @@ case "calendars", "watch-cal", "unwatch-cal":
 
 case "run", "dry-run":
     let store = EKEventStore()
-    guard Calendar2.requestAccess(store) else {
+    guard Meetings.requestAccess(store) else {
         FileHandle.standardError.write(
             "calendar access denied - System Settings > Privacy & Security > Calendars\n".data(using: .utf8)!)
         exit(3)
@@ -244,8 +244,8 @@ default:
     print("cals   : \(config.watchAllCalendars ? "all" : "\(config.watchedCalendarIDs.count) selected")")
 
     let store = EKEventStore()
-    if Calendar2.requestAccess(store) {
-        if let meeting = Calendar2.nextMeeting(store, within: 24 * 60, config: config) {
+    if Meetings.requestAccess(store) {
+        if let meeting = Meetings.nextMeeting(store, within: 24 * 60, config: config) {
             let minutes = Int(meeting.startDate.timeIntervalSinceNow / 60)
             print("next   : \"\(meeting.title ?? "?")\" in \(minutes) min (\(meeting.calendar.title))")
         } else {

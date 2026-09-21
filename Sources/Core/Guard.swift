@@ -32,6 +32,10 @@ enum Log {
     static let url = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/tm-eject-guard.log")
 
+    // Entries come from the main actor and from the work queue, so appends are
+    // serialised: two interleaved writes would corrupt the one record you go
+    // looking for after a failure.
+    private static let lock = NSLock()
     nonisolated(unsafe) private static var permissionsChecked = false
 
     private static let stamp: DateFormatter = {
@@ -45,6 +49,7 @@ enum Log {
         // otherwise let anyone forge a log record.
         let line = "\(stamp.string(from: Date()))  \(Sanitize.oneLine(message, max: 500))\n"
         guard let data = line.data(using: .utf8) else { return }
+        lock.lock(); defer { lock.unlock() }
         if isatty(STDERR_FILENO) == 1 {
             FileHandle.standardError.write(data)
         }
@@ -158,12 +163,23 @@ enum Shell {
 /// back to AppleScript. Under the hardened runtime the AppleScript route is not
 /// dependable, and the app has a bundle identity that can do it properly.
 enum Notify {
-    nonisolated(unsafe) static var handler: (String, String) -> Void = { title, body in
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var handler: (String, String) -> Void = { title, body in
         Shell.notifyViaAppleScript(title: title, body: body)
     }
 
+    /// Set once at startup, before anything can eject. Behind a lock because
+    /// the writer is the app launching and the readers are the work queue.
+    static func setHandler(_ newHandler: @escaping (String, String) -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        handler = newHandler
+    }
+
     static func post(title: String, body: String) {
-        handler(title, body)
+        lock.lock()
+        let current = handler
+        lock.unlock()
+        current(title, body)
     }
 }
 
@@ -297,6 +313,7 @@ enum ConfigStore {
         return readUnlocked()
     }
 
+    /// Only ever touched from `load()`, which holds `lock`.
     nonisolated(unsafe) private static var permissionsChecked = false
 
     /// An earlier version wrote this file with the default umask.
@@ -575,7 +592,8 @@ struct BackupStatus {
 
 // MARK: - Calendar
 
-enum Calendar2 {
+/// Finding the next meeting the guard should act on.
+enum Meetings {
     /// Callback form. EKEventStore is not thread safe, so a caller that owns
     /// the store on one thread must stay on it - this never blocks or hops.
     static func requestAccess(_ store: EKEventStore, completion: @escaping (Bool) -> Void) {
@@ -727,7 +745,7 @@ enum GuardRunner {
         let targets = guardedAttachedVolumes(config)
         guard !targets.isEmpty else { return outcome }
 
-        guard let meeting = Calendar2.nextMeeting(
+        guard let meeting = Meetings.nextMeeting(
             store, within: config.leadMinutes, config: config) else { return outcome }
         outcome.meeting = meeting
 

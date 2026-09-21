@@ -16,7 +16,8 @@ jobs:
         run: swift --version
 
       - name: Unit tests
-        run: swift test
+        # The build is warning free; keep it that way.
+        run: swift test -Xswiftc -warnings-as-errors
 
       # The shipping binaries are assembled by build.sh, not by SwiftPM, so
       # building them here is the only thing that proves they still compile.

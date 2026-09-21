@@ -20,7 +20,7 @@ rm -rf "$BUILD"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "building app..."
-swiftc -O -target arm64-apple-macos14.0 \
+swiftc -O -warnings-as-errors -target arm64-apple-macos14.0 \
     Sources/Core/Guard.swift Sources/App/*.swift \
     -o "$APP/Contents/MacOS/TMEjectGuard"
 
@@ -29,7 +29,7 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 codesign --force --sign - --identifier sk.moravcik.tmejectguard "$APP"
 
 echo "building cli..."
-swiftc -O -target arm64-apple-macos14.0 \
+swiftc -O -warnings-as-errors -target arm64-apple-macos14.0 \
     Sources/Core/Guard.swift Sources/CLI/main.swift \
     -o "$BUILD/tm-eject-guard" \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist
