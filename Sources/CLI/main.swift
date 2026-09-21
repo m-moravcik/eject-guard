@@ -13,7 +13,10 @@ func usage() -> Never {
       tm-eject-guard --list           list remembered disks
       tm-eject-guard --watch NAME     guard this disk (name or id, case insensitive)
       tm-eject-guard --unwatch NAME   stop guarding it
-      tm-eject-guard --forget NAME    drop a disk from the remembered list
+      tm-eject-guard --forget NAME    hide a disk from the remembered list
+      tm-eject-guard --unhide         bring back every hidden disk
+      tm-eject-guard --unskip         undo the most recent skipped meeting
+      tm-eject-guard --unskip-all     undo every skipped meeting
       tm-eject-guard --run            run one pass now (ejects if a meeting is due)
       tm-eject-guard --dry-run        same, but never eject
       tm-eject-guard --eject-now      eject every guarded disk regardless of calendar
@@ -81,6 +84,9 @@ while !arguments.isEmpty {
     case "--watch": action = "watch"; pendingValue = value()
     case "--unwatch": action = "unwatch"; pendingValue = value()
     case "--forget": action = "forget"; pendingValue = value()
+    case "--unhide": action = "unhide"
+    case "--unskip": action = "unskip"
+    case "--unskip-all": action = "unskip-all"
     case "--calendars": action = "calendars"
     case "--watch-cal": action = "watch-cal"; pendingValue = value()
     case "--unwatch-cal": action = "unwatch-cal"; pendingValue = value()
@@ -119,6 +125,9 @@ case "watch", "unwatch", "forget":
         case "forget":
             config.watchedDiskIDs.removeAll { $0 == disk.id }
             config.knownDisks.removeAll { $0.id == disk.id }
+            if !config.dismissedDiskIDs.contains(disk.id) {
+                config.dismissedDiskIDs.append(disk.id)
+            }
         default:
             config.watchedDiskIDs.removeAll { $0 == disk.id }
         }
@@ -128,6 +137,27 @@ case "watch", "unwatch", "forget":
     case "forget": print("forgotten: \(disk.name)")
     default: print("no longer guarding: \(disk.name)")
     }
+
+case "unhide":
+    let restored = ConfigStore.mutate { config -> Int in
+        let count = config.dismissedDiskIDs.count
+        config.dismissedDiskIDs = []
+        return count
+    }
+    print(restored == 0 ? "no hidden disks" : "restored \(restored) hidden disk(s)")
+
+case "unskip", "unskip-all":
+    let removed = ConfigStore.mutate { config -> Int in
+        if action == "unskip-all" {
+            let count = config.skippedEventIDs.count
+            config.skippedEventIDs = []
+            return count
+        }
+        guard !config.skippedEventIDs.isEmpty else { return 0 }
+        config.skippedEventIDs.removeLast()
+        return 1
+    }
+    print(removed == 0 ? "nothing was skipped" : "un-skipped \(removed) meeting(s)")
 
 case "calendars", "watch-cal", "unwatch-cal":
     let store = EKEventStore()

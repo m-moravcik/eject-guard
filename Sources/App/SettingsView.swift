@@ -9,6 +9,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             CalendarSettings()
                 .tabItem { Label("Calendars", systemImage: "calendar") }
+            AboutSettings()
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 440)
     }
@@ -69,6 +71,10 @@ private struct GeneralSettings: View {
 
             Section {
                 Button("Open log") { NSWorkspace.shared.open(Log.url) }
+                Button("Restore hidden disks (\(controller.hiddenDiskCount))") {
+                    controller.restoreHiddenDisks()
+                }
+                .disabled(controller.hiddenDiskCount == 0)
             }
         }
         .formStyle(.grouped)
@@ -155,5 +161,57 @@ private struct CalendarSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: - About
+
+private struct AboutSettings: View {
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String
+        let build = info?["CFBundleVersion"] as? String
+        guard let short else { return "development build" }
+        return build.map { "Version \(short) (\($0))" } ?? "Version \(short)"
+    }
+
+    private let repository = "https://github.com/m-moravcik/tm-eject-guard"
+
+    var body: some View {
+        VStack(spacing: Design.Spacing.l) {
+            Image(systemName: "externaldrive.badge.checkmark")
+                .font(.system(size: 44))
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, Design.Spacing.l)
+
+            VStack(spacing: Design.Spacing.s) {
+                Text("TM Eject Guard")
+                    .font(.system(size: 16, weight: .semibold))
+                Text(version)
+                    .font(Design.Typography.cardSubtitle)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Ejects your external disks a few minutes before a meeting starts, so a spinning drive is never unplugged while it is still mounted.")
+                .font(Design.Typography.row)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, Design.Spacing.l)
+
+            HStack(spacing: Design.Spacing.m) {
+                Button("Source code") {
+                    if let url = URL(string: repository) { NSWorkspace.shared.open(url) }
+                }
+                Button("Open log") { NSWorkspace.shared.open(Log.url) }
+                Button("Show config") {
+                    NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.url])
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, Design.Spacing.l)
     }
 }

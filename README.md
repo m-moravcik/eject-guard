@@ -26,6 +26,8 @@ When the timer fires, three questions are re-asked, stopping at the first "no":
 1. **Is a guarded disk attached?**
 2. **Is there still a real meeting starting within the lead time?** (5 minutes
    by default - the meeting may have been cancelled since the timer was armed.)
+   The scheduler looks a full day ahead so that at 08:55 it already knows about
+   the 09:00 meeting; the popover only ever shows today.
 3. **Is the guard active?** Not disabled, not paused.
 
 If all three hold, it stops a Time Machine backup that is writing to that disk,
@@ -64,17 +66,33 @@ Turn on **Spúšťať pri prihlásení** so it survives a reboot.
 
 | | |
 |---|---|
-| **Disks** | Every external disk seen at least once, plus local Time Machine destinations. Click one to guard it. Right click a disconnected, non-Time-Machine disk to forget it. |
-| **Next meeting** | What the schedule is currently aimed at, when it will eject, and why it will not if something is in the way. **Skip this meeting** ignores that one event. |
-| **Eject now** ⌘E | Eject the guarded disks immediately, ignoring the calendar. |
+| **Disks** | Every external disk seen at least once, plus local Time Machine destinations. Click one to guard it. A disk being backed up shows a spinner and the percentage. Right click to hide one you will never plug in. |
+| **Next meeting** | Only what is still happening **today** - this reports what the guard will do, it is not a second calendar. The calendar name is shown next to the title, which is how you spot it counting a calendar you did not mean to include. **Skip this meeting** ignores that one event, and **Undo skip** stays on screen until the meeting is behind you. |
+| **Eject now** ⌘E | Names what it will act on: *Eject Time Machine WD*, or *Eject 2 disks*. It ejects the disks you **ticked** that are **connected** - not everything plugged in. |
 | **Pause for 1 hour** | Suspend guarding. The row turns into **Resume guarding** while paused. |
 | **Settings…** ⌘, | See below. |
 
-Settings has two tabs:
+Network Time Machine destinations never appear: there is nothing to eject on an
+SMB share, so only `Kind = Local` destinations are listed.
+
+Settings has three tabs:
 
 - **General** - lead time, what counts as a meeting, ignoring *Free* events,
-  ejecting on sleep, launch at login.
+  ejecting on sleep, launch at login, restoring hidden disks.
 - **Calendars** - watch all of them, or tick the ones that matter.
+- **About** - version, source, log and config.
+
+### The menu bar icon
+
+Each state has its own shape rather than a different badge, because a badge
+swap is too quiet to notice during the few seconds an eject takes.
+
+| | |
+|---|---|
+| `externaldrive` | No guarded disk connected. |
+| `externaldrive.fill.badge.checkmark` | A guarded disk is connected and armed. |
+| `eject.fill` | Ejecting right now. |
+| `externaldrive.badge.xmark` | Guarding is off or paused. |
 
 ## CLI
 
@@ -84,9 +102,11 @@ The app is the normal way to use this. The CLI is for setup and debugging.
 tm-eject-guard                  # disks, selection, next meeting
 tm-eject-guard --list           # remembered disks
 tm-eject-guard --watch "WD"     # guard a disk
-tm-eject-guard --forget "WD"    # drop it from the remembered list
+tm-eject-guard --forget "WD"    # hide it from the list
+tm-eject-guard --unhide         # bring every hidden disk back
 tm-eject-guard --calendars      # list calendars and the current selection
 tm-eject-guard --watch-cal Calendar
+tm-eject-guard --unskip         # undo the most recent skipped meeting
 tm-eject-guard --dry-run        # run a pass without ejecting
 tm-eject-guard --eject-now      # eject guarded disks now
 ```

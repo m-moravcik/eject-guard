@@ -40,6 +40,14 @@ struct MenuContent: View {
         // it has ever shown.
         .fixedSize(horizontal: false, vertical: true)
         .background(.ultraThinMaterial)
+        // Time Machine progress is only interesting to someone looking at it,
+        // so this runs while the popover is open and stops when it closes.
+        .task {
+            while !Task.isCancelled {
+                controller.refreshBackupStatus()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
     }
 }
 
@@ -205,7 +213,15 @@ private struct DiskCard: View {
     private var guarded: Bool { controller.isGuarded(disk) }
     private var connected: Bool { controller.isAttached(disk) }
 
+    private var backingUp: Bool { controller.isBackingUp(disk) }
+
     private var subtitle: String {
+        if backingUp {
+            if let percent = controller.backup.percent {
+                return "Backing up… \(Int(percent * 100))%"
+            }
+            return "Backing up…"
+        }
         let watch = guarded ? "Guarded" : "Not guarded"
         return "\(watch) · \(connected ? "Connected" : "Disconnected")"
     }
@@ -238,10 +254,18 @@ private struct DiskCard: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Text(subtitle)
-                        .font(Design.Typography.cardSubtitle)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: Design.Spacing.s) {
+                        if backingUp {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .scaleEffect(0.7)
+                                .frame(width: 10, height: 10)
+                        }
+                        Text(subtitle)
+                            .font(Design.Typography.cardSubtitle)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer(minLength: Design.Spacing.s)
@@ -260,11 +284,10 @@ private struct DiskCard: View {
         .onHover { isHovering = $0 }
         .accessibilityLabel("\(disk.name), \(subtitle)")
         .contextMenu {
-            // Time Machine destinations are rediscovered automatically, so
-            // forgetting one would only make it reappear.
-            if !disk.isTimeMachineDestination && !connected {
-                Button("Forget this disk") { controller.forget(disk) }
-            }
+            // Anything can be hidden, including a Time Machine destination that
+            // belongs to another Mac and will never be plugged into this one.
+            // Settings has the way back.
+            Button("Hide this disk") { controller.hide(disk) }
         }
     }
 }
@@ -278,7 +301,7 @@ private struct NextMeetingSection: View {
         VStack(spacing: Design.Spacing.xs) {
             SectionHeader(title: "NEXT MEETING")
 
-            if let meeting = controller.nextMeeting {
+            if let meeting = controller.nextMeeting, controller.meetingIsToday {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meeting.title ?? "Untitled")
                         .font(Design.Typography.cardTitle)
@@ -306,6 +329,15 @@ private struct NextMeetingSection: View {
                     .padding(.horizontal, Design.Spacing.l)
                     .padding(.bottom, Design.Spacing.xs)
             }
+
+            // Skipping is one click and would otherwise be irreversible, so the
+            // way back stays on screen until the meeting is behind us.
+            if let skipped = controller.skippedMeeting {
+                MenuRow(icon: "arrow.uturn.backward",
+                        label: "Undo skip: \(skipped.title ?? "meeting")") {
+                    controller.undoLastSkip()
+                }
+            }
         }
     }
 
@@ -313,7 +345,7 @@ private struct NextMeetingSection: View {
         switch controller.calendarAccess {
         case .pending: return "Checking your calendar…"
         case .denied: return "No calendar access."
-        case .granted: return "Nothing scheduled in the next 24 hours."
+        case .granted: return "No more meetings today."
         }
     }
 
@@ -338,6 +370,24 @@ private struct FooterBar: View {
 
     private var paused: Bool { (controller.config.pausedUntil ?? .distantPast) > Date() }
 
+    /// Naming the disk beats a bare "Eject now": this acts on guarded disks
+    /// that are connected, which is not the same set as "everything plugged in".
+    private var ejectLabel: String {
+        if controller.isBusy { return "Ejecting…" }
+        let volumes = controller.guardedVolumes
+        switch volumes.count {
+        case 0: return "Eject now"
+        case 1: return "Eject \(volumes[0].name)"
+        default: return "Eject \(volumes.count) disks"
+        }
+    }
+
+    private var ejectHelp: String {
+        let volumes = controller.guardedVolumes
+        guard !volumes.isEmpty else { return "No guarded disk is connected." }
+        return "Ejects \(volumes.map(\.name).joined(separator: ", ")). Disks you have not ticked are left alone."
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Divider()
@@ -358,11 +408,12 @@ private struct FooterBar: View {
 
                 MenuRow(
                     icon: "eject",
-                    label: controller.isBusy ? "Ejecting…" : "Eject now",
+                    label: ejectLabel,
                     shortcut: "⌘E",
                     isEnabled: !controller.guardedVolumes.isEmpty && !controller.isBusy
                 ) { controller.ejectNow() }
                     .keyboardShortcut("e")
+                    .help(ejectHelp)
 
                 if paused {
                     MenuRow(icon: "play.circle", label: "Resume guarding") {

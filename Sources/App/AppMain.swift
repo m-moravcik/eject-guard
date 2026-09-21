@@ -20,8 +20,7 @@ struct TMEjectGuardApp: App {
             MenuContent()
                 .environment(controller)
         } label: {
-            Image(systemName: statusSymbol)
-                .accessibilityLabel("TM Eject Guard")
+            StatusIcon(controller: controller)
         }
         .menuBarExtraStyle(.window)
 
@@ -30,13 +29,50 @@ struct TMEjectGuardApp: App {
                 .environment(controller)
         }
     }
+}
 
-    /// The icon carries the only state worth reading at a glance: whether a
-    /// disk is actually being guarded right now.
-    private var statusSymbol: String {
-        if controller.isBusy { return "externaldrive.badge.minus" }
-        if !controller.config.isActive { return "externaldrive.badge.xmark" }
-        if controller.guardedVolumes.isEmpty { return "externaldrive" }
-        return "externaldrive.badge.checkmark"
+/// The menu bar icon, and the only state most people will ever read.
+///
+/// A View rather than a computed symbol name in the Scene body: observation is
+/// registered when a view body is evaluated, so this is what reliably redraws
+/// when a disk is plugged in or an eject starts.
+private struct StatusIcon: View {
+    let controller: GuardController
+
+    private enum State {
+        case ejecting, off, armed, idle
+    }
+
+    private var state: State {
+        if controller.isBusy { return .ejecting }
+        if !controller.config.isActive { return .off }
+        return controller.guardedVolumes.isEmpty ? .idle : .armed
+    }
+
+    /// Each state gets its own shape, not just a different badge. A badge swap
+    /// is too quiet to notice during the few seconds an eject takes.
+    private var symbol: String {
+        switch state {
+        case .ejecting: return "eject.fill"
+        case .off: return "externaldrive.badge.xmark"
+        case .armed: return "externaldrive.fill.badge.checkmark"
+        case .idle: return "externaldrive"
+        }
+    }
+
+    private var label: String {
+        switch state {
+        case .ejecting: return "Ejecting"
+        case .off: return "Guarding is off"
+        case .armed:
+            let names = controller.guardedVolumes.map(\.name).joined(separator: ", ")
+            return "Guarding \(names)"
+        case .idle: return "No guarded disk connected"
+        }
+    }
+
+    var body: some View {
+        Image(systemName: symbol)
+            .accessibilityLabel("TM Eject Guard: \(label)")
     }
 }

@@ -123,6 +123,10 @@ struct AttachedVolume {
 struct GuardConfig: Codable, Equatable {
     var watchedDiskIDs: [String] = []
     var knownDisks: [KnownDisk] = []
+    /// Disks the user hid. Time Machine destinations are rediscovered on every
+    /// pass, so without this there would be no way to get rid of one that is
+    /// never going to be plugged into this Mac.
+    var dismissedDiskIDs: [String] = []
     /// When true every calendar counts and `watchedCalendarIDs` is ignored.
     /// A separate flag rather than "empty means all", because that would turn
     /// unticking the last calendar into watching all of them.
@@ -157,7 +161,8 @@ struct GuardConfig: Codable, Equatable {
     // but a blank config. Adding one field would silently wipe every setting
     // the user had. Decoding each key on its own keeps old files readable.
     enum CodingKeys: String, CodingKey {
-        case watchedDiskIDs, knownDisks, watchAllCalendars, watchedCalendarIDs
+        case watchedDiskIDs, knownDisks, dismissedDiskIDs
+        case watchAllCalendars, watchedCalendarIDs
         case leadMinutes, minAttendees, enabled, ignoreFreeEvents, ejectOnSleep
         case pausedUntil, skippedEventIDs, ejectAttempts, ejectRetryDelay
     }
@@ -172,6 +177,7 @@ struct GuardConfig: Codable, Equatable {
 
         watchedDiskIDs = value(.watchedDiskIDs, fallback.watchedDiskIDs)
         knownDisks = value(.knownDisks, fallback.knownDisks)
+        dismissedDiskIDs = value(.dismissedDiskIDs, fallback.dismissedDiskIDs)
         watchAllCalendars = value(.watchAllCalendars, fallback.watchAllCalendars)
         watchedCalendarIDs = value(.watchedCalendarIDs, fallback.watchedCalendarIDs)
         leadMinutes = value(.leadMinutes, fallback.leadMinutes)
@@ -394,7 +400,10 @@ enum Disks {
                 lastSeen: Date()))
         }
 
-        config.knownDisks = known.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let dismissed = Set(config.dismissedDiskIDs)
+        config.knownDisks = known
+            .filter { !dismissed.contains($0.id) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// The attached volume backing a remembered disk, if it is plugged in.
@@ -404,6 +413,39 @@ enum Disks {
             if let tm = disk.tmDestinationID, tm == volume.tmDestinationID { return true }
             return false
         }
+    }
+}
+
+// MARK: - Backup status
+
+/// What Time Machine is doing right now. Read on demand while the popover is
+/// open, never on a background schedule.
+struct BackupStatus {
+    var running = false
+    var mountPoint: String?
+    /// 0...1, or nil when Time Machine has not worked out a figure yet.
+    var percent: Double?
+
+    static func current() -> BackupStatus {
+        let output = Shell.run("/usr/bin/tmutil", ["status", "-X"])
+        guard output.status == 0, let root = Shell.plist(from: output.output) else {
+            return BackupStatus()
+        }
+        var status = BackupStatus()
+        status.running = (root["Running"] as? NSNumber)?.boolValue ?? false
+        status.mountPoint = root["DestinationMountPoint"] as? String
+        // tmutil reports -1 while it is still sizing the job up.
+        if let raw = (root["Percent"] as? NSNumber)?.doubleValue ?? Double(root["Percent"] as? String ?? ""),
+           raw >= 0 {
+            status.percent = min(max(raw, 0), 1)
+        }
+        return status
+    }
+
+    func isBackingUp(to path: String) -> Bool {
+        // A running backup with no destination reported is still a reason to
+        // show activity on the one disk being guarded.
+        running && (mountPoint == nil || mountPoint == path)
     }
 }
 
@@ -518,13 +560,8 @@ enum Ejector {
     /// Stop a backup that is writing to this disk. A backup to another
     /// destination is left running.
     private static func stopBackupIfTargeting(_ volume: AttachedVolume) {
-        let status = Shell.run("/usr/bin/tmutil", ["status", "-X"])
-        let root = Shell.plist(from: status.output)
-        // If the status is unreadable, assume a backup is running: stopping one
-        // that is not there is harmless, ejecting under one is not.
-        let running = (root?["Running"] as? NSNumber)?.boolValue ?? true
-        let destination = root?["DestinationMountPoint"] as? String
-        guard running, destination == nil || destination == volume.path else { return }
+        let status = BackupStatus.current()
+        guard status.isBackingUp(to: volume.path) else { return }
         let stop = Shell.run("/usr/bin/tmutil", ["stopbackup"])
         Log.write("tmutil stopbackup -> status \(stop.status)\(stop.output.isEmpty ? "" : ": \(stop.output)")")
     }

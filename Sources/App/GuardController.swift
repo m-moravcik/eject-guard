@@ -25,6 +25,9 @@ final class GuardController {
     private(set) var isBusy = false
     private(set) var lastFailure: String?
 
+    /// Refreshed only while the popover is open - see `refreshBackupStatus`.
+    private(set) var backup = BackupStatus()
+
     /// Calendars offered in Settings. Read once access is granted.
     private(set) var calendars: [EKCalendar] = []
 
@@ -45,9 +48,10 @@ final class GuardController {
         meeting.eventIdentifier ?? "\(meeting.startDate.timeIntervalSince1970)"
     }
 
-    /// How far ahead to look for the meeting we will schedule against. A full
-    /// day so that in the evening the popover still names tomorrow's first
-    /// meeting instead of claiming there is nothing.
+    /// How far ahead to look for the meeting to schedule against. A full day,
+    /// because at 08:55 the guard must already know about the 09:00 meeting
+    /// even though it was still "tomorrow" an hour ago. What the popover shows
+    /// is a separate question - see `meetingIsToday`.
     private let horizonMinutes: Double = 24 * 60
     /// Backstop cadence. Only covers a missed notification, so it can be slow.
     private let heartbeatSeconds: TimeInterval = 300
@@ -60,7 +64,36 @@ final class GuardController {
             .compactMap { Disks.attachedVolume(for: $0, among: attached) }
     }
 
+    /// The scheduler looks a day ahead; the popover only reports what is still
+    /// happening today. Tomorrow's first meeting is calendar noise here.
+    var meetingIsToday: Bool {
+        guard let meeting = nextMeeting else { return false }
+        return Foundation.Calendar.current.isDateInToday(meeting.startDate)
+    }
+
+    /// The meeting most recently skipped, while it is still ahead of us. This
+    /// is what makes the skip undoable instead of a one way door.
+    var skippedMeeting: EKEvent? {
+        guard let id = config.skippedEventIDs.last,
+              let event = store.event(withIdentifier: id),
+              event.startDate > Date() else { return nil }
+        return event
+    }
+
     func isGuarded(_ disk: KnownDisk) -> Bool { config.watchedDiskIDs.contains(disk.id) }
+
+    func isBackingUp(_ disk: KnownDisk) -> Bool {
+        guard let volume = Disks.attachedVolume(for: disk, among: attached) else { return false }
+        return backup.isBackingUp(to: volume.path)
+    }
+
+    /// Polled by the popover while it is on screen. Deliberately not on a
+    /// background schedule: nobody needs to know about a backup they cannot see.
+    func refreshBackupStatus() {
+        backup = BackupStatus.current()
+    }
+
+    var hiddenDiskCount: Int { config.dismissedDiskIDs.count }
 
     func isAttached(_ disk: KnownDisk) -> Bool {
         Disks.attachedVolume(for: disk, among: attached) != nil
@@ -255,11 +288,23 @@ final class GuardController {
         }
     }
 
-    func forget(_ disk: KnownDisk) {
+    /// Hides a disk for good. Time Machine destinations are rediscovered on
+    /// every pass, so remembering the dismissal is the only way to keep one
+    /// that will never be plugged into this Mac out of the list.
+    func hide(_ disk: KnownDisk) {
         update { config in
             config.watchedDiskIDs.removeAll { $0 == disk.id }
             config.knownDisks.removeAll { $0.id == disk.id }
+            if !config.dismissedDiskIDs.contains(disk.id) {
+                config.dismissedDiskIDs.append(disk.id)
+            }
         }
+    }
+
+    func restoreHiddenDisks() {
+        update { $0.dismissedDiskIDs = [] }
+        reloadDisks()
+        reschedule()
     }
 
     var watchingAllCalendars: Bool { config.watchAllCalendars }
@@ -310,6 +355,13 @@ final class GuardController {
             if config.skippedEventIDs.count > 50 {
                 config.skippedEventIDs.removeFirst(config.skippedEventIDs.count - 50)
             }
+        }
+    }
+
+    func undoLastSkip() {
+        update { config in
+            guard !config.skippedEventIDs.isEmpty else { return }
+            config.skippedEventIDs.removeLast()
         }
     }
 
