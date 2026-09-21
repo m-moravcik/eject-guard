@@ -13,6 +13,7 @@ func usage() -> Never {
       tm-eject-guard --list           list remembered disks
       tm-eject-guard --watch NAME     guard this disk (name or id, case insensitive)
       tm-eject-guard --unwatch NAME   stop guarding it
+      tm-eject-guard --forget NAME    drop a disk from the remembered list
       tm-eject-guard --run            run one pass now (ejects if a meeting is due)
       tm-eject-guard --dry-run        same, but never eject
       tm-eject-guard --eject-now      eject every guarded disk regardless of calendar
@@ -79,6 +80,7 @@ while !arguments.isEmpty {
     case "--eject-now": action = "eject-now"
     case "--watch": action = "watch"; pendingValue = value()
     case "--unwatch": action = "unwatch"; pendingValue = value()
+    case "--forget": action = "forget"; pendingValue = value()
     case "--calendars": action = "calendars"
     case "--watch-cal": action = "watch-cal"; pendingValue = value()
     case "--unwatch-cal": action = "unwatch-cal"; pendingValue = value()
@@ -104,20 +106,28 @@ switch action {
 case "list":
     printDisks()
 
-case "watch", "unwatch":
+case "watch", "unwatch", "forget":
     guard let needle = pendingValue, let disk = findDisk(needle) else {
         FileHandle.standardError.write("no remembered disk matches \"\(pendingValue ?? "")\"\n".data(using: .utf8)!)
         printDisks()
         exit(1)
     }
     ConfigStore.mutate { config in
-        if action == "watch" {
+        switch action {
+        case "watch":
             if !config.watchedDiskIDs.contains(disk.id) { config.watchedDiskIDs.append(disk.id) }
-        } else {
+        case "forget":
+            config.watchedDiskIDs.removeAll { $0 == disk.id }
+            config.knownDisks.removeAll { $0.id == disk.id }
+        default:
             config.watchedDiskIDs.removeAll { $0 == disk.id }
         }
     }
-    print("\(action == "watch" ? "guarding" : "no longer guarding"): \(disk.name)")
+    switch action {
+    case "watch": print("guarding: \(disk.name)")
+    case "forget": print("forgotten: \(disk.name)")
+    default: print("no longer guarding: \(disk.name)")
+    }
 
 case "calendars", "watch-cal", "unwatch-cal":
     let store = EKEventStore()

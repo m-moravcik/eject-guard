@@ -216,8 +216,11 @@ enum Disks {
 
         return urls.compactMap { url -> AttachedVolume? in
             guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
-            guard values.volumeIsInternal == false,
-                  values.volumeIsEjectable == true,
+            // volumeIsInternal is nil for external media rather than false, so
+            // test for "not internal" instead of "external". Ejectable is the
+            // load bearing check: every built-in volume reports false.
+            guard values.volumeIsEjectable == true,
+                  values.volumeIsInternal != true,
                   values.volumeIsRootFileSystem != true else { return nil }
             let path = url.path
             guard isMountedVolume(path) else { return nil }

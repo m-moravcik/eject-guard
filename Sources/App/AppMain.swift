@@ -260,6 +260,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             submenu.addItem(.separator())
             submenu.addInfo("Disky sa pridajú samé, keď ich raz pripojíš")
+
+            // Without this the list only ever grows: a disk you used once stays
+            // in the menu forever. Time Machine destinations come back on their
+            // own, so only the rest can really be forgotten.
+            let forgettable = config.knownDisks.filter {
+                Disks.attachedVolume(for: $0, among: attached) == nil && !$0.isTimeMachineDestination
+            }
+            if !forgettable.isEmpty {
+                submenu.addSubmenu("Zabudnúť disk") { forget in
+                    for disk in forgettable {
+                        forget.addItem(ActionMenuItem(disk.name) {
+                            ConfigStore.mutate { stored in
+                                stored.watchedDiskIDs.removeAll { $0 == disk.id }
+                                stored.knownDisks.removeAll { $0.id == disk.id }
+                            }
+                            self.refreshIcon()
+                        })
+                    }
+                }
+            }
         }
 
         let guarded = GuardRunner.guardedAttachedVolumes(config)

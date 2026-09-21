@@ -49,7 +49,7 @@ Turn on **Spúšťať pri prihlásení** so it survives a reboot.
 
 | Item | What it does |
 |---|---|
-| Sledované disky | Which disks to guard. Attached ones are marked `● pripojený`. |
+| Sledované disky | Which disks to guard. Attached ones are marked `● pripojený`. Detached ones can be forgotten. |
 | Odpojiť teraz | Eject the guarded disks right now, ignoring the calendar. |
 | Kalendáre | Which calendars to watch. Default is all of them. |
 | Predstih | How long before a meeting to eject. |
@@ -66,6 +66,7 @@ The app is the normal way to use this. The CLI is for setup and debugging.
 tm-eject-guard                  # disks, selection, next meeting
 tm-eject-guard --list           # remembered disks
 tm-eject-guard --watch "WD"     # guard a disk
+tm-eject-guard --forget "WD"    # drop it from the remembered list
 tm-eject-guard --calendars      # list calendars and the current selection
 tm-eject-guard --watch-cal Calendar
 tm-eject-guard --dry-run        # run a pass without ejecting
