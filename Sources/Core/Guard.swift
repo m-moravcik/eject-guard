@@ -8,11 +8,31 @@
 import EventKit
 import Foundation
 
+// MARK: - Untrusted text
+
+/// Meeting titles come from calendar invitations and volume names come from
+/// whatever disk was plugged in. Both end up in the log and, for the command
+/// line tool, inside an AppleScript string literal. Control characters break
+/// the second and forge lines in the first.
+enum Sanitize {
+    static func oneLine(_ text: String, max: Int = 200) -> String {
+        var out = String()
+        out.reserveCapacity(min(text.count, max))
+        for scalar in text.unicodeScalars {
+            if out.count >= max { out += "…"; break }
+            out.append(CharacterSet.controlCharacters.contains(scalar) ? " " : Character(scalar))
+        }
+        return out.trimmingCharacters(in: .whitespaces)
+    }
+}
+
 // MARK: - Logging
 
 enum Log {
     static let url = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/tm-eject-guard.log")
+
+    nonisolated(unsafe) private static var permissionsChecked = false
 
     private static let stamp: DateFormatter = {
         let f = DateFormatter()
@@ -21,7 +41,9 @@ enum Log {
     }()
 
     static func write(_ message: String) {
-        let line = "\(stamp.string(from: Date()))  \(message)\n"
+        // One entry per line, always: a newline from a meeting title would
+        // otherwise let anyone forge a log record.
+        let line = "\(stamp.string(from: Date()))  \(Sanitize.oneLine(message, max: 500))\n"
         guard let data = line.data(using: .utf8) else { return }
         if isatty(STDERR_FILENO) == 1 {
             FileHandle.standardError.write(data)
@@ -30,6 +52,19 @@ enum Log {
         if let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
            size > 512_000 {
             try? FileManager.default.removeItem(at: url)
+        }
+        // The log names your meetings, so it is nobody else's business on a
+        // shared Mac. Create it 0600 rather than inheriting the umask, and
+        // repair a file left 0644 by an earlier version - once per process,
+        // because this runs on every line.
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(
+                atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+            permissionsChecked = true
+        } else if !permissionsChecked {
+            permissionsChecked = true
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: url.path)
         }
         if let handle = try? FileHandle(forWritingTo: url) {
             handle.seekToEndOfFile()
@@ -44,18 +79,55 @@ enum Log {
 // MARK: - Shell
 
 enum Shell {
+    private final class Box: @unchecked Sendable {
+        var data = Data()
+    }
+
+    /// Run a command and wait for it.
+    ///
+    /// Deliberately does **not** use `Process.waitUntilExit()`. That method runs
+    /// the run loop while it waits, so on the main thread it re-enters whatever
+    /// the run loop delivers next - including our own volume notifications. That
+    /// is how this app deadlocked on a non-recursive lock it already held. A
+    /// semaphore blocks the calling thread and nothing else.
+    ///
+    /// The timeout is the second half of the same lesson: a wedged child process
+    /// must never be able to hold anything forever.
     @discardableResult
-    static func run(_ launchPath: String, _ arguments: [String]) -> (status: Int32, output: String) {
+    static func run(
+        _ launchPath: String,
+        _ arguments: [String],
+        timeout: TimeInterval = 20
+    ) -> (status: Int32, output: String) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: launchPath)
         task.arguments = arguments
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = pipe
+
+        let finished = DispatchSemaphore(value: 0)
+        task.terminationHandler = { _ in finished.signal() }
+
         do { try task.run() } catch { return (-1, "\(error)") }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        let out = String(data: data, encoding: .utf8) ?? ""
+
+        // Drain the pipe on another thread: a child that fills the buffer would
+        // block forever if nobody is reading while we wait.
+        let box = Box()
+        let drained = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .utility).async {
+            box.data = pipe.fileHandleForReading.readDataToEndOfFile()
+            drained.signal()
+        }
+
+        if finished.wait(timeout: .now() + timeout) == .timedOut {
+            Log.write("timeout after \(Int(timeout))s: \(launchPath) \(arguments.joined(separator: " "))")
+            task.terminate()
+            _ = finished.wait(timeout: .now() + 5)
+        }
+        _ = drained.wait(timeout: .now() + 5)
+
+        let out = String(data: box.data, encoding: .utf8) ?? ""
         return (task.terminationStatus, out.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
@@ -76,7 +148,9 @@ enum Shell {
              .replacingOccurrences(of: "\"", with: "\\\"")
         }
         run("/usr/bin/osascript", ["-e",
-            "display notification \"\(esc(body))\" with title \"\(esc(title))\" sound name \"Submarine\""])
+            "display notification \"\(esc(Sanitize.oneLine(body)))\" "
+            + "with title \"\(esc(Sanitize.oneLine(title)))\" sound name \"Submarine\""],
+            timeout: 15)
     }
 }
 
@@ -111,7 +185,7 @@ struct KnownDisk: Codable, Equatable {
 }
 
 /// A disk that is plugged in right now.
-struct AttachedVolume {
+struct AttachedVolume: Equatable {
     var path: String
     var name: String
     var volumeUUID: String?
@@ -139,10 +213,25 @@ struct GuardConfig: Codable, Equatable {
     var ignoreFreeEvents: Bool = false
     /// Also eject when the Mac goes to sleep, not just before a meeting.
     var ejectOnSleep: Bool = false
-    /// Guard is off until this moment ("pause for an hour").
+    /// Guard is off until this moment.
     var pausedUntil: Date?
-    /// Events the user chose to ignore once.
+    /// How long the popover's pause row pauses for. A setting rather than a
+    /// submenu, so the popover keeps one row and stays reviewable.
+    var pauseHours: Double = 1
+    /// Events the user chose to ignore once. Bounded - see `skip(_:)`.
     var skippedEventIDs: [String] = []
+
+    static let maxSkippedEvents = 50
+
+    /// Record a skip, keeping the list bounded. Stale identifiers cost nothing
+    /// but the file should not grow forever.
+    mutating func skip(_ eventID: String) {
+        skippedEventIDs.removeAll { $0 == eventID }
+        skippedEventIDs.append(eventID)
+        if skippedEventIDs.count > Self.maxSkippedEvents {
+            skippedEventIDs.removeFirst(skippedEventIDs.count - Self.maxSkippedEvents)
+        }
+    }
 
     // Retry while Spotlight or backupd still holds the volume.
     var ejectAttempts: Int = 6
@@ -164,7 +253,7 @@ struct GuardConfig: Codable, Equatable {
         case watchedDiskIDs, knownDisks, dismissedDiskIDs
         case watchAllCalendars, watchedCalendarIDs
         case leadMinutes, minAttendees, enabled, ignoreFreeEvents, ejectOnSleep
-        case pausedUntil, skippedEventIDs, ejectAttempts, ejectRetryDelay
+        case pausedUntil, pauseHours, skippedEventIDs, ejectAttempts, ejectRetryDelay
     }
 
     init(from decoder: Decoder) throws {
@@ -186,6 +275,7 @@ struct GuardConfig: Codable, Equatable {
         ignoreFreeEvents = value(.ignoreFreeEvents, fallback.ignoreFreeEvents)
         ejectOnSleep = value(.ejectOnSleep, fallback.ejectOnSleep)
         pausedUntil = try? container.decodeIfPresent(Date.self, forKey: .pausedUntil)
+        pauseHours = value(.pauseHours, fallback.pauseHours)
         skippedEventIDs = value(.skippedEventIDs, fallback.skippedEventIDs)
         ejectAttempts = value(.ejectAttempts, fallback.ejectAttempts)
         ejectRetryDelay = value(.ejectRetryDelay, fallback.ejectRetryDelay)
@@ -203,7 +293,20 @@ enum ConfigStore {
 
     static func load() -> GuardConfig {
         lock.lock(); defer { lock.unlock() }
+        repairPermissionsOnce()
         return readUnlocked()
+    }
+
+    nonisolated(unsafe) private static var permissionsChecked = false
+
+    /// An earlier version wrote this file with the default umask.
+    private static func repairPermissionsOnce() {
+        guard !permissionsChecked else { return }
+        permissionsChecked = true
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     static func save(_ config: GuardConfig) {
@@ -239,50 +342,51 @@ enum ConfigStore {
     }
 
     private static func writeUnlocked(_ config: GuardConfig) {
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(config) else { return }
         try? data.write(to: url, options: .atomic)
+        // An atomic write replaces the file, so the mode has to be reapplied.
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }
 
 // MARK: - Disk discovery
 
+/// A local Time Machine destination. Network destinations are dropped at the
+/// source: there is no local disk to eject on an SMB share.
+struct TimeMachineDestination: Equatable {
+    var id: String
+    var name: String
+    var mountPoint: String?
+}
+
+/// One reading of what is plugged in. Producing this spawns processes;
+/// consuming it does not. Keeping the two apart is what lets the app scan off
+/// the main thread and merge under a lock without ever holding the lock across
+/// a process launch.
+struct DiskSnapshot: Equatable {
+    var destinations: [TimeMachineDestination] = []
+    var attached: [AttachedVolume] = []
+}
+
 enum Disks {
-    private static let destinationCacheLock = NSLock()
-    private static var destinationCache: (value: [(id: String, name: String, mountPoint: String?)], at: Date)?
+    // MARK: Scanning (spawns processes - never call while holding a lock)
 
-    /// Drop the cached destination list. Called when a volume mounts or
-    /// unmounts, which is the only time a MountPoint can change.
-    static func invalidateDestinationCache() {
-        destinationCacheLock.lock(); defer { destinationCacheLock.unlock() }
-        destinationCache = nil
+    static func scan() -> DiskSnapshot {
+        let destinations = readDestinations()
+        return DiskSnapshot(
+            destinations: destinations,
+            attached: attachedVolumes(destinations: destinations))
     }
 
-    /// Mount points of local Time Machine destinations, keyed by destination UUID.
-    /// A destination with no entry here is simply not plugged in.
-    ///
-    /// Cached for a few seconds: one pass asks for this list several times, and
-    /// each miss costs a `tmutil` process.
-    static func timeMachineDestinations() -> [(id: String, name: String, mountPoint: String?)] {
-        destinationCacheLock.lock()
-        if let cache = destinationCache, Date().timeIntervalSince(cache.at) < 5 {
-            defer { destinationCacheLock.unlock() }
-            return cache.value
-        }
-        destinationCacheLock.unlock()
-
-        let fresh = readDestinations()
-        destinationCacheLock.lock()
-        destinationCache = (fresh, Date())
-        destinationCacheLock.unlock()
-        return fresh
-    }
-
-    private static func readDestinations() -> [(id: String, name: String, mountPoint: String?)] {
-        let info = Shell.run("/usr/bin/tmutil", ["destinationinfo", "-X"])
+    private static func readDestinations() -> [TimeMachineDestination] {
+        let info = Shell.run("/usr/bin/tmutil", ["destinationinfo", "-X"], timeout: 15)
         guard info.status == 0,
               let root = Shell.plist(from: info.output),
               let destinations = root["Destinations"] as? [[String: Any]]
@@ -292,8 +396,10 @@ enum Disks {
             // Network destinations have no local disk to eject.
             guard (destination["Kind"] as? String) == "Local",
                   let id = destination["ID"] as? String else { return nil }
-            let name = (destination["Name"] as? String) ?? "Time Machine"
-            return (id, name, destination["MountPoint"] as? String)
+            return TimeMachineDestination(
+                id: id,
+                name: (destination["Name"] as? String) ?? "Time Machine",
+                mountPoint: destination["MountPoint"] as? String)
         }
     }
 
@@ -301,7 +407,7 @@ enum Disks {
     ///
     /// Internal and non-ejectable volumes are filtered out here, which is what
     /// keeps the boot disk out of reach of every later step.
-    static func attachedVolumes() -> [AttachedVolume] {
+    static func attachedVolumes(destinations: [TimeMachineDestination]) -> [AttachedVolume] {
         let keys: [URLResourceKey] = [
             .volumeIsInternalKey, .volumeIsEjectableKey, .volumeIsBrowsableKey,
             .volumeUUIDStringKey, .volumeLocalizedNameKey, .volumeIsRootFileSystemKey,
@@ -309,8 +415,6 @@ enum Disks {
         guard let urls = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes])
         else { return [] }
-
-        let destinations = timeMachineDestinations()
 
         return urls.compactMap { url -> AttachedVolume? in
             guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
@@ -323,14 +427,15 @@ enum Disks {
             let path = url.path
             guard isMountedVolume(path) else { return nil }
 
-            let tmID = destinations.first { $0.mountPoint == path }?.id
             return AttachedVolume(
                 path: path,
                 name: values.volumeLocalizedName ?? url.lastPathComponent,
                 volumeUUID: values.volumeUUIDString,
-                tmDestinationID: tmID)
+                tmDestinationID: destinations.first { $0.mountPoint == path }?.id)
         }
     }
+
+    // MARK: Pure logic (no processes, no I/O - this is the part under test)
 
     /// A path is only a candidate if it is a directory directly inside /Volumes.
     /// Last line of defence before anything reaches `diskutil eject`.
@@ -345,10 +450,10 @@ enum Disks {
         return true
     }
 
-    /// Merge what is plugged in now, and what Time Machine knows about, into the
-    /// remembered list. Disks are never dropped: the user picks from this list
-    /// while the disk sits in a drawer.
-    static func refreshKnownDisks(in config: inout GuardConfig) {
+    /// Fold a snapshot into the remembered list. Disks are never dropped unless
+    /// the user hid them: the list is what you pick from while the disk sits in
+    /// a drawer.
+    static func merge(_ snapshot: DiskSnapshot, into config: inout GuardConfig) {
         var known = config.knownDisks
 
         func upsert(_ disk: KnownDisk) {
@@ -382,7 +487,7 @@ enum Disks {
             }
         }
 
-        for destination in timeMachineDestinations() {
+        for destination in snapshot.destinations {
             upsert(KnownDisk(
                 id: destination.id,
                 name: destination.name,
@@ -391,7 +496,7 @@ enum Disks {
                 lastSeen: nil))
         }
 
-        for volume in attachedVolumes() {
+        for volume in snapshot.attached {
             upsert(KnownDisk(
                 id: volume.volumeUUID ?? volume.tmDestinationID ?? volume.path,
                 name: volume.name,
@@ -406,6 +511,12 @@ enum Disks {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// Scan and merge in one step. Fine for the command line tool, which is
+    /// single threaded; the app scans and merges separately.
+    static func refreshKnownDisks(in config: inout GuardConfig) {
+        merge(scan(), into: &config)
+    }
+
     /// The attached volume backing a remembered disk, if it is plugged in.
     static func attachedVolume(for disk: KnownDisk, among volumes: [AttachedVolume]) -> AttachedVolume? {
         volumes.first { volume in
@@ -413,6 +524,13 @@ enum Disks {
             if let tm = disk.tmDestinationID, tm == volume.tmDestinationID { return true }
             return false
         }
+    }
+
+    /// Remembered disks the user guards, that are present in this snapshot.
+    static func guardedVolumes(_ config: GuardConfig, among volumes: [AttachedVolume]) -> [AttachedVolume] {
+        config.knownDisks
+            .filter { config.watchedDiskIDs.contains($0.id) }
+            .compactMap { attachedVolume(for: $0, among: volumes) }
     }
 }
 
@@ -426,21 +544,27 @@ struct BackupStatus {
     /// 0...1, or nil when Time Machine has not worked out a figure yet.
     var percent: Double?
 
+    /// Spawns `tmutil`, so never call this on the main thread.
     static func current() -> BackupStatus {
-        let output = Shell.run("/usr/bin/tmutil", ["status", "-X"])
+        let output = Shell.run("/usr/bin/tmutil", ["status", "-X"], timeout: 15)
         guard output.status == 0, let root = Shell.plist(from: output.output) else {
             return BackupStatus()
         }
-        var status = BackupStatus()
-        status.running = (root["Running"] as? NSNumber)?.boolValue ?? false
-        status.mountPoint = root["DestinationMountPoint"] as? String
-        // tmutil reports -1 while it is still sizing the job up.
-        if let raw = (root["Percent"] as? NSNumber)?.doubleValue ?? Double(root["Percent"] as? String ?? ""),
-           raw >= 0 {
-            status.percent = min(max(raw, 0), 1)
-        }
-        return status
+        return BackupStatus(plist: root)
     }
+
+    /// Pure: parsing is separated from running the tool so it can be tested.
+    init(plist root: [String: Any]) {
+        running = (root["Running"] as? NSNumber)?.boolValue ?? false
+        mountPoint = root["DestinationMountPoint"] as? String
+        // tmutil reports -1 while it is still sizing the job up.
+        if let raw = (root["Percent"] as? NSNumber)?.doubleValue
+            ?? Double(root["Percent"] as? String ?? ""), raw >= 0 {
+            percent = min(max(raw, 0), 1)
+        }
+    }
+
+    init() {}
 
     func isBackingUp(to path: String) -> Bool {
         // A running backup with no destination reported is still a reason to
@@ -540,7 +664,7 @@ enum Ejector {
 
         var lastOutput = ""
         for attempt in 1...max(1, config.ejectAttempts) {
-            let result = Shell.run("/usr/sbin/diskutil", ["eject", volume.path])
+            let result = Shell.run("/usr/sbin/diskutil", ["eject", volume.path], timeout: 60)
             if result.status == 0 {
                 Log.write("ejected \(volume.name) on attempt \(attempt)")
                 return Result(volume: volume, succeeded: true, detail: "ok")
@@ -562,12 +686,15 @@ enum Ejector {
     private static func stopBackupIfTargeting(_ volume: AttachedVolume) {
         let status = BackupStatus.current()
         guard status.isBackingUp(to: volume.path) else { return }
-        let stop = Shell.run("/usr/bin/tmutil", ["stopbackup"])
+        // Measured at ~11 s on a real backup, so the default budget is too tight.
+        let stop = Shell.run("/usr/bin/tmutil", ["stopbackup"], timeout: 120)
         Log.write("tmutil stopbackup -> status \(stop.status)\(stop.output.isEmpty ? "" : ": \(stop.output)")")
     }
 
     static func blockingProcesses(at path: String) -> String {
-        let lsof = Shell.run("/usr/sbin/lsof", ["+D", path])
+        // lsof walks the whole volume, which is slow on a big disk and is only
+        // ever used to make an error message useful.
+        let lsof = Shell.run("/usr/sbin/lsof", ["+D", path], timeout: 30)
         let names = Set(lsof.output.split(separator: "\n").dropFirst().compactMap {
             $0.split(separator: " ").first.map(String.init)
         })
@@ -584,8 +711,8 @@ enum GuardRunner {
         var failed: [(name: String, detail: String)] = []
     }
 
-    /// One pass. Safe to call every 30 s: once a disk is ejected it is no longer
-    /// attached, so every later pass is a no-op.
+    /// One full pass: scan, decide, eject. Used by the command line tool and by
+    /// the app's timer. Spawns processes, so never call it on the main thread.
     @discardableResult
     static func tick(store: EKEventStore, dryRun: Bool = false) -> Outcome {
         let config = ConfigStore.mutate { config -> GuardConfig in
@@ -625,12 +752,10 @@ enum GuardRunner {
         Ejector.eject(volume, config: config, dryRun: dryRun)
     }
 
-    /// Guarded disks that are plugged in right now.
+    /// Guarded disks that are plugged in right now. Scans, so it must not run
+    /// on the main thread.
     static func guardedAttachedVolumes(_ config: GuardConfig) -> [AttachedVolume] {
-        let attached = Disks.attachedVolumes()
-        return config.knownDisks
-            .filter { config.watchedDiskIDs.contains($0.id) }
-            .compactMap { Disks.attachedVolume(for: $0, among: attached) }
+        Disks.guardedVolumes(config, among: Disks.scan().attached)
     }
 
     /// Eject every guarded disk without consulting the calendar. Used by the

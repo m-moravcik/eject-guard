@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Unit tests
+        run: swift test
+
+      # The shipping binaries are assembled by build.sh, not by SwiftPM, so
+      # building them here is the only thing that proves they still compile.
+      - name: Build app and CLI
+        run: ./build.sh
+
+      - name: Check the bundle
+        run: |
+          set -euo pipefail
+          APP="build/TM Eject Guard.app"
+          codesign --verify --strict --verbose=2 "$APP"
+          # A menu bar utility that shows up in the Dock is a regression.
+          /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP/Contents/Info.plist" | grep -q true
+          # EventKit is denied outright under the hardened runtime without this.
+          grep -q "personal-information.calendars" App/TMEjectGuard.entitlements
+          test -x "$APP/Contents/MacOS/TMEjectGuard"
+          test -x build/tm-eject-guard
+
+      - name: Guard against shell invocation
+        # Every external call must go through Process with an argument array.
+        # One `sh -c` and command injection becomes reachable.
+        run: |
+          set -euo pipefail
+          # Strip comments first so the rule can be explained in a comment.
+          if grep -rn --include='*.swift' -vE '^\s*(//|///|\*)' Sources/ \
+             | grep -qE '"/bin/(ba)?sh"|sh -c'; then
+            echo "a shell is being invoked - see the security note in README"; exit 1
+          fi
+
+      - name: Guard against blocking the main thread
+        # waitUntilExit runs the run loop, which re-enters our own notification
+        # handlers. That deadlocked the app once already.
+        run: |
+          set -euo pipefail
+          if grep -rn --include='*.swift' -vE '^\s*(//|///|\*)' Sources/ \
+             | grep -q 'waitUntilExit'; then
+            echo "waitUntilExit is banned - see Shell.run"; exit 1
+          fi

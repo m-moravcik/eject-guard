@@ -1,6 +1,7 @@
 import AppKit
 import EventKit
 import Observation
+import UserNotifications
 
 /// Observable state behind the menu bar UI, and the scheduler that decides when
 /// to eject.
@@ -28,6 +29,11 @@ final class GuardController {
     /// Refreshed only while the popover is open - see `refreshBackupStatus`.
     private(set) var backup = BackupStatus()
 
+    /// nil until we have asked. False means an eject will happen silently,
+    /// which is worth saying out loud since the notification is the only
+    /// feedback at the moment it matters.
+    private(set) var notificationsEnabled: Bool?
+
     /// Calendars offered in Settings. Read once access is granted.
     private(set) var calendars: [EKCalendar] = []
 
@@ -37,6 +43,8 @@ final class GuardController {
     private var ejectTimer: Timer?
     private var heartbeat: Timer?
     private var pendingReschedule: DispatchWorkItem?
+    private var isScanning = false
+    private var rescanWhenIdle = false
 
     /// Meetings already acted on, successfully or not. Without this a failed
     /// eject would reschedule itself into the past, fire again immediately, and
@@ -58,10 +66,10 @@ final class GuardController {
 
     var knownDisks: [KnownDisk] { config.knownDisks }
 
+    /// Reads the last snapshot. Never scans, because this is called from view
+    /// bodies on the main actor.
     var guardedVolumes: [AttachedVolume] {
-        config.knownDisks
-            .filter { config.watchedDiskIDs.contains($0.id) }
-            .compactMap { Disks.attachedVolume(for: $0, among: attached) }
+        Disks.guardedVolumes(config, among: attached)
     }
 
     /// The scheduler looks a day ahead; the popover only reports what is still
@@ -89,11 +97,28 @@ final class GuardController {
 
     /// Polled by the popover while it is on screen. Deliberately not on a
     /// background schedule: nobody needs to know about a backup they cannot see.
+    /// Reading it spawns `tmutil`, so that part stays off the main actor.
     func refreshBackupStatus() {
-        backup = BackupStatus.current()
+        work.async { [weak self] in
+            let status = BackupStatus.current()
+            Task { @MainActor in self?.backup = status }
+        }
     }
 
     var hiddenDiskCount: Int { config.dismissedDiskIDs.count }
+
+    func refreshNotificationStatus() {
+        // UNUserNotificationCenter.current() traps when the executable has no
+        // bundle identifier, which is exactly the preview harness.
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let allowed = settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+            Task { @MainActor [weak self] in self?.notificationsEnabled = allowed }
+        }
+    }
+
+    func dismissFailure() { lastFailure = nil }
 
     func isAttached(_ disk: KnownDisk) -> Bool {
         Disks.attachedVolume(for: disk, among: attached) != nil
@@ -103,6 +128,7 @@ final class GuardController {
 
     func start() {
         reloadDisks()
+        refreshNotificationStatus()
 
         // The permission callback arrives on an arbitrary queue; the store
         // itself is only ever touched back on the main actor.
@@ -160,14 +186,42 @@ final class GuardController {
 
     // MARK: - State
 
-    /// Re-read the disk picture. Only called on mount, unmount and wake.
+    /// Re-read the disk picture.
+    ///
+    /// Scanning spawns `tmutil`, so it happens on the work queue and only the
+    /// merge runs on the main actor. Doing the scan inline is what froze the app:
+    /// `Process.waitUntilExit` pumps the run loop, the run loop delivered the
+    /// next volume notification, and the second pass blocked on the config lock
+    /// the first pass was still holding.
     private func reloadDisks() {
-        Disks.invalidateDestinationCache()
-        config = ConfigStore.mutate { config -> GuardConfig in
-            Disks.refreshKnownDisks(in: &config)
-            return config
+        guard !isScanning else {
+            // A scan is already in flight and the world changed again; run one
+            // more when it lands rather than queueing a pile of them.
+            rescanWhenIdle = true
+            return
         }
-        attached = Disks.attachedVolumes()
+        isScanning = true
+        work.async { [weak self] in
+            let snapshot = Disks.scan()
+            Task { @MainActor in
+                guard let self else { return }
+                self.isScanning = false
+                self.config = ConfigStore.mutate { config -> GuardConfig in
+                    Disks.merge(snapshot, into: &config)
+                    return config
+                }
+                self.attached = snapshot.attached
+                // Once the disk that failed to eject is gone, the warning is
+                // stale - it must not sit in the popover for days.
+                if self.guardedVolumes.isEmpty { self.lastFailure = nil }
+                if self.rescanWhenIdle {
+                    self.rescanWhenIdle = false
+                    self.reloadDisks()
+                } else {
+                    self.reschedule()
+                }
+            }
+        }
     }
 
     func reloadConfig() {
@@ -261,7 +315,9 @@ final class GuardController {
 
     private func runEject(reason: String, notifyOnSuccess: Bool) {
         let config = self.config
-        guard !GuardRunner.guardedAttachedVolumes(config).isEmpty else { return }
+        // Check against the snapshot we already have; the eject itself rescans
+        // on the work queue.
+        guard !guardedVolumes.isEmpty else { return }
         isBusy = true
         work.async { [weak self] in
             let outcome = GuardRunner.ejectGuarded(
@@ -303,8 +359,8 @@ final class GuardController {
 
     func restoreHiddenDisks() {
         update { $0.dismissedDiskIDs = [] }
+        // reloadDisks reschedules once the scan lands.
         reloadDisks()
-        reschedule()
     }
 
     var watchingAllCalendars: Bool { config.watchAllCalendars }
@@ -348,14 +404,7 @@ final class GuardController {
 
     func skipNextMeeting() {
         guard let id = nextMeeting?.eventIdentifier else { return }
-        update { config in
-            config.skippedEventIDs.append(id)
-            // Bounded: these are never removed otherwise, and stale identifiers
-            // cost nothing but keep the file growing.
-            if config.skippedEventIDs.count > 50 {
-                config.skippedEventIDs.removeFirst(config.skippedEventIDs.count - 50)
-            }
-        }
+        update { $0.skip(id) }
     }
 
     func undoLastSkip() {
@@ -379,13 +428,21 @@ final class GuardController {
         runEject(reason: "Ejected from the menu", notifyOnSuccess: false)
     }
 
-    /// macOS waits only briefly for sleep observers, so this makes a single
-    /// attempt and never retries.
+    /// Best effort only.
+    ///
+    /// macOS gives sleep observers a short window, and stopping a running backup
+    /// alone was measured at ~11 s. Blocking the main thread here would delay
+    /// sleep and could still be cut off mid-eject, so the work is handed to the
+    /// background queue with a single attempt and no retries. If the machine
+    /// sleeps first, the log says so.
     private func handleSleep() {
-        var config = ConfigStore.load()
-        guard config.ejectOnSleep, config.isActive else { return }
+        var config = self.config
+        guard config.ejectOnSleep, config.isActive, !guardedVolumes.isEmpty else { return }
         config.ejectAttempts = 1
-        GuardRunner.ejectGuarded(reason: "Mac going to sleep", config: config)
+        work.async {
+            Log.write("sleep: attempting one eject before the Mac sleeps")
+            GuardRunner.ejectGuarded(reason: "Mac going to sleep", config: config)
+        }
     }
 
     func openCalendarSettings() {

@@ -46,7 +46,7 @@ func findDisk(_ needle: String) -> KnownDisk? {
 }
 
 func printDisks() {
-    let attached = Disks.attachedVolumes()
+    let attached = Disks.scan().attached
     if config.knownDisks.isEmpty {
         print("no external disks remembered yet - plug one in and run this again")
         return

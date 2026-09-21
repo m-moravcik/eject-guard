@@ -61,6 +61,12 @@ private struct GeneralSettings: View {
                     .font(Design.Typography.note)
                     .foregroundStyle(.secondary)
 
+                Picker("Pause for", selection: pauseBinding) {
+                    Text("1 hour").tag(1.0)
+                    Text("4 hours").tag(4.0)
+                    Text("8 hours").tag(8.0)
+                }
+
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, wanted in
                         setLoginItem(wanted)
@@ -94,6 +100,11 @@ private struct GeneralSettings: View {
     private var ignoreFreeBinding: Binding<Bool> {
         Binding(get: { controller.config.ignoreFreeEvents },
                 set: { value in controller.update { $0.ignoreFreeEvents = value } })
+    }
+
+    private var pauseBinding: Binding<Double> {
+        Binding(get: { controller.config.pauseHours },
+                set: { value in controller.update { $0.pauseHours = value } })
     }
 
     private var ejectOnSleepBinding: Binding<Bool> {

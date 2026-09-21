@@ -34,9 +34,17 @@ If all three hold, it stops a Time Machine backup that is writing to that disk,
 ejects it with retries while Spotlight or `backupd` still holds it, and posts a
 notification.
 
-Deciding happens on the main thread, where the event store lives; only the
-ejecting is handed to a background queue, because it can block for over a minute
-on a busy volume and needs no EventKit at all.
+Deciding happens on the main thread, where the event store lives. **Everything
+that launches a process runs on a background queue** - scanning disks, reading
+Time Machine status, and ejecting.
+
+That last rule is not a preference. `Process.waitUntilExit()` runs the run loop
+while it waits, so calling it on the main thread re-enters whatever the run loop
+delivers next. A volume notification arrived during one such wait, ran the same
+code again, and blocked on the config lock the first pass was still holding: a
+permanent freeze with the app still showing in the menu bar. `Shell.run` no
+longer uses `waitUntilExit`, every child process has a timeout, and CI fails the
+build if either rule comes back.
 
 ### What counts as a "real meeting"
 
@@ -78,7 +86,8 @@ SMB share, so only `Kind = Local` destinations are listed.
 Settings has three tabs:
 
 - **General** - lead time, what counts as a meeting, ignoring *Free* events,
-  ejecting on sleep, launch at login, restoring hidden disks.
+  how long the pause row pauses for, ejecting on sleep, launch at login,
+  restoring hidden disks.
 - **Calendars** - watch all of them, or tick the ones that matter.
 - **About** - version, source, log and config.
 
@@ -118,6 +127,36 @@ tm-eject-guard --eject-now      # eject guarded disks now
 | `~/Library/Application Support/TMEjectGuard/config.json` | Settings, shared by the app and the CLI. |
 | `~/Library/Logs/tm-eject-guard.log` | What it did and why. Rotates at 512 KB. |
 
+## Tests
+
+```sh
+swift test
+```
+
+`Package.swift` exists for the tests, not for shipping: it exposes `Sources/Core`
+as a library so `swift test` can reach it with `@testable`. The app and CLI are
+still assembled by `build.sh` from the same sources, so the shipping binaries are
+unaffected by the test setup.
+
+The suite covers the pure half of the logic, which is where every real bug in
+this project has been so far:
+
+| Area | Why it is tested |
+|---|---|
+| Config decoding | A key added later once wiped every setting the user had. |
+| `Disks.merge` | Identity of a disk, and whether re-keying it silently unguards it. |
+| `Disks.guardedVolumes` | An unticked disk must never become a target. |
+| `Disks.isMountedVolume` | The boot volume must never be an eject candidate. |
+| `Sanitize.oneLine` | Untrusted titles must not forge log lines or break AppleScript. |
+| `BackupStatus` | `Percent: -1` means unknown, not zero. |
+
+The tests were checked by putting two real bugs back in: removing the hand
+written config decoder, and dropping the ticked-disk filter. Both were caught.
+
+CI runs the tests, builds the app and CLI, and enforces two rules that are
+easier to state than to remember: no shell is ever invoked, and `waitUntilExit`
+is banned.
+
 ## Safety notes
 
 - Only volumes that are **external, ejectable and directly under `/Volumes`** are
@@ -129,6 +168,10 @@ tm-eject-guard --eject-now      # eject guarded disks now
 - A failed eject is reported with the processes holding the volume, so you know
   not to pull the cable.
 - Ejecting powers the drive down. To use it again, unplug and replug it.
+- The log names your meetings, so it is created `0600`, as is the config file.
+- Eject-on-sleep is best effort. macOS gives sleep observers a short window and
+  stopping a running backup alone was measured at ~11 s, so it is attempted once
+  on a background queue and may not finish. It never blocks sleep.
 
 ## Build
 

@@ -19,6 +19,11 @@ struct MenuContent: View {
                             tint: .orange,
                             title: "Guarding is off",
                             detail: "Turn it back on in Settings.")
+            } else if controller.notificationsEnabled == false {
+                StateBanner(icon: "bell.slash.fill",
+                            tint: .orange,
+                            title: "Notifications are off",
+                            detail: "Disks will still be ejected, but silently.")
             }
 
             VStack(spacing: 0) {
@@ -43,6 +48,7 @@ struct MenuContent: View {
         // Time Machine progress is only interesting to someone looking at it,
         // so this runs while the popover is open and stops when it closes.
         .task {
+            controller.refreshNotificationStatus()
             while !Task.isCancelled {
                 controller.refreshBackupStatus()
                 try? await Task.sleep(for: .seconds(2))
@@ -196,6 +202,16 @@ private struct DisksSection: View {
                         ForEach(controller.knownDisks, id: \.id) { disk in
                             DiskCard(disk: disk)
                         }
+                        // The one thing a new user has to do, said where they
+                        // are looking rather than only in the README.
+                        if controller.config.watchedDiskIDs.isEmpty {
+                            Text("Click a disk to guard it.")
+                                .font(Design.Typography.note)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, Design.Spacing.s)
+                                .padding(.top, Design.Spacing.xs)
+                        }
                     }
                 }
             }
@@ -247,6 +263,7 @@ private struct DiskCard: View {
                             .lineLimit(1)
                         if disk.isTimeMachineDestination {
                             Text("TM")
+                                .help("A Time Machine backup destination")
                                 .font(Design.Typography.badge)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
@@ -288,6 +305,7 @@ private struct DiskCard: View {
             // belongs to another Mac and will never be plugged into this one.
             // Settings has the way back.
             Button("Hide this disk") { controller.hide(disk) }
+            Text("Restore it later in Settings")
         }
     }
 }
@@ -370,6 +388,11 @@ private struct FooterBar: View {
 
     private var paused: Bool { (controller.config.pausedUntil ?? .distantPast) > Date() }
 
+    private var pauseLabel: String {
+        let hours = controller.config.pauseHours
+        return hours == 1 ? "Pause for 1 hour" : "Pause for \(Int(hours)) hours"
+    }
+
     /// Naming the disk beats a bare "Eject now": this acts on guarded disks
     /// that are connected, which is not the same set as "everything plugged in".
     private var ejectLabel: String {
@@ -401,6 +424,11 @@ private struct FooterBar: View {
                         Text(failure)
                             .font(Design.Typography.note)
                             .lineLimit(2)
+                        Spacer(minLength: Design.Spacing.s)
+                        Button("Dismiss") { controller.dismissFailure() }
+                            .font(Design.Typography.note)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, Design.Spacing.l)
                     .padding(.vertical, Design.Spacing.s)
@@ -420,8 +448,8 @@ private struct FooterBar: View {
                         controller.resume()
                     }
                 } else {
-                    MenuRow(icon: "pause.circle", label: "Pause for 1 hour") {
-                        controller.pause(for: 3600)
+                    MenuRow(icon: "pause.circle", label: pauseLabel) {
+                        controller.pause(for: controller.config.pauseHours * 3600)
                     }
                 }
 
