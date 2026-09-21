@@ -39,12 +39,14 @@ var config = ConfigStore.mutate { config -> GuardConfig in
 }
 
 /// Resolve a user supplied disk reference against the remembered list.
+@MainActor
 func findDisk(_ needle: String) -> KnownDisk? {
     config.knownDisks.first { $0.id.caseInsensitiveCompare(needle) == .orderedSame }
         ?? config.knownDisks.first { $0.name.caseInsensitiveCompare(needle) == .orderedSame }
         ?? config.knownDisks.first { $0.name.localizedCaseInsensitiveContains(needle) }
 }
 
+@MainActor
 func printDisks() {
     let attached = Disks.scan().attached
     if config.knownDisks.isEmpty {

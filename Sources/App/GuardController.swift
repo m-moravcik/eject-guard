@@ -436,12 +436,14 @@ final class GuardController {
     /// background queue with a single attempt and no retries. If the machine
     /// sleeps first, the log says so.
     private func handleSleep() {
-        var config = self.config
-        guard config.ejectOnSleep, config.isActive, !guardedVolumes.isEmpty else { return }
-        config.ejectAttempts = 1
+        var adjusted = config
+        guard adjusted.ejectOnSleep, adjusted.isActive, !guardedVolumes.isEmpty else { return }
+        adjusted.ejectAttempts = 1
+        // An immutable copy crosses to the other queue; a captured var would not.
+        let snapshot = adjusted
         work.async {
             Log.write("sleep: attempting one eject before the Mac sleeps")
-            GuardRunner.ejectGuarded(reason: "Mac going to sleep", config: config)
+            GuardRunner.ejectGuarded(reason: "Mac going to sleep", config: snapshot)
         }
     }
 

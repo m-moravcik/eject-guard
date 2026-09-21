@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 // This package exists for the tests, not for shipping.
@@ -11,10 +11,16 @@ let package = Package(
     name: "TMEjectGuard",
     platforms: [.macOS(.v14)],
     targets: [
-        .target(name: "TMEjectGuardCore", path: "Sources/Core"),
+        .target(
+            name: "TMEjectGuardCore",
+            path: "Sources/Core",
+            // Swift 6 checking found the one real concurrency bug in this
+            // project before it shipped; keep it on.
+            swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(
             name: "TMEjectGuardCoreTests",
             dependencies: ["TMEjectGuardCore"],
-            path: "Tests"),
+            path: "Tests",
+            swiftSettings: [.swiftLanguageMode(.v6)]),
     ]
 )

@@ -59,15 +59,17 @@ struct MenuContent: View {
 
 // MARK: - Shared pieces
 
-/// Matches the section labels used across the rest of the toolbelt: 9pt
-/// semibold rounded, tertiary, with a touch of letter spacing.
+/// 9pt semibold rounded with a touch of letter spacing, as elsewhere in the
+/// toolbelt - but `.secondary` rather than `.tertiary`. Measured off the
+/// rendered popover, tertiary gives 2.74:1 against the dark background, under
+/// the 4.5:1 WCAG asks for at this size. Secondary measures 5.6:1.
 struct SectionHeader: View {
     let title: String
 
     var body: some View {
         Text(title)
             .font(Design.Typography.sectionHeader)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.secondary)
             .tracking(0.5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Design.Spacing.l)
@@ -199,8 +201,8 @@ private struct DisksSection: View {
                         .padding(.vertical, Design.Spacing.l)
                 } else {
                     VStack(spacing: Design.Spacing.xs) {
-                        ForEach(controller.knownDisks, id: \.id) { disk in
-                            DiskCard(disk: disk)
+                        ForEach(Array(controller.knownDisks.enumerated()), id: \.element.id) { index, disk in
+                            DiskCard(disk: disk, shortcutIndex: index)
                         }
                         // The one thing a new user has to do, said where they
                         // are looking rather than only in the README.
@@ -223,8 +225,17 @@ private struct DisksSection: View {
 private struct DiskCard: View {
     @Environment(GuardController.self) private var controller
     let disk: KnownDisk
+    /// Position in the list, which is also its keyboard shortcut.
+    let shortcutIndex: Int
 
     @State private var isHovering = false
+
+    /// Only the first nine get one; past that the number stops being a shortcut
+    /// and starts being a lookup.
+    private var shortcut: Character? {
+        guard shortcutIndex < 9 else { return nil }
+        return Character("\(shortcutIndex + 1)")
+    }
 
     private var guarded: Bool { controller.isGuarded(disk) }
     private var connected: Bool { controller.isAttached(disk) }
@@ -287,6 +298,13 @@ private struct DiskCard: View {
 
                 Spacer(minLength: Design.Spacing.s)
 
+                if let shortcut {
+                    Text("⌘\(String(shortcut))")
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+
                 Image(systemName: guarded ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 15))
                     .foregroundStyle(guarded ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
@@ -298,6 +316,7 @@ private struct DiskCard: View {
             .contentShape(RoundedRectangle(cornerRadius: Design.Radius.card))
         }
         .buttonStyle(.plain)
+        .modifier(OptionalShortcut(key: shortcut))
         .onHover { isHovering = $0 }
         .accessibilityLabel("\(disk.name), \(subtitle)")
         .contextMenu {
@@ -306,6 +325,19 @@ private struct DiskCard: View {
             // Settings has the way back.
             Button("Hide this disk") { controller.hide(disk) }
             Text("Restore it later in Settings")
+        }
+    }
+}
+
+/// `keyboardShortcut` takes no optional, and a tenth disk has no key left.
+private struct OptionalShortcut: ViewModifier {
+    let key: Character?
+
+    func body(content: Content) -> some View {
+        if let key {
+            content.keyboardShortcut(KeyEquivalent(key), modifiers: .command)
+        } else {
+            content
         }
     }
 }

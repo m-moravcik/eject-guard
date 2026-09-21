@@ -20,17 +20,27 @@ rm -rf "$BUILD"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "building app..."
-swiftc -O -warnings-as-errors -target arm64-apple-macos14.0 \
-    Sources/Core/Guard.swift Sources/App/*.swift \
+swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
+    Sources/Core/*.swift Sources/App/*.swift \
     -o "$APP/Contents/MacOS/TMEjectGuard"
 
 cp App/Info.plist "$APP/Contents/Info.plist"
+
+# Stamp the real version rather than leaving 1.0 in the plist forever: the
+# About tab is the only place you can check what is actually installed.
+VERSION="$(tr -d ' \n' < VERSION)"
+# Not BUILD: that already names the output directory further up.
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 0)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+    "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
+echo "version: $VERSION ($BUILD_NUMBER)"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 codesign --force --sign - --identifier sk.moravcik.tmejectguard "$APP"
 
 echo "building cli..."
-swiftc -O -warnings-as-errors -target arm64-apple-macos14.0 \
-    Sources/Core/Guard.swift Sources/CLI/main.swift \
+swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
+    Sources/Core/*.swift Sources/CLI/main.swift \
     -o "$BUILD/tm-eject-guard" \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist
 codesign --force --sign - "$BUILD/tm-eject-guard"

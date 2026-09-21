@@ -76,6 +76,7 @@ Turn on **Spúšťať pri prihlásení** so it survives a reboot.
 |---|---|
 | **Disks** | Every external disk seen at least once, plus local Time Machine destinations. Click one to guard it. A disk being backed up shows a spinner and the percentage. Right click to hide one you will never plug in. |
 | **Next meeting** | Only what is still happening **today** - this reports what the guard will do, it is not a second calendar. The calendar name is shown next to the title, which is how you spot it counting a calendar you did not mean to include. **Skip this meeting** ignores that one event, and **Undo skip** stays on screen until the meeting is behind you. |
+| **Disks ⌘1…⌘9** | The first nine disks toggle from the keyboard, and the card shows which key. |
 | **Eject now** ⌘E | Names what it will act on: *Eject Time Machine WD*, or *Eject 2 disks*. It ejects the disks you **ticked** that are **connected** - not everything plugged in. |
 | **Pause for 1 hour** | Suspend guarding. The row turns into **Resume guarding** while paused. |
 | **Settings…** ⌘, | See below. |
@@ -127,6 +128,21 @@ tm-eject-guard --eject-now      # eject guarded disks now
 | `~/Library/Application Support/TMEjectGuard/config.json` | Settings, shared by the app and the CLI. |
 | `~/Library/Logs/tm-eject-guard.log` | What it did and why. Rotates at 512 KB. |
 
+## Layout
+
+```
+Sources/Core/     the engine: no UI, compiled into both binaries and the tests
+Sources/App/      the SwiftUI menu bar app
+Sources/CLI/      the command line tool
+Sources/Preview/  renders the popover to PNG so the layout can be reviewed
+Tests/            unit tests over Sources/Core
+```
+
+Everything is built in **Swift 6 language mode** with warnings as errors. That
+is not decoration: strict concurrency checking is what names the kind of mistake
+that froze this app once already, and it now refuses to compile a captured
+mutable variable crossing a queue boundary.
+
 ## Tests
 
 ```sh
@@ -169,6 +185,8 @@ is banned.
   not to pull the cable.
 - Ejecting powers the drive down. To use it again, unplug and replug it.
 - The log names your meetings, so it is created `0600`, as is the config file.
+  At 512 KB it rolls over to `.log.1` rather than being deleted, because the
+  entry you want is usually the one just before the rollover.
 - Eject-on-sleep is best effort. macOS gives sleep observers a short window and
   stopping a running backup alone was measured at ~11 s, so it is attempted once
   on a background queue and may not finish. It never blocks sleep.
@@ -198,14 +216,21 @@ Under the hardened runtime EventKit needs an explicit entitlement
 (`com.apple.security.personal-information.calendars`), which is why
 `App/TMEjectGuard.entitlements` exists.
 
+### Contrast
+
+The popover renders to PNG, so contrast is measured rather than guessed. Section
+headers were `.tertiary`, matching the sibling apps, which measured **2.74:1**
+against the dark background - under the 4.5:1 WCAG asks for at 9pt. They are
+`.secondary` now, which measures 5.91:1.
+
 ### Reviewing the UI
 
 `MenuBarExtra` popovers cannot be opened programmatically, so there is a harness
 that renders the popover straight to PNG in both appearances:
 
 ```sh
-swiftc -O -target arm64-apple-macos14.0 \
-    Sources/Core/Guard.swift Sources/App/DesignTokens.swift \
+swiftc -O -swift-version 6 -target arm64-apple-macos14.0 \
+    Sources/Core/*.swift Sources/App/DesignTokens.swift \
     Sources/App/GuardController.swift Sources/App/MenuContent.swift \
     Sources/App/SettingsView.swift Sources/Preview/main.swift -o /tmp/preview
 /tmp/preview /tmp/menu.png     # writes menu-light.png and menu-dark.png

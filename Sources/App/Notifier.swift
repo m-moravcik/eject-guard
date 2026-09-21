@@ -6,6 +6,7 @@ import UserNotifications
 /// Only the bundled app may use this: `UNUserNotificationCenter.current()`
 /// traps when the running executable has no bundle identifier, which is why the
 /// command line tool keeps the AppleScript fallback.
+@MainActor
 enum AppNotifier {
     private static let delegate = ForegroundDelegate()
 
