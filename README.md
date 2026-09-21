@@ -9,17 +9,32 @@ bad habit.
 
 ## How it decides
 
-Every 30 seconds the app asks three questions, and stops at the first "no":
+Nothing is polled. The app works out the single moment it needs to act on, arms
+one timer for it, and then does nothing until something actually changes:
 
-1. **Is a guarded disk attached?** If not, nothing else happens - the calendar is
-   never even touched.
-2. **Is there a real meeting starting within the lead time?** (6 minutes by
-   default.)
+- a volume mounts or unmounts (`NSWorkspace`)
+- the calendar changes (`EKEventStoreChanged` - EventKit is already the local
+  replica that the sync daemons maintain, so there is no second cache to keep)
+- the Mac wakes, and every timer that should have fired while it slept did not
+- a setting changes
+
+A five minute heartbeat is kept purely as a backstop for a notification that
+never arrives.
+
+When the timer fires, three questions are re-asked, stopping at the first "no":
+
+1. **Is a guarded disk attached?**
+2. **Is there still a real meeting starting within the lead time?** (5 minutes
+   by default - the meeting may have been cancelled since the timer was armed.)
 3. **Is the guard active?** Not disabled, not paused.
 
 If all three hold, it stops a Time Machine backup that is writing to that disk,
 ejects it with retries while Spotlight or `backupd` still holds it, and posts a
 notification.
+
+Deciding happens on the main thread, where the event store lives; only the
+ejecting is handed to a background queue, because it can block for over a minute
+on a busy volume and needs no EventKit at all.
 
 ### What counts as a "real meeting"
 
@@ -45,18 +60,21 @@ in the list straight away.
 
 Turn on **Spúšťať pri prihlásení** so it survives a reboot.
 
-## Menu
+## The popover
 
-| Item | What it does |
+| | |
 |---|---|
-| Sledované disky | Which disks to guard. Attached ones are marked `● pripojený`. Detached ones can be forgotten. |
-| Odpojiť teraz | Eject the guarded disks right now, ignoring the calendar. |
-| Kalendáre | Which calendars to watch. Default is all of them. |
-| Predstih | How long before a meeting to eject. |
-| Čo je míting | Attendee threshold, and whether to ignore *Free* events. |
-| Preskočiť tento míting | Ignore the next meeting once. |
-| Pozastaviť | Pause for 1, 4 or 8 hours. |
-| Odpojiť aj pri uspaní Macu | Also eject when the lid closes. Off by default. |
+| **Disks** | Every external disk seen at least once, plus local Time Machine destinations. Click one to guard it. Right click a disconnected, non-Time-Machine disk to forget it. |
+| **Next meeting** | What the schedule is currently aimed at, when it will eject, and why it will not if something is in the way. **Skip this meeting** ignores that one event. |
+| **Eject now** ⌘E | Eject the guarded disks immediately, ignoring the calendar. |
+| **Pause for 1 hour** | Suspend guarding. The row turns into **Resume guarding** while paused. |
+| **Settings…** ⌘, | See below. |
+
+Settings has two tabs:
+
+- **General** - lead time, what counts as a meeting, ignoring *Free* events,
+  ejecting on sleep, launch at login.
+- **Calendars** - watch all of them, or tick the ones that matter.
 
 ## CLI
 
@@ -95,11 +113,39 @@ tm-eject-guard --eject-now      # eject guarded disks now
 ## Build
 
 ```sh
-./build.sh      # build/TM Eject Guard.app and build/tm-eject-guard
+./build.sh      # build/TM Eject Guard.app and build/tm-eject-guard, ad-hoc signed
+./install.sh    # build, install to /Applications and ~/bin, launch
 ./uninstall.sh  # stop and remove, keeping config and log
 ```
 
-Both binaries are ad-hoc signed. TCC identifies them by code directory hash, so
-a rebuild revokes Calendar access and macOS prompts again on the next launch.
+### Signing and notarization
+
+```sh
+SKIP_NOTARIZE=1 ./release.sh   # sign only, to check the certificate resolves
+./release.sh                   # sign, notarize, staple
+./install.sh --no-build        # install it without re-signing over the ticket
+```
+
+This matters for more than distribution. An ad-hoc signature is identified by
+the binary's code directory hash, so **every rebuild looks like a different
+program to TCC** and macOS asks for Calendar access again. A Developer ID
+signature is a stable identity, so the permission is granted once and stays.
+
+Under the hardened runtime EventKit needs an explicit entitlement
+(`com.apple.security.personal-information.calendars`), which is why
+`App/TMEjectGuard.entitlements` exists.
+
+### Reviewing the UI
+
+`MenuBarExtra` popovers cannot be opened programmatically, so there is a harness
+that renders the popover straight to PNG in both appearances:
+
+```sh
+swiftc -O -target arm64-apple-macos14.0 \
+    Sources/Core/Guard.swift Sources/App/DesignTokens.swift \
+    Sources/App/GuardController.swift Sources/App/MenuContent.swift \
+    Sources/App/SettingsView.swift Sources/Preview/main.swift -o /tmp/preview
+/tmp/preview /tmp/menu.png     # writes menu-light.png and menu-dark.png
+```
 
 Requires macOS 14 or newer.

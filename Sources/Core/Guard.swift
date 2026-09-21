@@ -67,7 +67,9 @@ enum Shell {
         return root
     }
 
-    static func notify(title: String, body: String) {
+    /// Fallback used by the command line tool, which has no bundle and so
+    /// cannot post a user notification of its own.
+    static func notifyViaAppleScript(title: String, body: String) {
         // AppleScript string literals: backslashes first, then quotes.
         func esc(_ s: String) -> String {
             s.replacingOccurrences(of: "\\", with: "\\\\")
@@ -78,11 +80,26 @@ enum Shell {
     }
 }
 
+/// Indirection so the app can post real user notifications while the CLI falls
+/// back to AppleScript. Under the hardened runtime the AppleScript route is not
+/// dependable, and the app has a bundle identity that can do it properly.
+enum Notify {
+    nonisolated(unsafe) static var handler: (String, String) -> Void = { title, body in
+        Shell.notifyViaAppleScript(title: title, body: body)
+    }
+
+    static func post(title: String, body: String) {
+        handler(title, body)
+    }
+}
+
 // MARK: - Known disks
 
 /// A disk the user has plugged in at least once, or that Time Machine knows about.
 /// `id` is what the config file stores, so it has to survive remounts: a volume
 /// UUID when we have seen the disk, otherwise the Time Machine destination UUID.
+/// Every added property here must be optional or have its own tolerant
+/// decoding, for the same reason GuardConfig writes its decoder by hand.
 struct KnownDisk: Codable, Equatable {
     var id: String
     var name: String
@@ -103,12 +120,15 @@ struct AttachedVolume {
 
 // MARK: - Configuration
 
-struct GuardConfig: Codable {
+struct GuardConfig: Codable, Equatable {
     var watchedDiskIDs: [String] = []
     var knownDisks: [KnownDisk] = []
-    /// Calendar identifiers to watch. Empty means every calendar.
+    /// When true every calendar counts and `watchedCalendarIDs` is ignored.
+    /// A separate flag rather than "empty means all", because that would turn
+    /// unticking the last calendar into watching all of them.
+    var watchAllCalendars: Bool = true
     var watchedCalendarIDs: [String] = []
-    var leadMinutes: Double = 6
+    var leadMinutes: Double = 5
     var minAttendees: Int = 2
     var enabled: Bool = true
     /// Skip events the user marked as Free - those are blocks, not meetings.
@@ -128,6 +148,41 @@ struct GuardConfig: Codable {
         guard enabled else { return false }
         if let until = pausedUntil, until > Date() { return false }
         return true
+    }
+
+    init() {}
+
+    // Swift's synthesised Codable throws on a missing key even when the
+    // property has a default, and the caller then has nothing to fall back on
+    // but a blank config. Adding one field would silently wipe every setting
+    // the user had. Decoding each key on its own keeps old files readable.
+    enum CodingKeys: String, CodingKey {
+        case watchedDiskIDs, knownDisks, watchAllCalendars, watchedCalendarIDs
+        case leadMinutes, minAttendees, enabled, ignoreFreeEvents, ejectOnSleep
+        case pausedUntil, skippedEventIDs, ejectAttempts, ejectRetryDelay
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = GuardConfig()
+
+        func value<T: Decodable>(_ key: CodingKeys, _ default: T) -> T {
+            (try? container.decodeIfPresent(T.self, forKey: key)) .flatMap { $0 } ?? `default`
+        }
+
+        watchedDiskIDs = value(.watchedDiskIDs, fallback.watchedDiskIDs)
+        knownDisks = value(.knownDisks, fallback.knownDisks)
+        watchAllCalendars = value(.watchAllCalendars, fallback.watchAllCalendars)
+        watchedCalendarIDs = value(.watchedCalendarIDs, fallback.watchedCalendarIDs)
+        leadMinutes = value(.leadMinutes, fallback.leadMinutes)
+        minAttendees = value(.minAttendees, fallback.minAttendees)
+        enabled = value(.enabled, fallback.enabled)
+        ignoreFreeEvents = value(.ignoreFreeEvents, fallback.ignoreFreeEvents)
+        ejectOnSleep = value(.ejectOnSleep, fallback.ejectOnSleep)
+        pausedUntil = try? container.decodeIfPresent(Date.self, forKey: .pausedUntil)
+        skippedEventIDs = value(.skippedEventIDs, fallback.skippedEventIDs)
+        ejectAttempts = value(.ejectAttempts, fallback.ejectAttempts)
+        ejectRetryDelay = value(.ejectRetryDelay, fallback.ejectRetryDelay)
     }
 }
 
@@ -155,9 +210,11 @@ enum ConfigStore {
     @discardableResult
     static func mutate<T>(_ body: (inout GuardConfig) -> T) -> T {
         lock.lock(); defer { lock.unlock() }
-        var config = readUnlocked()
+        let original = readUnlocked()
+        var config = original
         let result = body(&config)
-        writeUnlocked(config)
+        // Rewriting an unchanged file would mean a disk write on every pass.
+        if config != original { writeUnlocked(config) }
         return result
     }
 
@@ -165,7 +222,14 @@ enum ConfigStore {
         guard let data = try? Data(contentsOf: url) else { return GuardConfig() }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode(GuardConfig.self, from: data)) ?? GuardConfig()
+        do {
+            return try decoder.decode(GuardConfig.self, from: data)
+        } catch {
+            // Falling back to defaults discards the user's settings, so say so
+            // rather than letting it happen quietly.
+            Log.write("config unreadable, falling back to defaults: \(error)")
+            return GuardConfig()
+        }
     }
 
     private static func writeUnlocked(_ config: GuardConfig) {
@@ -181,9 +245,37 @@ enum ConfigStore {
 // MARK: - Disk discovery
 
 enum Disks {
+    private static let destinationCacheLock = NSLock()
+    private static var destinationCache: (value: [(id: String, name: String, mountPoint: String?)], at: Date)?
+
+    /// Drop the cached destination list. Called when a volume mounts or
+    /// unmounts, which is the only time a MountPoint can change.
+    static func invalidateDestinationCache() {
+        destinationCacheLock.lock(); defer { destinationCacheLock.unlock() }
+        destinationCache = nil
+    }
+
     /// Mount points of local Time Machine destinations, keyed by destination UUID.
     /// A destination with no entry here is simply not plugged in.
+    ///
+    /// Cached for a few seconds: one pass asks for this list several times, and
+    /// each miss costs a `tmutil` process.
     static func timeMachineDestinations() -> [(id: String, name: String, mountPoint: String?)] {
+        destinationCacheLock.lock()
+        if let cache = destinationCache, Date().timeIntervalSince(cache.at) < 5 {
+            defer { destinationCacheLock.unlock() }
+            return cache.value
+        }
+        destinationCacheLock.unlock()
+
+        let fresh = readDestinations()
+        destinationCacheLock.lock()
+        destinationCache = (fresh, Date())
+        destinationCacheLock.unlock()
+        return fresh
+    }
+
+    private static func readDestinations() -> [(id: String, name: String, mountPoint: String?)] {
         let info = Shell.run("/usr/bin/tmutil", ["destinationinfo", "-X"])
         guard info.status == 0,
               let root = Shell.plist(from: info.output),
@@ -318,7 +410,17 @@ enum Disks {
 // MARK: - Calendar
 
 enum Calendar2 {
-    /// Ask once and cache the answer for the lifetime of the process.
+    /// Callback form. EKEventStore is not thread safe, so a caller that owns
+    /// the store on one thread must stay on it - this never blocks or hops.
+    static func requestAccess(_ store: EKEventStore, completion: @escaping (Bool) -> Void) {
+        store.requestFullAccessToEvents { granted, error in
+            if let error { Log.write("calendar access error: \(error.localizedDescription)") }
+            completion(granted)
+        }
+    }
+
+    /// Blocking form, for the command line tool where there is no run loop to
+    /// return to.
     static func requestAccess(_ store: EKEventStore, timeout: TimeInterval = 30) -> Bool {
         var granted = false
         let semaphore = DispatchSemaphore(value: 0)
@@ -353,15 +455,13 @@ enum Calendar2 {
         return true
     }
 
-    /// The calendars the guard looks at. An empty selection means all of them,
-    /// so the tool works before the user has configured anything.
+    /// The calendars the guard looks at. Returns nil for "all of them", which
+    /// is what EventKit's predicate wants, and an empty array for "none" -
+    /// a selection that resolves to nothing must match nothing, not everything.
     static func watchedCalendars(_ store: EKEventStore, config: GuardConfig) -> [EKCalendar]? {
-        guard !config.watchedCalendarIDs.isEmpty else { return nil }
-        let selected = store.calendars(for: .event)
+        guard !config.watchAllCalendars else { return nil }
+        return store.calendars(for: .event)
             .filter { config.watchedCalendarIDs.contains($0.calendarIdentifier) }
-        // A selection that no longer resolves would silently match everything,
-        // which is the opposite of what the user asked for.
-        return selected.isEmpty ? [] : selected
     }
 
     static func nextMeeting(_ store: EKEventStore, within minutes: Double, config: GuardConfig) -> EKEvent? {
@@ -511,26 +611,26 @@ enum GuardRunner {
             }
         }
         if notifyOnSuccess && !outcome.ejected.isEmpty {
-            Shell.notify(title: "\(outcome.ejected.joined(separator: ", ")) odpojený",
-                         body: "\(reason) - disk môžeš bezpečne vytiahnuť.")
+            Notify.post(title: "\(outcome.ejected.joined(separator: ", ")) ejected",
+                         body: "\(reason). Safe to unplug.")
         }
         for failure in outcome.failed {
-            Shell.notify(title: "\(failure.name) sa NEPODARILO odpojiť",
-                         body: "Drží ho: \(failure.detail.isEmpty ? "neznáme" : failure.detail).")
+            Notify.post(title: "Could not eject \(failure.name)",
+                         body: "Held by \(failure.detail.isEmpty ? "an unknown process" : failure.detail).")
         }
         return outcome
     }
 
     static func announce(_ outcome: Outcome, meetingTitle: String, minutesAhead: Int) {
         if !outcome.ejected.isEmpty {
-            Shell.notify(
-                title: "\(outcome.ejected.joined(separator: ", ")) odpojený",
-                body: "\(meetingTitle) o \(minutesAhead) min - disk môžeš bezpečne vytiahnuť.")
+            Notify.post(
+                title: "\(outcome.ejected.joined(separator: ", ")) ejected",
+                body: "\(meetingTitle) in \(minutesAhead) min. Safe to unplug.")
         }
         for failure in outcome.failed {
-            Shell.notify(
-                title: "\(failure.name) sa NEPODARILO odpojiť",
-                body: "Drží ho: \(failure.detail.isEmpty ? "neznáme" : failure.detail). Nevyťahuj disk, odpoj ho ručne.")
+            Notify.post(
+                title: "Could not eject \(failure.name)",
+                body: "Held by \(failure.detail.isEmpty ? "an unknown process" : failure.detail). Do not unplug it.")
         }
     }
 }

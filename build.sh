@@ -21,7 +21,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "building app..."
 swiftc -O -target arm64-apple-macos14.0 \
-    Sources/Core/Guard.swift Sources/App/AppMain.swift \
+    Sources/Core/Guard.swift Sources/App/*.swift \
     -o "$APP/Contents/MacOS/TMEjectGuard"
 
 cp App/Info.plist "$APP/Contents/Info.plist"

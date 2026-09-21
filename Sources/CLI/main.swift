@@ -144,7 +144,14 @@ case "calendars", "watch-cal", "unwatch-cal":
             FileHandle.standardError.write("no calendar matches \"\(pendingValue ?? "")\"\n".data(using: .utf8)!)
             exit(1)
         }
+        let everyID = calendars.map(\.calendarIdentifier)
         config = ConfigStore.mutate { config -> GuardConfig in
+            // Narrowing from "all" starts from everything selected, so one
+            // command does not silently drop every other calendar.
+            if config.watchAllCalendars {
+                config.watchAllCalendars = false
+                config.watchedCalendarIDs = everyID
+            }
             if action == "watch-cal" {
                 if !config.watchedCalendarIDs.contains(calendar.calendarIdentifier) {
                     config.watchedCalendarIDs.append(calendar.calendarIdentifier)
@@ -152,14 +159,18 @@ case "calendars", "watch-cal", "unwatch-cal":
             } else {
                 config.watchedCalendarIDs.removeAll { $0 == calendar.calendarIdentifier }
             }
+            if Set(config.watchedCalendarIDs) == Set(everyID) {
+                config.watchAllCalendars = true
+                config.watchedCalendarIDs = []
+            }
             return config
         }
     }
-    if config.watchedCalendarIDs.isEmpty {
-        print("watching ALL calendars (no selection made)")
+    if config.watchAllCalendars {
+        print("watching ALL calendars")
     }
     for calendar in calendars.sorted(by: { $0.title < $1.title }) {
-        let watched = config.watchedCalendarIDs.isEmpty
+        let watched = config.watchAllCalendars
             || config.watchedCalendarIDs.contains(calendar.calendarIdentifier)
         print("  \(watched ? "[x]" : "[ ]") \(calendar.title)  (\(calendar.source.title))")
     }
@@ -200,7 +211,7 @@ default:
     }
     print("guard  : \(state), \(Int(config.leadMinutes)) min before a meeting")
     print("filter : events with at least \(config.minAttendees) attendees, not declined, not all day")
-    print("cals   : \(config.watchedCalendarIDs.isEmpty ? "all" : "\(config.watchedCalendarIDs.count) selected")")
+    print("cals   : \(config.watchAllCalendars ? "all" : "\(config.watchedCalendarIDs.count) selected")")
 
     let store = EKEventStore()
     if Calendar2.requestAccess(store) {
