@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>sk.moravcik.tmejectguard.cli</string>
+    <key>CFBundleName</key>
+    <string>tm-eject-guard</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Reads your upcoming meetings so the external disk can be ejected before you unplug it.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Reads your upcoming meetings so the external disk can be ejected before you unplug it.</string>
+</dict>
+</plist>
