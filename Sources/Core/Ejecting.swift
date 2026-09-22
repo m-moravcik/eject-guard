@@ -20,11 +20,16 @@ enum Ejector {
 
         stopBackupIfTargeting(volume)
 
+        // Resolve before unmounting: once the volume is gone there is nothing
+        // left to ask about. Ejecting the whole disk also unmounts every volume
+        // on it, which is what Finder's eject button does.
+        let target = DeviceResolver.ejectTarget(forMountPoint: volume.path)
+
         var lastOutput = ""
         for attempt in 1...max(1, config.ejectAttempts) {
-            let result = Shell.run("/usr/sbin/diskutil", ["eject", volume.path], timeout: 60)
+            let result = Shell.run("/usr/sbin/diskutil", ["eject", target], timeout: 60)
             if result.status == 0 {
-                Log.write("ejected \(volume.name) on attempt \(attempt)")
+                Log.write("ejected \(volume.name) via \(target) on attempt \(attempt)")
                 return Result(volume: volume, succeeded: true, detail: "ok")
             }
             lastOutput = result.output

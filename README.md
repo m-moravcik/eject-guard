@@ -183,7 +183,12 @@ is banned.
   ejected. A backup to a different destination keeps running.
 - A failed eject is reported with the processes holding the volume, so you know
   not to pull the cable.
-- Ejecting powers the drive down. To use it again, unplug and replug it.
+- The eject targets the **whole physical disk**, not just the guarded volume,
+  which is what Finder's eject does. Other volumes on the same disk are
+  unmounted too; if one of them is busy the eject fails and names the process.
+- To use the disk again, unplug and replug it. An encrypted Time Machine volume
+  cannot be remounted in software once ejected - it unlocks from the keychain
+  when the disk is reattached.
 - The log names your meetings, so it is created `0600`, as is the config file.
   At 512 KB it rolls over to `.log.1` rather than being deleted, because the
   entry you want is usually the one just before the rollover.
