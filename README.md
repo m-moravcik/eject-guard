@@ -183,6 +183,12 @@ gh release create v1.2 build/TM-Eject-Guard-1.2.zip
 git add appcast.xml && git commit -m "Release 1.2" && git push
 ```
 
+**The repository has to be public for updates to work.** Sparkle carries no
+GitHub credentials, so on a private repository both the feed on
+raw.githubusercontent.com and the release asset answer 404 and every check fails
+with nothing obviously wrong at either end. Measured, not guessed: with a token
+both return 200 and the published archive's EdDSA signature matches the appcast.
+
 `sparkle.sh` pins the framework by version **and** SHA-256. An updater is the
 one dependency whose compromise is arbitrary code execution, so it is never
 fetched as "latest".
