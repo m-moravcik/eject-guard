@@ -52,9 +52,11 @@ enum Disks {
     /// Internal and non-ejectable volumes are filtered out here, which is what
     /// keeps the boot disk out of reach of every later step.
     static func attachedVolumes(destinations: [TimeMachineDestination]) -> [AttachedVolume] {
+        // Every key the predicate reads must be requested here, or it comes
+        // back nil and the volume is silently rejected.
         let keys: [URLResourceKey] = [
-            .volumeIsInternalKey, .volumeIsEjectableKey, .volumeIsBrowsableKey,
-            .volumeUUIDStringKey, .volumeLocalizedNameKey, .volumeIsRootFileSystemKey,
+            .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRootFileSystemKey,
+            .volumeUUIDStringKey, .volumeLocalizedNameKey,
         ]
         guard let urls = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes])
@@ -62,14 +64,12 @@ enum Disks {
 
         return urls.compactMap { url -> AttachedVolume? in
             guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
-            // volumeIsInternal is nil for external media rather than false, so
-            // test for "not internal" instead of "external". Ejectable is the
-            // load bearing check: every built-in volume reports false.
-            guard values.volumeIsEjectable == true,
-                  values.volumeIsInternal != true,
-                  values.volumeIsRootFileSystem != true else { return nil }
             let path = url.path
-            guard isMountedVolume(path) else { return nil }
+            guard isMountedVolume(path),
+                  isGuardable(isInternal: values.volumeIsInternal,
+                              isLocal: values.volumeIsLocal,
+                              isRootFileSystem: values.volumeIsRootFileSystem)
+            else { return nil }
 
             return AttachedVolume(
                 path: path,
@@ -80,6 +80,38 @@ enum Disks {
     }
 
     // MARK: Pure logic (no processes, no I/O - this is the part under test)
+
+    /// Whether a mounted volume is one we may offer to guard.
+    ///
+    /// Pure, and tested against values read off real hardware, because getting
+    /// this wrong is silent in both directions.
+    ///
+    /// `volumeIsEjectable` is **not** part of it, despite the name. A fixed
+    /// external USB hard disk reports `ejectable == false`: in this API
+    /// "ejectable" means removable media - a card reader, an optical drive, a
+    /// disk image - not "can be unmounted and unplugged". Requiring it meant a
+    /// real Time Machine drive never appeared, and a disk image test fixture
+    /// hid that for a whole day because images do report true.
+    ///
+    /// Observed values:
+    ///
+    /// | volume                    | internal | local | ejectable |
+    /// |---------------------------|----------|-------|-----------|
+    /// | external USB hard disk    | false    | true  | false     |
+    /// | boot and system volumes   | true     | true  | false     |
+    /// | disk image                | nil      | true  | true      |
+    /// | Time Machine snapshots    | nil      | true  | false     |
+    /// | autofs network mount      | nil      | false | false     |
+    ///
+    /// So: never internal, always local. `nil` is allowed because a disk image
+    /// reports it, and the user still has to tick a disk before anything
+    /// happens to it.
+    static func isGuardable(isInternal: Bool?, isLocal: Bool?, isRootFileSystem: Bool?) -> Bool {
+        guard isInternal != true else { return false }
+        guard isLocal == true else { return false }
+        guard isRootFileSystem != true else { return false }
+        return true
+    }
 
     /// A path is only a candidate if it is a directory directly inside /Volumes.
     /// Last line of defence before anything reaches `diskutil eject`.

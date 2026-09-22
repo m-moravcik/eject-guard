@@ -39,3 +39,43 @@ final class SafetyTests: XCTestCase {
         XCTAssertEqual(Sanitize.oneLine(title), title)
     }
 }
+
+/// Values read off real hardware on 2026-09-22, when a 3 TB external USB Time
+/// Machine disk turned out to report `ejectable == false` and therefore never
+/// appeared in the app. A disk image fixture reported `true` and hid it.
+final class VolumeEligibilityTests: XCTestCase {
+    func testExternalUsbHardDiskIsGuardable() {
+        // /Volumes/Time Machine WD, WD 3 TB over USB, APFS.
+        XCTAssertTrue(Disks.isGuardable(isInternal: false, isLocal: true, isRootFileSystem: false))
+    }
+
+    func testDiskImageIsGuardable() {
+        // Reports internal as nil rather than false.
+        XCTAssertTrue(Disks.isGuardable(isInternal: nil, isLocal: true, isRootFileSystem: false))
+    }
+
+    func testBootVolumeIsNot() {
+        XCTAssertFalse(Disks.isGuardable(isInternal: true, isLocal: true, isRootFileSystem: true))
+    }
+
+    func testInternalSystemVolumeIsNot() {
+        // /System/Volumes/VM, Preboot, and friends.
+        XCTAssertFalse(Disks.isGuardable(isInternal: true, isLocal: true, isRootFileSystem: false))
+    }
+
+    func testNetworkMountIsNot() {
+        // Nothing to eject on an autofs or SMB mount.
+        XCTAssertFalse(Disks.isGuardable(isInternal: nil, isLocal: false, isRootFileSystem: false))
+    }
+
+    func testUnknownLocalityIsNot() {
+        XCTAssertFalse(Disks.isGuardable(isInternal: false, isLocal: nil, isRootFileSystem: false))
+    }
+
+    func testEjectableIsDeliberatelyNotConsulted() {
+        // The real disk reports ejectable false. If this predicate ever starts
+        // depending on it again, the tool silently stops working.
+        let real = Disks.isGuardable(isInternal: false, isLocal: true, isRootFileSystem: false)
+        XCTAssertTrue(real, "a fixed external disk reports ejectable == false")
+    }
+}
