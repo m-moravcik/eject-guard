@@ -40,7 +40,7 @@ enum Meetings {
     }
 
     /// A personal focus block has no other attendees; a real meeting does. That
-    /// single signal separates "Focus" and "Home-office" from "Weekly sync/review"
+    /// single signal separates "Focus" and "Home-office" from a real meeting
     /// without any title matching.
     static func isRealMeeting(_ event: EKEvent, config: GuardConfig) -> Bool {
         if event.isAllDay { return false }
