@@ -18,7 +18,8 @@
 #
 # Environment:
 #   SIGN_IDENTITY    Defaults to the Developer ID Application certificate.
-#   NOTARY_PROFILE   notarytool keychain profile name.
+#   NOTARY_PROFILE   notarytool keychain profile name. Put it in .release.env
+#                    rather than typing it every release.
 #   SKIP_NOTARIZE=1  Sign and verify only, no round trip to Apple. Use this to
 #                    confirm the certificate resolves before spending a
 #                    submission.
@@ -28,6 +29,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source ./sparkle.sh
+
+# Local, gitignored overrides - normally just the notarytool profile name, which
+# is personal to whoever is signing and has no business in a public repository.
+# Same idea as VibeRes's .release.env.
+# shellcheck source=/dev/null
+[ -f .release.env ] && source ./.release.env
 
 APP_NAME="TM Eject Guard"
 APP="build/$APP_NAME.app"

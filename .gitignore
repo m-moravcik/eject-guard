@@ -4,6 +4,9 @@ build/
 .swiftpm/
 .index-build/
 
+# Whoever signs a release has their own notarytool profile name.
+.release.env
+
 # Review artefacts live outside the repo; this is a backstop in case one is
 # ever copied in.
 *audit*.md

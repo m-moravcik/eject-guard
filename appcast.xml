@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>TM Eject Guard</title>
+    <link>https://raw.githubusercontent.com/m-moravcik/tm-eject-guard/main/appcast.xml</link>
+    <description>Ejects external disks before a meeting starts.</description>
+    <language>en</language>
+    <item>
+      <title>Version 1.2</title>
+      <pubDate>Tue, 22 Sep 2026 17:54:11 +0000</pubDate>
+      <sparkle:version>11</sparkle:version>
+      <sparkle:shortVersionString>1.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases/tag/v1.2</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2/TM-Eject-Guard-1.2.zip"
+                 sparkle:edSignature="M4SZA8HQW3O6a9+UpGBYZ97mKJT+l/stYs44hm0ZT+kcsrkL8LO28YZOu47rbp6Cx4o839ivS2QyiZuaJo7NDA=="
+                 length="1419361"
+                 type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

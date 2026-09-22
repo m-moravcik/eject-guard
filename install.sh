@@ -43,7 +43,10 @@ done
 
 mkdir -p "$DEST"
 rm -rf "$DEST/$APP_NAME.app"
-cp -R "build/$APP_NAME.app" "$DEST/"
+# ditto, not cp -R: the bundle embeds Sparkle.framework, which is a tree of
+# symlinks into Versions plus four separately signed helpers. ditto is the
+# documented way to reproduce that exactly, extended attributes and all.
+ditto "build/$APP_NAME.app" "$DEST/$APP_NAME.app"
 
 mkdir -p "$HOME/bin"
 cp "build/tm-eject-guard" "$HOME/bin/tm-eject-guard"
