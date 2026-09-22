@@ -1,0 +1,3 @@
+/* Shown by macOS in the Calendar permission prompt, before the app has any UI. */
+"NSCalendarsUsageDescription" = "Liest deine bevorstehenden Besprechungen, damit das externe Laufwerk ausgeworfen wird, bevor du es abziehst.";
+"NSCalendarsFullAccessUsageDescription" = "Liest deine bevorstehenden Besprechungen, damit das externe Laufwerk ausgeworfen wird, bevor du es abziehst.";

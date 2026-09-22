@@ -64,11 +64,11 @@ optionally ignore events you marked as *Free*.
 Builds both targets, puts the app in `/Applications`, the CLI in `~/bin`, and
 starts the app. macOS will ask for Calendar access on first launch.
 
-Then open the menu bar icon and tick your disk under **Sledované disky**. Disks
+Then open the menu bar icon and tick your disk under **DISKS**. Disks
 are remembered once you plug them in, and local Time Machine destinations appear
 in the list straight away.
 
-Turn on **Spúšťať pri prihlásení** so it survives a reboot.
+Turn on **Launch at login** in Settings so it survives a reboot.
 
 ## The popover
 
@@ -101,8 +101,91 @@ swap is too quiet to notice during the few seconds an eject takes.
 |---|---|
 | `externaldrive` | No guarded disk connected. |
 | `externaldrive.fill.badge.checkmark` | A guarded disk is connected and armed. |
+| `externaldrive.fill.badge.timemachine` | Time Machine is writing to a guarded disk, with a progress bar under it. |
 | `eject.fill` | Ejecting right now. |
 | `externaldrive.badge.xmark` | Guarding is off or paused. |
+
+While a backup runs, a 15x2 pt bar sits under the drive: filled to the
+percentage Time Machine reports, or a short segment travelling left to right
+while it is still sizing the job up - a bar frozen at zero reads as a stalled
+backup. Both forms breathe between 55% and 100% opacity, because progress can
+sit on one number for minutes and a still icon in a menu bar reads as a dead
+one.
+
+**A `MenuBarExtra` label is rendered to a static image, so SwiftUI's own symbol
+effects never run there.** That was measured rather than assumed: a throwaway
+menu bar app with `.symbolEffect(.pulse, options: .repeating)` was screenshotted
+twenty times over two seconds and its icon brightness did not move by a
+hundredth. The animation is therefore driven by `GuardController.backupPhase`,
+an integer advanced four times a second - and only while a backup is actually
+running.
+
+Knowing a backup is running costs one `tmutil status` every 5 s while one is,
+20 s while a guarded disk is merely attached, and nothing at all when none is.
+That is a deliberate exception to the event-driven rule in the rest of the app,
+and it is bounded by the thing that matters: the disk being plugged in.
+
+The states are hard to review in place - the icon is 16 pt wide and some of them
+only appear mid-backup - so the preview harness renders them all side by side:
+
+```sh
+/tmp/preview /tmp/icons.png icons
+```
+
+That is how the backing-up glyph was caught shrinking: stacking a bar under the
+symbol stole its height until the size was pinned.
+
+## Languages
+
+English, Slovak, Czech and German; the app follows the system language and falls
+back to English. Translations live in `Resources/<lang>.lproj/`, keyed
+explicitly (`footer.ejectNow`) rather than by their English sentence, so
+rewording the English does not silently orphan three translations.
+
+Slovak and Czech need a separate plural form for 2-4 ("2 disky" but "5 diskov"),
+which `Localizable.stringsdict` provides and `LocalizationTests` insists on.
+Those tests also check that every key the source uses exists in all four
+languages, that no language carries a key nothing uses, and that the format
+specifiers match English - a `%@` translated as `%d` does not render wrong text,
+it reads whatever happens to be at that address.
+
+Log lines are deliberately **not** translated. A log gets grepped and pasted
+into issues, so it stays English.
+
+## Updates
+
+The app updates itself through [Sparkle](https://sparkle-project.org). The feed
+is `appcast.xml` on the main branch, and the archives are GitHub release assets.
+
+Two independent checks have to pass before anything is installed:
+
+- **The running copy must carry our Developer ID signature.** An ad-hoc build -
+  which is what `build.sh` produces - reports "This build cannot update itself"
+  and never contacts the feed. Downloading and executing a binary because an
+  unsigned build asked to is remote code execution with extra steps, so the
+  decision is a pure function in `UpdaterGate` with tests, not a condition
+  buried in a factory.
+- **The downloaded archive must carry our EdDSA signature.** The public half is
+  in `Info.plist`; the private half is in the login keychain. These answer
+  different questions - one says *we* are the thing running, the other says the
+  thing we fetched came from us - and neither substitutes for the other.
+
+Sparkle normally installs on quit, which for a menu bar app can mean never, so
+the install-on-quit hook is captured and offered as a row in the popover
+instead.
+
+Releasing:
+
+```sh
+./release.sh                        # sign, notarize, staple
+./make-appcast.sh build/TM-Eject-Guard-1.2.zip
+gh release create v1.2 build/TM-Eject-Guard-1.2.zip
+git add appcast.xml && git commit -m "Release 1.2" && git push
+```
+
+`sparkle.sh` pins the framework by version **and** SHA-256. An updater is the
+one dependency whose compromise is arbitrary code execution, so it is never
+fetched as "latest".
 
 ## CLI
 
@@ -135,6 +218,7 @@ Sources/Core/     the engine: no UI, compiled into both binaries and the tests
 Sources/App/      the SwiftUI menu bar app
 Sources/CLI/      the command line tool
 Sources/Preview/  renders the popover to PNG so the layout can be reviewed
+Resources/        en, sk, cs and de translations, copied into the bundle
 Tests/            unit tests over Sources/Core
 ```
 
@@ -237,7 +321,8 @@ that renders the popover straight to PNG in both appearances:
 swiftc -O -swift-version 6 -target arm64-apple-macos14.0 \
     Sources/Core/*.swift Sources/App/DesignTokens.swift \
     Sources/App/GuardController.swift Sources/App/MenuContent.swift \
-    Sources/App/SettingsView.swift Sources/Preview/main.swift -o /tmp/preview
+    Sources/App/SettingsView.swift Sources/App/UpdaterProtocol.swift \
+    Sources/App/StatusIcon.swift Sources/Preview/main.swift -o /tmp/preview
 /tmp/preview /tmp/menu.png     # writes menu-light.png and menu-dark.png
 ```
 

@@ -11,6 +11,13 @@ MainActor.assumeIsolated {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
 
+    // Icon mode renders the menu bar icon instead of the popover. It needs no
+    // controller and no calendar, because StatusIconArt takes plain values.
+    if CommandLine.arguments.contains("icons") {
+        renderIconSheet()
+        exit(0)
+    }
+
     let controller = GuardController()
     controller.start()
 
@@ -26,6 +33,9 @@ MainActor.assumeIsolated {
         for scheme in [ColorScheme.light, .dark] {
             let view = MenuContent()
                 .environment(controller)
+                // The harness never updates itself; this is only here because
+                // the popover reads the status out of the environment.
+                .environment(UpdateStatus())
                 .environment(\.colorScheme, scheme)
                 // The real popover sits on ultraThinMaterial over the desktop,
                 // which an offscreen render has nothing to blur. Substitute a
@@ -60,4 +70,81 @@ MainActor.assumeIsolated {
     }
 
     app.run()
+}
+
+
+/// A contact sheet of every menu bar state, at the size the menu bar draws them
+/// and again enlarged.
+///
+/// The menu bar icon is the part of this app that is hardest to look at: it is
+/// 16 points wide, it only shows some states while a backup is actually
+/// running, and a MenuBarExtra label cannot be opened on demand. Rendering it
+/// offscreen is the only way the backup animation gets reviewed rather than
+/// hoped about.
+@MainActor
+func renderIconSheet() {
+    struct Sample {
+        let title: String
+        let state: StatusIconState
+        var percent: Double?
+        var phase: Int = 0
+    }
+
+    var samples: [Sample] = [
+        Sample(title: "idle", state: .idle),
+        Sample(title: "armed", state: .armed),
+        Sample(title: "off", state: .off),
+        Sample(title: "ejecting", state: .ejecting),
+        Sample(title: "0%", state: .backingUp, percent: 0),
+        Sample(title: "35%", state: .backingUp, percent: 0.35),
+        Sample(title: "78%", state: .backingUp, percent: 0.78),
+        Sample(title: "100%", state: .backingUp, percent: 1),
+    ]
+    // The indeterminate sweep, one column per step of its cycle.
+    for phase in 0..<GuardController.breatheSteps {
+        samples.append(Sample(title: "…\(phase)", state: .backingUp, percent: nil, phase: phase))
+    }
+
+    let sheet = VStack(alignment: .leading, spacing: 14) {
+        ForEach([ColorScheme.light, .dark], id: \.self) { scheme in
+            HStack(alignment: .bottom, spacing: 10) {
+                ForEach(Array(samples.enumerated()), id: \.offset) { _, sample in
+                    VStack(spacing: 6) {
+                        // Actual size, on the menu bar's own tinted background.
+                        StatusIconArt(state: sample.state,
+                                      percent: sample.percent,
+                                      phase: sample.phase)
+                            .frame(width: 26, height: 22)
+                            .background(scheme == .dark
+                                        ? Color(white: 0.18) : Color(white: 0.82))
+                        Text(sample.title)
+                            .font(.system(size: 8))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(10)
+            .environment(\.colorScheme, scheme)
+            .background(scheme == .dark ? Color(white: 0.10) : Color(white: 0.95))
+        }
+    }
+    .padding(12)
+    .background(Color(white: 0.5))
+
+    let renderer = ImageRenderer(content: sheet)
+    // The icon is 16 points wide; 6x is what makes a 2 point bar reviewable.
+    renderer.scale = 6
+    let path = CommandLine.arguments.count > 1
+        ? CommandLine.arguments[1]
+        : NSTemporaryDirectory() + "status-icons.png"
+    guard let image = renderer.nsImage,
+          let tiff = image.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: tiff),
+          let png = bitmap.representation(using: .png, properties: [:]),
+          (try? png.write(to: URL(fileURLWithPath: path))) != nil
+    else {
+        FileHandle.standardError.write("icon render failed\n".data(using: .utf8)!)
+        exit(1)
+    }
+    print("wrote \(path)")
 }

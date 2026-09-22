@@ -25,6 +25,35 @@
     <string>Reads your upcoming meetings so the external disk can be ejected before you unplug it.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Reads your upcoming meetings so the external disk can be ejected before you unplug it.</string>
+    <!-- Sparkle. The feed is a stable path in the repository rather than a
+         release asset, so the URL never changes and a release only has to
+         rewrite one file. SUPublicEDKey is the public half of the EdDSA key
+         that signs update archives; the private half lives in the login
+         keychain and is what an attacker would need to serve a malicious
+         update. -->
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/m-moravcik/tm-eject-guard/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>ciayVzrfVUd/AHaU8EB8T7xsMfathzO3rKMGxHK1xEk=</string>
+    <!-- Sparkle's own default is to ask on first launch. A menu bar utility has
+         no launch the user is watching, so the answer is made here instead. -->
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <!-- Daily. Sparkle's default is weekly, which for a tool that guards a disk
+         every working day is longer than it needs to be. -->
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <!-- The four interface languages. Without this macOS reports only the
+         development region and Sparkle's own windows ignore the rest. -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>sk</string>
+        <string>cs</string>
+        <string>de</string>
+    </array>
     <key>NSSupportsAutomaticTermination</key>
     <false/>
     <key>NSSupportsSuddenTermination</key>

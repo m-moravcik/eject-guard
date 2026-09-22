@@ -226,7 +226,7 @@ case "run", "dry-run":
     if !outcome.failed.isEmpty { exit(1) }
 
 case "eject-now":
-    let outcome = GuardRunner.ejectGuarded(reason: "manual eject", config: config, notifyOnSuccess: false)
+    let outcome = GuardRunner.ejectGuarded(reason: .manual(), config: config, notifyOnSuccess: false)
     if outcome.ejected.isEmpty && outcome.failed.isEmpty {
         print("no guarded disk is attached")
     }

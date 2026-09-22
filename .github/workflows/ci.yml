@@ -28,13 +28,29 @@ jobs:
         run: |
           set -euo pipefail
           APP="build/TM Eject Guard.app"
-          codesign --verify --strict --verbose=2 "$APP"
+          # --deep: the bundle now embeds a framework with nested helpers.
+          codesign --verify --deep --strict --verbose=2 "$APP"
           # A menu bar utility that shows up in the Dock is a regression.
           /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP/Contents/Info.plist" | grep -q true
           # EventKit is denied outright under the hardened runtime without this.
           grep -q "personal-information.calendars" App/TMEjectGuard.entitlements
           test -x "$APP/Contents/MacOS/TMEjectGuard"
           test -x build/tm-eject-guard
+          # All four interface languages must reach the bundle, or the app
+          # silently falls back to the English in the source.
+          for lang in en sk cs de; do
+            test -f "$APP/Contents/Resources/$lang.lproj/Localizable.strings"
+            test -f "$APP/Contents/Resources/$lang.lproj/Localizable.stringsdict"
+          done
+          # Sparkle has to be embedded and reachable through the rpath, or the
+          # app fails to launch rather than failing to update.
+          test -d "$APP/Contents/Frameworks/Sparkle.framework"
+          otool -l "$APP/Contents/MacOS/TMEjectGuard" \
+            | grep -q "@executable_path/../Frameworks"
+          # The updater feed and its public key are what make an update safe to
+          # install; an empty one would ship an app that trusts anything.
+          /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$APP/Contents/Info.plist" | grep -q https
+          /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$APP/Contents/Info.plist" | grep -q .
 
       - name: Guard against shell invocation
         # Every external call must go through Process with an argument array.
@@ -55,4 +71,17 @@ jobs:
           if grep -rn --include='*.swift' -vE '^\s*(//|///|\*)' Sources/ \
              | grep -q 'waitUntilExit'; then
             echo "waitUntilExit is banned - see Shell.run"; exit 1
+          fi
+
+      - name: Guard against untranslated interface text
+        # Every user-facing string goes through Loc.t so LocalizationTests can
+        # see it. A bare Text("…") or Button("…") is invisible to that check.
+        run: |
+          set -euo pipefail
+          if grep -rn --include='*.swift' -vE '^\s*(//|///|\*)' \
+             Sources/App Sources/Core \
+             | grep -E '(Text|Button|Toggle|Label|Picker)\("[A-Z][a-z]+ ' \
+             | grep -v 'Loc\.t'; then
+            echo "user-facing text is not going through Loc.t - see README, Languages"
+            exit 1
           fi

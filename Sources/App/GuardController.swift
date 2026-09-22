@@ -26,8 +26,12 @@ final class GuardController {
     private(set) var isBusy = false
     private(set) var lastFailure: String?
 
-    /// Refreshed only while the popover is open - see `refreshBackupStatus`.
     private(set) var backup = BackupStatus()
+    /// Advances while a guarded disk is being backed up, and is what makes the
+    /// menu bar icon move. A MenuBarExtra label is rendered to a static image,
+    /// so SwiftUI's own symbol effects never run there - measured, not assumed.
+    /// The only animation available is one we redraw ourselves.
+    private(set) var backupPhase = 0
 
     /// nil until we have asked. False means an eject will happen silently,
     /// which is worth saying out loud since the notification is the only
@@ -42,6 +46,11 @@ final class GuardController {
 
     private var ejectTimer: Timer?
     private var heartbeat: Timer?
+    /// Asks Time Machine what it is doing, but only while a guarded disk is
+    /// plugged in - see `updateBackupWatch`.
+    private var backupTimer: Timer?
+    /// Advances `backupPhase`. Pure bookkeeping, no process is spawned.
+    private var breatheTimer: Timer?
     private var pendingReschedule: DispatchWorkItem?
     private var isScanning = false
     private var rescanWhenIdle = false
@@ -63,6 +72,14 @@ final class GuardController {
     private let horizonMinutes: Double = 24 * 60
     /// Backstop cadence. Only covers a missed notification, so it can be slow.
     private let heartbeatSeconds: TimeInterval = 300
+    /// While a backup runs the menu bar shows progress, so it is read often.
+    /// Otherwise this is only here to notice one starting.
+    private let backupPollWhileRunning: TimeInterval = 5
+    private let backupPollWhileIdle: TimeInterval = 20
+    /// Eight steps of a two second cycle: slow enough to read as breathing
+    /// rather than blinking, cheap enough to run for the length of a backup.
+    static let breatheSteps = 8
+    private let breatheInterval: TimeInterval = 0.25
 
     var knownDisks: [KnownDisk] { config.knownDisks }
 
@@ -95,14 +112,85 @@ final class GuardController {
         return backup.isBackingUp(to: volume.path)
     }
 
-    /// Polled by the popover while it is on screen. Deliberately not on a
-    /// background schedule: nobody needs to know about a backup they cannot see.
-    /// Reading it spawns `tmutil`, so that part stays off the main actor.
+    /// True when Time Machine is writing to a disk this app is guarding.
+    var isGuardedBackupRunning: Bool {
+        guardedVolumes.contains { backup.isBackingUp(to: $0.path) }
+    }
+
+    /// 0...1, or nil while Time Machine is still sizing the job up.
+    var guardedBackupPercent: Double? {
+        isGuardedBackupRunning ? backup.percent : nil
+    }
+
+    /// Reading this spawns `tmutil`, so that part stays off the main actor.
+    ///
+    /// Called both by the popover while it is open and, since the menu bar icon
+    /// shows backup progress, by `backupTimer`. That timer only runs while a
+    /// guarded disk is actually plugged in, which is the only time the answer
+    /// can be anything but "no".
     func refreshBackupStatus() {
         work.async { [weak self] in
             let status = BackupStatus.current()
-            Task { @MainActor in self?.backup = status }
+            Task { @MainActor in
+                guard let self else { return }
+                self.backup = status
+                // Both the poll interval and the breathing depend on the
+                // answer, so every answer re-evaluates them. The call is cheap:
+                // it rebuilds a timer only when the interval actually changed.
+                self.updateBackupWatch()
+            }
         }
+    }
+
+    // MARK: - Backup watch
+
+    /// Start, restart or stop the backup poll to match the current state.
+    ///
+    /// The cost of knowing is one `tmutil status` every few seconds, and only
+    /// while a guarded disk is attached and guarding is on - which is exactly
+    /// when a backup can be running and when the answer is worth showing. With
+    /// nothing plugged in, nothing is polled at all.
+    private func updateBackupWatch() {
+        let wanted = config.isActive && !guardedVolumes.isEmpty
+        guard wanted else {
+            stopBackupWatch()
+            if backup.running { backup = BackupStatus() }
+            return
+        }
+
+        let interval = backup.running ? backupPollWhileRunning : backupPollWhileIdle
+        if backupTimer?.timeInterval != interval {
+            backupTimer?.invalidate()
+            backupTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+                MainActor.assumeIsolated { self.refreshBackupStatus() }
+            }
+            // A backup is minutes long; the poll does not need to be punctual.
+            backupTimer?.tolerance = interval / 4
+        }
+
+        // The breathing only exists while there is something to breathe about.
+        if isGuardedBackupRunning {
+            if breatheTimer == nil {
+                breatheTimer = Timer.scheduledTimer(
+                    withTimeInterval: breatheInterval, repeats: true) { _ in
+                    MainActor.assumeIsolated {
+                        self.backupPhase = (self.backupPhase + 1) % Self.breatheSteps
+                    }
+                }
+            }
+        } else {
+            breatheTimer?.invalidate()
+            breatheTimer = nil
+            backupPhase = 0
+        }
+    }
+
+    private func stopBackupWatch() {
+        backupTimer?.invalidate()
+        backupTimer = nil
+        breatheTimer?.invalidate()
+        breatheTimer = nil
+        backupPhase = 0
     }
 
     var hiddenDiskCount: Int { config.dismissedDiskIDs.count }
@@ -257,6 +345,8 @@ final class GuardController {
         ejectDate = nil
 
         reloadConfig()
+        // After the reload, so it reads the settings that are now in force.
+        updateBackupWatch()
         guard calendarAccess == .granted else { return }
 
         // Surface the next meeting even when the guard cannot act on it, so the
@@ -309,11 +399,13 @@ final class GuardController {
         // endless retry loop. The user still has "Eject now".
         handledMeetings.insert(key(for: meeting))
         let minutesAhead = Int((meeting.startDate.timeIntervalSinceNow / 60).rounded())
-        let reason = "\(meeting.title ?? "Meeting") in \(minutesAhead) min"
+        let reason = GuardRunner.Reason.meeting(
+            title: meeting.title ?? Loc.t("meeting.untitled", "Meeting"),
+            minutesAhead: minutesAhead)
         runEject(reason: reason, notifyOnSuccess: true)
     }
 
-    private func runEject(reason: String, notifyOnSuccess: Bool) {
+    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool) {
         let config = self.config
         // Check against the snapshot we already have; the eject itself rescans
         // on the work queue.
@@ -325,7 +417,9 @@ final class GuardController {
             Task { @MainActor in
                 guard let self else { return }
                 self.isBusy = false
-                self.lastFailure = outcome.failed.first.map { "\($0.name): held by \($0.detail)" }
+                self.lastFailure = outcome.failed.first.map {
+                    Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, $0.detail)
+                }
                 self.reloadDisks()
                 self.reschedule()
             }
@@ -425,7 +519,7 @@ final class GuardController {
     func ejectNow() {
         guard !isBusy else { return }
         reloadConfig()
-        runEject(reason: "Ejected from the menu", notifyOnSuccess: false)
+        runEject(reason: .menu(), notifyOnSuccess: false)
     }
 
     /// Best effort only.
@@ -443,7 +537,7 @@ final class GuardController {
         let snapshot = adjusted
         work.async {
             Log.write("sleep: attempting one eject before the Mac sleeps")
-            GuardRunner.ejectGuarded(reason: "Mac going to sleep", config: snapshot)
+            GuardRunner.ejectGuarded(reason: .sleep(), config: snapshot)
         }
     }
 
@@ -460,10 +554,12 @@ enum Format {
     static func relative(_ date: Date) -> String {
         let minutes = Int((date.timeIntervalSinceNow / 60).rounded())
         if minutes <= 0 { return "now" }
-        if minutes < 60 { return "in \(minutes) min" }
+        if minutes < 60 { return Loc.t("relative.minutes", "in %d min", minutes) }
         let hours = minutes / 60
         let rest = minutes % 60
-        return rest == 0 ? "in \(hours) h" : "in \(hours) h \(rest) min"
+        return rest == 0
+            ? Loc.t("relative.hours", "in %d h", hours)
+            : Loc.t("relative.hoursMinutes", "in %1$d h %2$d min", hours, rest)
     }
 
     static func clock(_ date: Date) -> String {

@@ -1,0 +1,3 @@
+/* Shown by macOS in the Calendar permission prompt, before the app has any UI. */
+"NSCalendarsUsageDescription" = "Čte tvoje nejbližší schůzky, aby se externí disk vysunul dřív, než ho odpojíš.";
+"NSCalendarsFullAccessUsageDescription" = "Čte tvoje nejbližší schůzky, aby se externí disk vysunul dřív, než ho odpojíš.";

@@ -12,18 +12,18 @@ struct MenuContent: View {
             } else if let until = controller.config.pausedUntil, until > Date() {
                 StateBanner(icon: "pause.circle.fill",
                             tint: .orange,
-                            title: "Paused until \(Format.clock(until))",
-                            detail: "Nothing will be ejected until then.")
+                            title: Loc.t("banner.pausedUntil", "Paused until %@", Format.clock(until)),
+                            detail: Loc.t("banner.pausedDetail", "Nothing will be ejected until then."))
             } else if !controller.config.enabled {
                 StateBanner(icon: "xmark.circle.fill",
                             tint: .orange,
-                            title: "Guarding is off",
-                            detail: "Turn it back on in Settings.")
+                            title: Loc.t("banner.guardingOff", "Guarding is off"),
+                            detail: Loc.t("banner.guardingOffDetail", "Turn it back on in Settings."))
             } else if controller.notificationsEnabled == false {
                 StateBanner(icon: "bell.slash.fill",
                             tint: .orange,
-                            title: "Notifications are off",
-                            detail: "Disks will still be ejected, but silently.")
+                            title: Loc.t("banner.notificationsOff", "Notifications are off"),
+                            detail: Loc.t("banner.notificationsOffDetail", "Disks will still be ejected, but silently."))
             }
 
             VStack(spacing: 0) {
@@ -163,9 +163,9 @@ private struct CalendarAccessBanner: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Calendar access needed")
+                    Text(Loc.t("calendar.accessNeeded", "Calendar access needed"))
                         .font(Design.Typography.cardTitle)
-                    Text("Without it the guard cannot see your meetings.")
+                    Text(Loc.t("calendar.accessDetail", "Without it the guard cannot see your meetings."))
                         .font(Design.Typography.note)
                         .foregroundStyle(.secondary)
                 }
@@ -189,11 +189,11 @@ private struct DisksSection: View {
 
     var body: some View {
         VStack(spacing: Design.Spacing.xs) {
-            SectionHeader(title: "DISKS")
+            SectionHeader(title: Loc.t("section.disks", "DISKS"))
 
             Group {
                 if controller.knownDisks.isEmpty {
-                    Text("No external disks seen yet.\nPlug one in and it shows up here.")
+                    Text(Loc.t("disks.empty", "No external disks seen yet.\nPlug one in and it shows up here."))
                         .font(Design.Typography.note)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -207,7 +207,7 @@ private struct DisksSection: View {
                         // The one thing a new user has to do, said where they
                         // are looking rather than only in the README.
                         if controller.config.watchedDiskIDs.isEmpty {
-                            Text("Click a disk to guard it.")
+                            Text(Loc.t("disks.hint", "Click a disk to guard it."))
                                 .font(Design.Typography.note)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -245,12 +245,13 @@ private struct DiskCard: View {
     private var subtitle: String {
         if backingUp {
             if let percent = controller.backup.percent {
-                return "Backing up… \(Int(percent * 100))%"
+                return Loc.t("disk.backingUpPercent", "Backing up… %d%%", Int(percent * 100))
             }
-            return "Backing up…"
+            return Loc.t("disk.backingUp", "Backing up…")
         }
-        let watch = guarded ? "Guarded" : "Not guarded"
-        return "\(watch) · \(connected ? "Connected" : "Disconnected")"
+        let watch = guarded ? Loc.t("disk.guarded", "Guarded") : Loc.t("disk.notGuarded", "Not guarded")
+        let state = connected ? Loc.t("disk.connected", "Connected") : Loc.t("disk.disconnected", "Disconnected")
+        return "\(watch) · \(state)"
     }
 
     private var fill: Color {
@@ -274,7 +275,7 @@ private struct DiskCard: View {
                             .lineLimit(1)
                         if disk.isTimeMachineDestination {
                             Text("TM")
-                                .help("A Time Machine backup destination")
+                                .help(Loc.t("disk.timeMachineBadge", "A Time Machine backup destination"))
                                 .font(Design.Typography.badge)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
@@ -323,8 +324,8 @@ private struct DiskCard: View {
             // Anything can be hidden, including a Time Machine destination that
             // belongs to another Mac and will never be plugged into this one.
             // Settings has the way back.
-            Button("Hide this disk") { controller.hide(disk) }
-            Text("Restore it later in Settings")
+            Button(Loc.t("disk.hide", "Hide this disk")) { controller.hide(disk) }
+            Text(Loc.t("disk.hideHint", "Restore it later in Settings"))
         }
     }
 }
@@ -349,11 +350,11 @@ private struct NextMeetingSection: View {
 
     var body: some View {
         VStack(spacing: Design.Spacing.xs) {
-            SectionHeader(title: "NEXT MEETING")
+            SectionHeader(title: Loc.t("section.nextMeeting", "NEXT MEETING"))
 
             if let meeting = controller.nextMeeting, controller.meetingIsToday {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(meeting.title ?? "Untitled")
+                    Text(meeting.title ?? Loc.t("meeting.untitledEvent", "Untitled"))
                         .font(Design.Typography.cardTitle)
                         .lineLimit(1)
                     Text(detail(for: meeting))
@@ -368,7 +369,7 @@ private struct NextMeetingSection: View {
                 .padding(.horizontal, Design.Spacing.m)
                 .padding(.bottom, Design.Spacing.xs)
 
-                MenuRow(icon: "forward.end", label: "Skip this meeting") {
+                MenuRow(icon: "forward.end", label: Loc.t("meeting.skip", "Skip this meeting")) {
                     controller.skipNextMeeting()
                 }
             } else {
@@ -384,7 +385,7 @@ private struct NextMeetingSection: View {
             // way back stays on screen until the meeting is behind us.
             if let skipped = controller.skippedMeeting {
                 MenuRow(icon: "arrow.uturn.backward",
-                        label: "Undo skip: \(skipped.title ?? "meeting")") {
+                        label: Loc.t("meeting.undoSkip", "Undo skip: %@", skipped.title ?? Loc.t("meeting.lowercase", "meeting"))) {
                     controller.undoLastSkip()
                 }
             }
@@ -393,20 +394,20 @@ private struct NextMeetingSection: View {
 
     private var emptyText: String {
         switch controller.calendarAccess {
-        case .pending: return "Checking your calendar…"
-        case .denied: return "No calendar access."
-        case .granted: return "No more meetings today."
+        case .pending: return Loc.t("meeting.checking", "Checking your calendar…")
+        case .denied: return Loc.t("meeting.noAccess", "No calendar access.")
+        case .granted: return Loc.t("meeting.noneToday", "No more meetings today.")
         }
     }
 
     private func detail(for meeting: EKEvent) -> String {
         var parts = ["\(Format.relative(meeting.startDate)) · \(meeting.calendar.title)"]
         if let ejectDate = controller.ejectDate {
-            parts.append("Ejects at \(Format.clock(ejectDate))")
+            parts.append(Loc.t("meeting.ejectsAt", "Ejects at %@", Format.clock(ejectDate)))
         } else if controller.guardedVolumes.isEmpty {
-            parts.append("No guarded disk connected")
+            parts.append(Loc.t("meeting.noGuardedDisk", "No guarded disk connected"))
         } else if !controller.config.isActive {
-            parts.append("Guard is off")
+            parts.append(Loc.t("meeting.guardOff", "Guard is off"))
         }
         return parts.joined(separator: "\n")
     }
@@ -417,30 +418,32 @@ private struct NextMeetingSection: View {
 private struct FooterBar: View {
     @Environment(GuardController.self) private var controller
     @Environment(\.openSettings) private var openSettings
+    @Environment(UpdateStatus.self) private var updateStatus
+    @Environment(\.updater) private var updater
 
     private var paused: Bool { (controller.config.pausedUntil ?? .distantPast) > Date() }
 
     private var pauseLabel: String {
         let hours = controller.config.pauseHours
-        return hours == 1 ? "Pause for 1 hour" : "Pause for \(Int(hours)) hours"
+        return Loc.t("footer.pauseHours", "Pause for %d hours", Int(hours))
     }
 
     /// Naming the disk beats a bare "Eject now": this acts on guarded disks
     /// that are connected, which is not the same set as "everything plugged in".
     private var ejectLabel: String {
-        if controller.isBusy { return "Ejecting…" }
+        if controller.isBusy { return Loc.t("footer.ejecting", "Ejecting…") }
         let volumes = controller.guardedVolumes
         switch volumes.count {
-        case 0: return "Eject now"
-        case 1: return "Eject \(volumes[0].name)"
-        default: return "Eject \(volumes.count) disks"
+        case 0: return Loc.t("footer.ejectNow", "Eject now")
+        case 1: return Loc.t("footer.ejectOne", "Eject %@", volumes[0].name)
+        default: return Loc.t("footer.ejectMany", "Eject %d disks", volumes.count)
         }
     }
 
     private var ejectHelp: String {
         let volumes = controller.guardedVolumes
-        guard !volumes.isEmpty else { return "No guarded disk is connected." }
-        return "Ejects \(volumes.map(\.name).joined(separator: ", ")). Disks you have not ticked are left alone."
+        guard !volumes.isEmpty else { return Loc.t("footer.ejectHelpNone", "No guarded disk is connected.") }
+        return Loc.t("footer.ejectHelp", "Ejects %@. Disks you have not ticked are left alone.", volumes.map(\.name).joined(separator: ", "))
     }
 
     var body: some View {
@@ -457,7 +460,7 @@ private struct FooterBar: View {
                             .font(Design.Typography.note)
                             .lineLimit(2)
                         Spacer(minLength: Design.Spacing.s)
-                        Button("Dismiss") { controller.dismissFailure() }
+                        Button(Loc.t("footer.dismiss", "Dismiss")) { controller.dismissFailure() }
                             .font(Design.Typography.note)
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
@@ -476,7 +479,7 @@ private struct FooterBar: View {
                     .help(ejectHelp)
 
                 if paused {
-                    MenuRow(icon: "play.circle", label: "Resume guarding") {
+                    MenuRow(icon: "play.circle", label: Loc.t("footer.resume", "Resume guarding")) {
                         controller.resume()
                     }
                 } else {
@@ -485,13 +488,24 @@ private struct FooterBar: View {
                     }
                 }
 
-                MenuRow(icon: "gearshape", label: "Settings…", shortcut: "⌘,") {
+                // Only when there is something staged. Sparkle installs on
+                // quit by default, and a menu bar app can go weeks without
+                // quitting, so this is the moment the update becomes real.
+                if updateStatus.isUpdateReady {
+                    MenuRow(icon: "arrow.down.circle.fill",
+                            label: Loc.t("footer.updateReady", "Update ready - restart now")) {
+                        updater?.installUpdate()
+                    }
+                    .help(Loc.t("footer.updateReadyHelp", "Restarts TM Eject Guard to finish installing the downloaded update."))
+                }
+
+                MenuRow(icon: "gearshape", label: Loc.t("footer.settings", "Settings…"), shortcut: "⌘,") {
                     NSApp.activate(ignoringOtherApps: true)
                     openSettings()
                 }
                 .keyboardShortcut(",")
 
-                MenuRow(icon: "power", label: "Quit", shortcut: "⌘Q") {
+                MenuRow(icon: "power", label: Loc.t("footer.quit", "Quit"), shortcut: "⌘Q") {
                     NSApp.terminate(nil)
                 }
                 .keyboardShortcut("q")

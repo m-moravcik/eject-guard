@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>footer.ejectMany</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>Vysunúť %d disk</string>
+                <key>few</key>
+                <string>Vysunúť %d disky</string>
+                <key>other</key>
+                <string>Vysunúť %d diskov</string>
+        </dict>
+    </dict>
+    <key>footer.pauseHours</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>Pozastaviť na %d hodinu</string>
+                <key>few</key>
+                <string>Pozastaviť na %d hodiny</string>
+                <key>other</key>
+                <string>Pozastaviť na %d hodín</string>
+        </dict>
+    </dict>
+    <key>settings.hours</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>%d hodina</string>
+                <key>few</key>
+                <string>%d hodiny</string>
+                <key>other</key>
+                <string>%d hodín</string>
+        </dict>
+    </dict>
+    <key>settings.leadMinutes</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>%d minútu pred stretnutím</string>
+                <key>few</key>
+                <string>%d minúty pred stretnutím</string>
+                <key>other</key>
+                <string>%d minút pred stretnutím</string>
+        </dict>
+    </dict>
+</dict>
+</plist>

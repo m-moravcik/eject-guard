@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>footer.ejectMany</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>Eject %d disk</string>
+                <key>other</key>
+                <string>Eject %d disks</string>
+        </dict>
+    </dict>
+    <key>footer.pauseHours</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>Pause for %d hour</string>
+                <key>other</key>
+                <string>Pause for %d hours</string>
+        </dict>
+    </dict>
+    <key>settings.hours</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>%d hour</string>
+                <key>other</key>
+                <string>%d hours</string>
+        </dict>
+    </dict>
+    <key>settings.leadMinutes</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+                <key>one</key>
+                <string>%d minute before a meeting</string>
+                <key>other</key>
+                <string>%d minutes before a meeting</string>
+        </dict>
+    </dict>
+</dict>
+</plist>
