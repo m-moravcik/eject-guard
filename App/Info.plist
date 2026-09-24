@@ -11,7 +11,11 @@
     <key>CFBundleDisplayName</key>
     <string>TM Eject Guard</string>
     <!-- No Dock icon, but Finder, notifications and Sparkle's windows still
-         show this. Rendered from AppIcon.svg by make-icon.sh. -->
+         show this. CFBundleIconName is the Assets.car icon macOS 26 draws;
+         CFBundleIconFile the .icns older systems fall back to. Both come from
+         AppIcon.icon via make-icon.sh. -->
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>

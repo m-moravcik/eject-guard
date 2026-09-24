@@ -1,35 +1,36 @@
 #!/bin/bash
-# Render App/AppIcon.icns from App/AppIcon.svg.
+# Compile App/AppIcon.icon into the files build.sh ships.
 #
-# Run it after editing the SVG and commit both. The .icns is checked in so that
-# build.sh needs nothing but the Xcode command line tools.
+#   App/AppIcon.icon/     the source: Icon Composer layers (SVG) and icon.json
+#   App/Icon/Assets.car   the macOS 26 icon, rendered by the system with glass
+#   App/Icon/AppIcon.icns the fallback macOS 14 and 15 read instead
 #
-# qlmanage renders SVG through WebKit, which is the renderer that honours the
-# drop shadow filter; NSImage's own SVG support silently drops it. Every size is
-# downscaled from one 1024 px master rather than rendered separately, which is
-# what iconutil expects and keeps the sizes pixel-consistent.
+# Run it after editing the .icon (in Icon Composer, or by hand) and commit the
+# output. It is checked in because actool only understands .icon from Xcode 26
+# on, and build.sh - CI included - must not depend on which Xcode is selected.
+#
+# A plain .icns alone is not enough on macOS 26: Finder shrinks it into a grey
+# rounded tile, because only an icon compiled from .icon counts as conforming.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SVG="App/AppIcon.svg"
-ICNS="App/AppIcon.icns"
+SOURCE="App/AppIcon.icon"
+OUT="App/Icon"
 
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+[ -d "$SOURCE" ] || die "no icon source at $SOURCE"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-qlmanage -t -s 1024 -o "$WORK" "$SVG" >/dev/null 2>&1
-MASTER="$WORK/$(basename "$SVG").png"
-[ -f "$MASTER" ] || die "qlmanage did not render $SVG"
+xcrun actool "$SOURCE" --compile "$WORK" \
+    --platform macosx --minimum-deployment-target 14.0 \
+    --app-icon AppIcon --output-partial-info-plist "$WORK/partial.plist" >/dev/null \
+    || die "actool failed - it needs Xcode 26 or newer"
+[ -f "$WORK/Assets.car" ] && [ -f "$WORK/AppIcon.icns" ] \
+    || die "actool produced no icon - is Xcode 26 selected? (xcode-select -p)"
 
-ICONSET="$WORK/AppIcon.iconset"
-mkdir "$ICONSET"
-for size in 16 32 128 256 512; do
-    sips -z "$size" "$size" "$MASTER" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
-    double=$((size * 2))
-    sips -z "$double" "$double" "$MASTER" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
-done
-
-iconutil -c icns "$ICONSET" -o "$ICNS"
-echo "wrote $ICNS"
+mkdir -p "$OUT"
+cp "$WORK/Assets.car" "$WORK/AppIcon.icns" "$OUT/"
+echo "wrote $OUT/Assets.car and $OUT/AppIcon.icns"

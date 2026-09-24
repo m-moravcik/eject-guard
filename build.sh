@@ -38,8 +38,9 @@ swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
     -o "$APP/Contents/MacOS/TMEjectGuard"
 
 cp App/Info.plist "$APP/Contents/Info.plist"
-# Checked in, not rendered here, so a build needs no SVG renderer.
-cp App/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Compiled by make-icon.sh and checked in, so a build does not depend on which
+# Xcode is selected. Assets.car for macOS 26, the .icns for 14 and 15.
+cp App/Icon/Assets.car App/Icon/AppIcon.icns "$APP/Contents/Resources/"
 
 # Interface translations. SwiftUI resolves these against the bundle at runtime,
 # so a missing .lproj silently falls back to the English in the source; the
