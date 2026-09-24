@@ -2,8 +2,8 @@
 # Build the menu bar app bundle and the CLI.
 #
 # Output:
-#   build/TM Eject Guard.app   menu bar app (LSUIElement, no Dock icon)
-#   build/tm-eject-guard       command line tool
+#   build/Eject Guard.app   menu bar app (LSUIElement, no Dock icon)
+#   build/eject-guard       command line tool
 #
 # Both are ad-hoc signed. TCC identifies an ad-hoc binary by its code directory
 # hash, so a rebuild revokes Calendar access and macOS prompts again on the next
@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 source ./sparkle.sh
 
-APP_NAME="TM Eject Guard"
+APP_NAME="Eject Guard"
 BUILD="build"
 APP="$BUILD/$APP_NAME.app"
 
@@ -35,7 +35,7 @@ swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
     -F "$SPARKLE_ROOT" -framework Sparkle \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
     Sources/Core/*.swift Sources/App/*.swift \
-    -o "$APP/Contents/MacOS/TMEjectGuard"
+    -o "$APP/Contents/MacOS/EjectGuard"
 
 cp App/Info.plist "$APP/Contents/Info.plist"
 # Compiled by make-icon.sh and checked in, so a build does not depend on which
@@ -74,10 +74,10 @@ echo "building cli..."
 # pure decision logic, never Sparkle itself.
 swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
     Sources/Core/*.swift Sources/CLI/main.swift \
-    -o "$BUILD/tm-eject-guard" \
+    -o "$BUILD/eject-guard" \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker CLI/Info.plist
-codesign --force --sign - "$BUILD/tm-eject-guard"
+codesign --force --sign - "$BUILD/eject-guard"
 
 echo "built:"
 echo "  $PWD/$APP"
-echo "  $PWD/$BUILD/tm-eject-guard"
+echo "  $PWD/$BUILD/eject-guard"

@@ -207,7 +207,7 @@ struct HeroScene<Popover: View>: View {
                                 .resizable()
                                 .frame(width: 168, height: 168)
                         }
-                        Text("TM Eject Guard")
+                        Text("Eject Guard")
                             .font(.system(size: 40, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)

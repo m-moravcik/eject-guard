@@ -1,7 +1,7 @@
 #!/bin/bash
 # Write appcast.xml for a built, signed, notarized archive.
 #
-#   ./make-appcast.sh build/TM-Eject-Guard-1.1.zip
+#   ./make-appcast.sh build/Eject-Guard-1.3.zip
 #
 # Run this after release.sh, then attach the same archive to a GitHub release
 # tagged v<version> and commit appcast.xml.
@@ -23,8 +23,8 @@ source ./sparkle.sh
 
 ZIP="${1:-}"
 OUT="${2:-appcast.xml}"
-REPO="m-moravcik/tm-eject-guard"
-APP="build/TM Eject Guard.app"
+REPO="m-moravcik/eject-guard"
+APP="build/Eject Guard.app"
 
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
@@ -73,7 +73,7 @@ cat > "$OUT" <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>TM Eject Guard</title>
+    <title>Eject Guard</title>
     <link>https://raw.githubusercontent.com/$REPO/main/appcast.xml</link>
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>

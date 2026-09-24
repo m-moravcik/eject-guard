@@ -38,12 +38,12 @@
 "footer.ejectNow" = "Eject now";
 "footer.ejectOne" = "Eject %@";
 "footer.ejecting" = "Ejecting…";
-"footer.about" = "About TM Eject Guard";
+"footer.about" = "About Eject Guard";
 "footer.quit" = "Quit";
 "footer.resume" = "Resume guarding";
 "footer.settings" = "Settings…";
 "footer.updateReady" = "Update ready - restart now";
-"footer.updateReadyHelp" = "Restarts TM Eject Guard to finish installing the downloaded update.";
+"footer.updateReadyHelp" = "Restarts Eject Guard to finish installing the downloaded update.";
 "meeting.checking" = "Checking your calendar…";
 "meeting.ejectsAt" = "Ejects at %@";
 "meeting.guardOff" = "Guard is off";

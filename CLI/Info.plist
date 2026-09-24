@@ -5,7 +5,7 @@
     <key>CFBundleIdentifier</key>
     <string>sk.moravcik.tmejectguard.cli</string>
     <key>CFBundleName</key>
-    <string>tm-eject-guard</string>
+    <string>eject-guard</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>NSCalendarsUsageDescription</key>

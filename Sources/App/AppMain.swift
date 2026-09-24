@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct TMEjectGuardApp: App {
+struct EjectGuardApp: App {
     @State private var controller: GuardController
     /// Not @State: the updater is created once and never replaced, and the
     /// thing views observe is its `updateStatus`, not the controller itself.

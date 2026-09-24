@@ -1,21 +1,22 @@
 <p align="center"><img src="docs/icon.png" width="128" height="128" alt=""></p>
 
-<h1 align="center">TM Eject Guard</h1>
+<h1 align="center">Eject Guard</h1>
 
-**Never unplug a mounted backup disk again.** TM Eject Guard is a small macOS
-menu bar app that ejects your external disks a few minutes before a meeting
-starts, so you can grab the laptop and go.
+**Never unplug a mounted disk again.** Eject Guard is a small macOS menu bar
+app that ejects your external disks a few minutes before a meeting starts, so
+you can grab the laptop and go. A Time Machine drive, an archive, a portable
+SSD: whichever you tick.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/popover-dark.png">
-    <img src="docs/popover-light.png" width="480" alt="TM Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42%, two more disks, and the next meeting with the time the disks will be ejected">
+    <img src="docs/popover-light.png" width="480" alt="Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42%, two more disks, and the next meeting with the time the disks will be ejected">
   </picture>
 </p>
 
 You head to a meeting, pull the laptop off the desk, and only remember the
 Time Machine drive once the cable is already out. On a spinning HDD, especially
-mid-backup, that is how backups get corrupted. TM Eject Guard remembers for you.
+mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
 
 ## What it does
 
@@ -37,9 +38,9 @@ It works in English, Slovak, Czech and German, and updates itself.
 
 ## Install
 
-1. Download `TM-Eject-Guard-<version>.zip` from the
-   [latest release](https://github.com/m-moravcik/tm-eject-guard/releases/latest).
-2. Unzip it and move **TM Eject Guard** to Applications.
+1. Download `Eject-Guard-<version>.zip` from the
+   [latest release](https://github.com/m-moravcik/eject-guard/releases/latest).
+2. Unzip it and move **Eject Guard** to Applications.
 3. Open it and allow Calendar access.
 4. Click the menu bar icon and tick the disks to guard.
 
@@ -76,19 +77,22 @@ back in to use it again.
 
 ## Command line
 
-An optional CLI, `tm-eject-guard`, is installed by `./install.sh` from source.
+An optional CLI, `eject-guard`, is installed by `./install.sh` from source.
 It is handy for setup and debugging:
 
 ```sh
-tm-eject-guard                # disks, selection, next meeting
-tm-eject-guard --watch "WD"   # guard a disk
-tm-eject-guard --dry-run      # run a pass without ejecting
-tm-eject-guard --eject-now    # eject guarded disks now
-tm-eject-guard --help         # everything else
+eject-guard                # disks, selection, next meeting
+eject-guard --watch "WD"   # guard a disk
+eject-guard --dry-run      # run a pass without ejecting
+eject-guard --eject-now    # eject guarded disks now
+eject-guard --help         # everything else
 ```
 
-Settings live in `~/Library/Application Support/TMEjectGuard/config.json` and
-the log in `~/Library/Logs/tm-eject-guard.log`.
+Settings live in `~/Library/Application Support/EjectGuard/config.json` and
+the log in `~/Library/Logs/eject-guard.log`.
+
+Eject Guard was called TM Eject Guard before 1.3. Updating keeps your
+settings: they move to the new folder on first launch.
 
 ## Building from source
 

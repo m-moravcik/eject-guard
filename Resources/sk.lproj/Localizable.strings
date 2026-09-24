@@ -38,12 +38,12 @@
 "footer.ejectNow" = "Vysunúť teraz";
 "footer.ejectOne" = "Vysunúť %@";
 "footer.ejecting" = "Vysúva sa…";
-"footer.about" = "O aplikácii TM Eject Guard";
+"footer.about" = "O aplikácii Eject Guard";
 "footer.quit" = "Ukončiť";
 "footer.resume" = "Obnoviť stráženie";
 "footer.settings" = "Nastavenia…";
 "footer.updateReady" = "Aktualizácia je pripravená - reštartuj";
-"footer.updateReadyHelp" = "Reštartuje TM Eject Guard a dokončí inštaláciu stiahnutej aktualizácie.";
+"footer.updateReadyHelp" = "Reštartuje Eject Guard a dokončí inštaláciu stiahnutej aktualizácie.";
 "meeting.checking" = "Kontrolujem kalendár…";
 "meeting.ejectsAt" = "Vysunie o %@";
 "meeting.guardOff" = "Stráž je vypnutá";

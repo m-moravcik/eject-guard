@@ -38,12 +38,12 @@
 "footer.ejectNow" = "Jetzt auswerfen";
 "footer.ejectOne" = "%@ auswerfen";
 "footer.ejecting" = "Wird ausgeworfen…";
-"footer.about" = "Über TM Eject Guard";
+"footer.about" = "Über Eject Guard";
 "footer.quit" = "Beenden";
 "footer.resume" = "Überwachung fortsetzen";
 "footer.settings" = "Einstellungen…";
 "footer.updateReady" = "Update bereit - jetzt neu starten";
-"footer.updateReadyHelp" = "Startet TM Eject Guard neu, um das geladene Update zu installieren.";
+"footer.updateReadyHelp" = "Startet Eject Guard neu, um das geladene Update zu installieren.";
 "meeting.checking" = "Kalender wird geprüft…";
 "meeting.ejectsAt" = "Wirft um %@ aus";
 "meeting.guardOff" = "Überwachung ist aus";

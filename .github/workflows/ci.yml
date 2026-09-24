@@ -27,15 +27,15 @@ jobs:
       - name: Check the bundle
         run: |
           set -euo pipefail
-          APP="build/TM Eject Guard.app"
+          APP="build/Eject Guard.app"
           # --deep: the bundle now embeds a framework with nested helpers.
           codesign --verify --deep --strict --verbose=2 "$APP"
           # A menu bar utility that shows up in the Dock is a regression.
           /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP/Contents/Info.plist" | grep -q true
           # EventKit is denied outright under the hardened runtime without this.
-          grep -q "personal-information.calendars" App/TMEjectGuard.entitlements
-          test -x "$APP/Contents/MacOS/TMEjectGuard"
-          test -x build/tm-eject-guard
+          grep -q "personal-information.calendars" App/EjectGuard.entitlements
+          test -x "$APP/Contents/MacOS/EjectGuard"
+          test -x build/eject-guard
           # All four interface languages must reach the bundle, or the app
           # silently falls back to the English in the source.
           for lang in en sk cs de; do
@@ -45,7 +45,7 @@ jobs:
           # Sparkle has to be embedded and reachable through the rpath, or the
           # app fails to launch rather than failing to update.
           test -d "$APP/Contents/Frameworks/Sparkle.framework"
-          otool -l "$APP/Contents/MacOS/TMEjectGuard" \
+          otool -l "$APP/Contents/MacOS/EjectGuard" \
             | grep -q "@executable_path/../Frameworks"
           # The updater feed and its public key are what make an update safe to
           # install; an empty one would ship an app that trusts anything.

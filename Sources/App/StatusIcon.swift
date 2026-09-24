@@ -60,7 +60,7 @@ struct StatusIcon: View {
         StatusIconArt(state: state,
                       percent: controller.guardedBackupPercent,
                       phase: controller.backupPhase)
-            .accessibilityLabel("TM Eject Guard: \(label)")
+            .accessibilityLabel("Eject Guard: \(label)")
     }
 }
 

@@ -1,6 +1,6 @@
 # Development
 
-How TM Eject Guard works inside, how to build and release it, and the lessons
+How Eject Guard works inside, how to build and release it, and the lessons
 behind the rules the code follows. For what the app does, see the
 [README](README.md).
 
@@ -128,13 +128,13 @@ instead.
 Releasing:
 
 ```sh
-echo 1.2.4 > VERSION                # and write release-notes/1.2.4.md
+echo 1.3 > VERSION                # and write release-notes/1.3.md
 ./release.sh                        # sign, notarize, staple
-./make-appcast.sh build/TM-Eject-Guard-1.2.4.zip
-git add VERSION appcast.xml release-notes && git commit -m "Release 1.2.4"
-git push && git tag v1.2.4 && git push origin v1.2.4
-gh release create v1.2.4 build/TM-Eject-Guard-1.2.4.zip --verify-tag \
-    --title v1.2.4 --notes-file release-notes/1.2.4.md
+./make-appcast.sh build/Eject-Guard-1.3.zip
+git add VERSION appcast.xml release-notes && git commit -m "Release 1.3"
+git push && git tag v1.3 && git push origin v1.3
+gh release create v1.3 build/Eject-Guard-1.3.zip --verify-tag \
+    --title v1.3 --notes-file release-notes/1.3.md
 ```
 
 Push `main` before tagging: a release created with `--target main` tags
@@ -227,7 +227,7 @@ is banned.
 ## Build
 
 ```sh
-./build.sh      # build/TM Eject Guard.app and build/tm-eject-guard, ad-hoc signed
+./build.sh      # build/Eject Guard.app and build/eject-guard, ad-hoc signed
 ./install.sh    # build, install to /Applications and ~/bin, launch
 ./uninstall.sh  # stop and remove, keeping config and log
 ```
@@ -255,7 +255,7 @@ signature is a stable identity, so the permission is granted once and stays.
 
 Under the hardened runtime EventKit needs an explicit entitlement
 (`com.apple.security.personal-information.calendars`), which is why
-`App/TMEjectGuard.entitlements` exists.
+`App/EjectGuard.entitlements` exists.
 
 ### Contrast
 
@@ -281,3 +281,25 @@ Output lands in `build/preview/`. The published screenshot always comes from
 `demo`: the plain mode shows whatever is on this Mac's calendar.
 
 Requires macOS 14 or newer.
+
+## The rename
+
+Until 1.3 the app was TM Eject Guard. Everything a person sees is now Eject
+Guard, including the repository, which GitHub redirects from the old name.
+
+What deliberately did not change:
+
+- **The bundle identifier `sk.moravcik.tmejectguard`.** Sparkle, calendar
+  permission and launch at login all key on it. Changing it would make the
+  update a different app.
+- **The notarytool profile default in `release.sh`.** It names a keychain
+  item, not the product.
+- **The Swift module names** (`TMEjectGuardCore`), which nobody outside the
+  code sees.
+
+Installed copies from before 1.3 still ask the old feed URL, which only
+works while the GitHub redirect does. Never create a new repository called
+`tm-eject-guard` under this account: it would take over the redirect and cut
+those installs off. The settings folder moves on first launch
+(`ConfigStore.migrate`), and the old log is left where it was.
+

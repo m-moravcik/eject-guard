@@ -1,4 +1,4 @@
-// Command line face of tm-eject-guard: inspect state, pick disks, force a pass.
+// Command line face of eject-guard: inspect state, pick disks, force a pass.
 // The menu bar app is the normal way to use this; the CLI exists for setup,
 // scripting and debugging.
 
@@ -7,31 +7,35 @@ import Foundation
 
 func usage() -> Never {
     print("""
-    tm-eject-guard - eject guarded external disks before a meeting starts
+    eject-guard - eject guarded external disks before a meeting starts
 
-      tm-eject-guard                  show disks, selection and the next meeting
-      tm-eject-guard --list           list remembered disks
-      tm-eject-guard --watch NAME     guard this disk (name or id, case insensitive)
-      tm-eject-guard --unwatch NAME   stop guarding it
-      tm-eject-guard --forget NAME    hide a disk from the remembered list
-      tm-eject-guard --unhide         bring back every hidden disk
-      tm-eject-guard --unskip         undo the most recent skipped meeting
-      tm-eject-guard --unskip-all     undo every skipped meeting
-      tm-eject-guard --run            run one pass now (ejects if a meeting is due)
-      tm-eject-guard --dry-run        same, but never eject
-      tm-eject-guard --eject-now      eject every guarded disk regardless of calendar
-      tm-eject-guard --calendars      list calendars and which ones are watched
-      tm-eject-guard --watch-cal NAME   watch this calendar (repeatable)
-      tm-eject-guard --unwatch-cal NAME stop watching it
-      tm-eject-guard --lead MINUTES   set how long before a meeting to eject
-      tm-eject-guard --enable         turn the guard on
-      tm-eject-guard --disable        turn the guard off
+      eject-guard                  show disks, selection and the next meeting
+      eject-guard --list           list remembered disks
+      eject-guard --watch NAME     guard this disk (name or id, case insensitive)
+      eject-guard --unwatch NAME   stop guarding it
+      eject-guard --forget NAME    hide a disk from the remembered list
+      eject-guard --unhide         bring back every hidden disk
+      eject-guard --unskip         undo the most recent skipped meeting
+      eject-guard --unskip-all     undo every skipped meeting
+      eject-guard --run            run one pass now (ejects if a meeting is due)
+      eject-guard --dry-run        same, but never eject
+      eject-guard --eject-now      eject every guarded disk regardless of calendar
+      eject-guard --calendars      list calendars and which ones are watched
+      eject-guard --watch-cal NAME   watch this calendar (repeatable)
+      eject-guard --unwatch-cal NAME stop watching it
+      eject-guard --lead MINUTES   set how long before a meeting to eject
+      eject-guard --enable         turn the guard on
+      eject-guard --disable        turn the guard off
 
     Config: \(ConfigStore.url.path)
     Log:    \(Log.url.path)
     """)
     exit(0)
 }
+
+// Before anything reads the config: help should never have side effects, and
+// the first read of the config can move its folder (see ConfigStore.migrate).
+if CommandLine.arguments.contains(where: { $0 == "--help" || $0 == "-h" }) { usage() }
 
 var config = ConfigStore.mutate { config -> GuardConfig in
     Disks.refreshKnownDisks(in: &config)

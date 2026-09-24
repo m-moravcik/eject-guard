@@ -36,12 +36,12 @@ source ./sparkle.sh
 # shellcheck source=/dev/null
 [ -f .release.env ] && source ./.release.env
 
-APP_NAME="TM Eject Guard"
+APP_NAME="Eject Guard"
 APP="build/$APP_NAME.app"
-CLI="build/tm-eject-guard"
+CLI="build/eject-guard"
 # Named for the release asset; spaces in a download URL are a nuisance.
 ZIP=""  # set once the version is known
-ENTITLEMENTS="App/TMEjectGuard.entitlements"
+ENTITLEMENTS="App/EjectGuard.entitlements"
 
 SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tm-eject-guard-notary}"
@@ -122,7 +122,7 @@ fi
 
 step "Notarize"
 VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")"
-ZIP="build/TM-Eject-Guard-$VERSION.zip"
+ZIP="build/Eject-Guard-$VERSION.zip"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait --timeout 60m

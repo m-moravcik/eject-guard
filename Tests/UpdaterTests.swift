@@ -5,7 +5,7 @@ import XCTest
 /// allowed to download and execute a binary from the internet. These are the
 /// tests that a development build can never reach that state.
 final class UpdaterGateTests: XCTestCase {
-    private let installed = URL(fileURLWithPath: "/Applications/TM Eject Guard.app")
+    private let installed = URL(fileURLWithPath: "/Applications/Eject Guard.app")
 
     func testSignedInstalledBundleMayUpdate() {
         XCTAssertEqual(
@@ -21,7 +21,7 @@ final class UpdaterGateTests: XCTestCase {
 
     /// build.sh ad-hoc signs, so this is the case that covers every local build.
     func testAdHocBuildInTheBuildDirectoryMayNotUpdate() {
-        let local = URL(fileURLWithPath: "/Users/someone/src/build/TM Eject Guard.app")
+        let local = URL(fileURLWithPath: "/Users/someone/src/build/Eject Guard.app")
         XCTAssertEqual(
             UpdaterGate.decide(bundleURL: local, isDeveloperIDSigned: false),
             .disabled(reason: .notSigned))
@@ -29,7 +29,7 @@ final class UpdaterGateTests: XCTestCase {
 
     /// A loose binary has nowhere to install an update to.
     func testLooseBinaryMayNotUpdate() {
-        let binary = URL(fileURLWithPath: "/usr/local/bin/tm-eject-guard")
+        let binary = URL(fileURLWithPath: "/usr/local/bin/eject-guard")
         XCTAssertEqual(
             UpdaterGate.decide(bundleURL: binary, isDeveloperIDSigned: true),
             .disabled(reason: .notABundle))
@@ -38,7 +38,7 @@ final class UpdaterGateTests: XCTestCase {
     /// The signature is checked before the path, so an unsigned copy is never
     /// told the problem is where it lives.
     func testSignatureIsReportedBeforeLocation() {
-        let binary = URL(fileURLWithPath: "/usr/local/bin/tm-eject-guard")
+        let binary = URL(fileURLWithPath: "/usr/local/bin/eject-guard")
         XCTAssertEqual(
             UpdaterGate.decide(bundleURL: binary, isDeveloperIDSigned: false),
             .disabled(reason: .notSigned))

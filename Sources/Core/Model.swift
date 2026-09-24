@@ -116,6 +116,9 @@ struct GuardConfig: Codable, Equatable {
 
 enum ConfigStore {
     static let directory = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/EjectGuard")
+    /// Where releases before 1.3, still called TM Eject Guard, kept it.
+    static let legacyDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/TMEjectGuard")
     static let url = directory.appendingPathComponent("config.json")
 
@@ -125,8 +128,41 @@ enum ConfigStore {
 
     static func load() -> GuardConfig {
         lock.lock(); defer { lock.unlock() }
+        migrateOnce()
         repairPermissionsOnce()
         return readUnlocked()
+    }
+
+    /// Only ever touched with `lock` held.
+    nonisolated(unsafe) private static var migrationChecked = false
+
+    /// Before the first read or write, so neither the app nor the CLI can
+    /// create an empty config in the new place while the old one still holds
+    /// every setting.
+    private static func migrateOnce() {
+        guard !migrationChecked else { return }
+        migrationChecked = true
+        if migrate(from: legacyDirectory, to: directory) {
+            Log.write("moved settings from \(legacyDirectory.path) to \(directory.path)")
+        }
+    }
+
+    /// Moves the old folder to the new name, once. A move and not a copy, so
+    /// there are never two configs drifting apart. When the new folder already
+    /// exists both are left alone: that one is the newer truth.
+    static func migrate(from legacy: URL, to current: URL) -> Bool {
+        let files = FileManager.default
+        guard files.fileExists(atPath: legacy.path),
+              !files.fileExists(atPath: current.path) else { return false }
+        do {
+            try files.createDirectory(at: current.deletingLastPathComponent(),
+                                      withIntermediateDirectories: true)
+            try files.moveItem(at: legacy, to: current)
+            return true
+        } catch {
+            Log.write("could not move settings from \(legacy.path): \(error)")
+            return false
+        }
     }
 
     /// Only ever touched from `load()`, which holds `lock`.
@@ -144,6 +180,7 @@ enum ConfigStore {
 
     static func save(_ config: GuardConfig) {
         lock.lock(); defer { lock.unlock() }
+        migrateOnce()
         writeUnlocked(config)
     }
 
@@ -152,6 +189,7 @@ enum ConfigStore {
     @discardableResult
     static func mutate<T>(_ body: (inout GuardConfig) -> T) -> T {
         lock.lock(); defer { lock.unlock() }
+        migrateOnce()
         let original = readUnlocked()
         var config = original
         let result = body(&config)

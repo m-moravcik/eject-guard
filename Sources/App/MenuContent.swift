@@ -456,7 +456,7 @@ private struct FooterBar: View {
     private func showAbout() {
         let credits = NSAttributedString(
             string: Loc.t("about.description", "Ejects your external disks a few minutes before a meeting starts, so a spinning drive is never unplugged while it is still mounted.")
-                + "\n\nMIT · github.com/m-moravcik/tm-eject-guard",
+                + "\n\nMIT · github.com/m-moravcik/eject-guard",
             attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
@@ -518,7 +518,7 @@ private struct FooterBar: View {
                             label: Loc.t("footer.updateReady", "Update ready - restart now")) {
                         updater?.installUpdate()
                     }
-                    .help(Loc.t("footer.updateReadyHelp", "Restarts TM Eject Guard to finish installing the downloaded update."))
+                    .help(Loc.t("footer.updateReadyHelp", "Restarts Eject Guard to finish installing the downloaded update."))
                 }
 
                 MenuRow(icon: "gearshape", label: Loc.t("footer.settings", "Settings…"), shortcut: "⌘,") {
@@ -527,7 +527,7 @@ private struct FooterBar: View {
                 }
                 .keyboardShortcut(",")
 
-                MenuRow(icon: "info.circle", label: Loc.t("footer.about", "About TM Eject Guard")) {
+                MenuRow(icon: "info.circle", label: Loc.t("footer.about", "About Eject Guard")) {
                     showAbout()
                 }
 

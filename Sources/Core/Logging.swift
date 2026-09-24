@@ -4,7 +4,7 @@ import Foundation
 
 enum Log {
     static let url = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/tm-eject-guard.log")
+        .appendingPathComponent("Library/Logs/eject-guard.log")
 
     // Entries come from the main actor and from the work queue, so appends are
     // serialised: two interleaved writes would corrupt the one record you go

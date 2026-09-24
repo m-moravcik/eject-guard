@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>TMEjectGuard</string>
+    <string>EjectGuard</string>
     <key>CFBundleIdentifier</key>
     <string>sk.moravcik.tmejectguard</string>
     <key>CFBundleName</key>
-    <string>TM Eject Guard</string>
+    <string>Eject Guard</string>
     <key>CFBundleDisplayName</key>
-    <string>TM Eject Guard</string>
+    <string>Eject Guard</string>
     <!-- No Dock icon, but Finder, notifications and Sparkle's windows still
          show this. CFBundleIconName is the Assets.car icon macOS 26 draws;
          CFBundleIconFile the .icns older systems fall back to. Both come from
@@ -40,7 +40,7 @@
          keychain and is what an attacker would need to serve a malicious
          update. -->
     <key>SUFeedURL</key>
-    <string>https://raw.githubusercontent.com/m-moravcik/tm-eject-guard/main/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/m-moravcik/eject-guard/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>ciayVzrfVUd/AHaU8EB8T7xsMfathzO3rKMGxHK1xEk=</string>
     <!-- Sparkle's own default is to ask on first launch. A menu bar utility has

@@ -187,7 +187,7 @@ private struct AboutSettings: View {
             ?? Loc.t("about.version", "Version %@", short)
     }
 
-    private let repository = "https://github.com/m-moravcik/tm-eject-guard"
+    private let repository = "https://github.com/m-moravcik/eject-guard"
 
     @Environment(\.updater) private var updater
 
@@ -209,7 +209,7 @@ private struct AboutSettings: View {
                 .padding(.top, Design.Spacing.l)
 
             VStack(spacing: Design.Spacing.s) {
-                Text("TM Eject Guard")
+                Text("Eject Guard")
                     .font(.system(size: 16, weight: .semibold))
                 Text(version)
                     .font(Design.Typography.cardSubtitle)
