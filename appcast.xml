@@ -7,11 +7,15 @@
     <language>en</language>
     <item>
       <title>Version 1.2.3</title>
-      <pubDate>Thu, 24 Sep 2026 15:19:32 +0000</pubDate>
+      <pubDate>Thu, 24 Sep 2026 15:20:23 +0000</pubDate>
       <sparkle:version>20</sparkle:version>
       <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases/tag/v1.2.3</sparkle:releaseNotesLink>
+      <description><![CDATA[
+<p>The popover and the menu bar icon show the real Time Machine backup percentage again. Current macOS reports it in a different place, so the app only ever showed "Backing up…".</p>
+<p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
+      ]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases</sparkle:fullReleaseNotesLink>
       <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2.3/TM-Eject-Guard-1.2.3.zip"
                  sparkle:edSignature="B5wmlaltr0hZoiVwR9QoTwvgpvBkkTxbXGRNrOppstB4lAQfq9Wzf7KfatN6UPlUNF42I6RJmJ8we+8jwLS0Dg=="
                  length="1765293"

@@ -4,7 +4,12 @@
 #   ./make-appcast.sh build/TM-Eject-Guard-1.1.zip
 #
 # Run this after release.sh, then attach the same archive to a GitHub release
-# tagged v<version> and commit appcast.xml. The feed URL in Info.plist points at
+# tagged v<version> and commit appcast.xml.
+#
+# The release notes come from release-notes/<version>.md and are embedded in
+# the feed as HTML, so the update window shows just the notes rather than the
+# whole GitHub release page. The same file is the GitHub release body. The
+# format is deliberately small: paragraphs, "- " bullets and `code`. The feed URL in Info.plist points at
 # this file on the main branch, so publishing an update is: release, upload,
 # commit.
 #
@@ -44,6 +49,22 @@ LENGTH="$(stat -f%z "$ZIP")"
 SIGNATURE="$("$SIGN_UPDATE" -p "$ZIP")" || die "sign_update failed"
 [ -n "$SIGNATURE" ] || die "sign_update produced no signature"
 
+NOTES="release-notes/$VERSION.md"
+[ -f "$NOTES" ] || die "no release notes at $NOTES"
+
+# Markdown subset to HTML. Escaping comes first, so a note can never inject
+# markup into the page Sparkle renders.
+NOTES_HTML="$(awk '
+    function esc(s) { gsub(/&/, "\\&amp;", s); gsub(/</, "\\&lt;", s); gsub(/>/, "\\&gt;", s); return s }
+    function inline(s) { s = esc(s); while (match(s, /`[^`]+`/)) s = substr(s, 1, RSTART - 1) "<code>" substr(s, RSTART + 1, RLENGTH - 2) "</code>" substr(s, RSTART + RLENGTH); return s }
+    function close_block() { if (para != "") { print "<p>" para "</p>"; para = "" } if (inlist) { print "</ul>"; inlist = 0 } }
+    /^[[:space:]]*$/ { close_block(); next }
+    /^- / { if (para != "") { print "<p>" para "</p>"; para = "" } if (!inlist) { print "<ul>"; inlist = 1 } print "<li>" inline(substr($0, 3)) "</li>"; next }
+    { if (inlist) { print "</ul>"; inlist = 0 } para = (para == "" ? "" : para " ") inline($0) }
+    END { close_block() }
+' "$NOTES")"
+case "$NOTES_HTML" in *"]]>"*) die "release notes must not contain ]]>" ;; esac
+
 ASSET="$(basename "$ZIP")"
 URL="https://github.com/$REPO/releases/download/v$VERSION/$ASSET"
 PUBDATE="$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"
@@ -62,7 +83,10 @@ cat > "$OUT" <<XML
       <sparkle:version>$BUILD_NUMBER</sparkle:version>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>$MIN_OS</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/$REPO/releases/tag/v$VERSION</sparkle:releaseNotesLink>
+      <description><![CDATA[
+$NOTES_HTML
+      ]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/$REPO/releases</sparkle:fullReleaseNotesLink>
       <enclosure url="$URL"
                  sparkle:edSignature="$SIGNATURE"
                  length="$LENGTH"
@@ -78,5 +102,5 @@ echo "  archive:   $ZIP  ($LENGTH bytes)"
 echo "  signature: ${SIGNATURE:0:16}…"
 echo
 echo "next:"
-echo "  gh release create v$VERSION \"$ZIP\" --repo $REPO --title \"v$VERSION\" --notes ..."
+echo "  gh release create v$VERSION \"$ZIP\" --repo $REPO --title \"v$VERSION\" --notes-file $NOTES"
 echo "  git add $OUT && git commit -m \"Release $VERSION\" && git push"
