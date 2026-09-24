@@ -548,6 +548,53 @@ final class GuardController {
     }
 }
 
+#if PREVIEW
+// MARK: - Demo state
+
+/// Invented disks and a meeting for the published screenshot, so it never shows
+/// whatever is on the calendar and plugged in on the machine that renders it.
+/// Compiled into the preview harness only; the app never sets it.
+extension GuardController {
+    func loadDemo() {
+        let timeMachine = KnownDisk(id: "demo-tm", name: "Time Machine",
+                                    volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest")
+        let archive = KnownDisk(id: "demo-archive", name: "Archive HDD", volumeUUID: "demo-archive-uuid")
+        let portable = KnownDisk(id: "demo-t7", name: "Samsung T7", volumeUUID: "demo-t7-uuid")
+
+        var demo = GuardConfig()
+        demo.knownDisks = [timeMachine, archive, portable]
+        demo.watchedDiskIDs = [timeMachine.id, archive.id]
+        config = demo
+
+        attached = [
+            AttachedVolume(path: "/Volumes/Time Machine", name: timeMachine.name,
+                           volumeUUID: timeMachine.volumeUUID, tmDestinationID: timeMachine.tmDestinationID),
+            AttachedVolume(path: "/Volumes/Samsung T7", name: portable.name,
+                           volumeUUID: portable.volumeUUID),
+        ]
+
+        var status = BackupStatus()
+        status.running = true
+        status.mountPoint = "/Volumes/Time Machine"
+        status.percent = 0.42
+        backup = status
+
+        let calendar = EKCalendar(for: .event, eventStore: store)
+        calendar.title = "Work"
+        let meeting = EKEvent(eventStore: store)
+        meeting.title = "Design review"
+        meeting.calendar = calendar
+        meeting.startDate = Date().addingTimeInterval(12 * 60)
+        meeting.endDate = meeting.startDate.addingTimeInterval(45 * 60)
+        nextMeeting = meeting
+        ejectDate = meeting.startDate.addingTimeInterval(-demo.leadMinutes * 60)
+
+        calendarAccess = .granted
+        notificationsEnabled = true
+    }
+}
+#endif
+
 // MARK: - Formatting
 
 enum Format {

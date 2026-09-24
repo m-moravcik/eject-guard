@@ -18,8 +18,11 @@ MainActor.assumeIsolated {
         exit(0)
     }
 
+    // Demo mode renders invented disks and a meeting, for the screenshot in the
+    // README. Without it the shot shows this Mac's real calendar and disks.
+    let demo = CommandLine.arguments.contains("demo")
     let controller = GuardController()
-    controller.start()
+    if demo { controller.loadDemo() } else { controller.start() }
 
     let output = CommandLine.arguments.count > 1
         ? CommandLine.arguments[1]

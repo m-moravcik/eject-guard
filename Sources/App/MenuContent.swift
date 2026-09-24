@@ -285,10 +285,21 @@ private struct DiskCard: View {
                     }
                     HStack(spacing: Design.Spacing.s) {
                         if backingUp {
+                            #if PREVIEW
+                            // ImageRenderer cannot draw the AppKit-backed spinner
+                            // and paints a placeholder instead; a still arc of
+                            // the same size stands in for the screenshot.
+                            Circle()
+                                .trim(from: 0, to: 0.7)
+                                .stroke(.secondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                                .frame(width: 8, height: 8)
+                                .frame(width: 10, height: 10)
+                            #else
                             ProgressView()
                                 .controlSize(.mini)
                                 .scaleEffect(0.7)
                                 .frame(width: 10, height: 10)
+                            #endif
                         }
                         Text(subtitle)
                             .font(Design.Typography.cardSubtitle)
