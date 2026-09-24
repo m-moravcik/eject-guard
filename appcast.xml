@@ -6,19 +6,23 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.2.3</title>
-      <pubDate>Thu, 24 Sep 2026 15:20:23 +0000</pubDate>
-      <sparkle:version>20</sparkle:version>
-      <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
+      <title>Version 1.2.4</title>
+      <pubDate>Thu, 24 Sep 2026 15:26:53 +0000</pubDate>
+      <sparkle:version>25</sparkle:version>
+      <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>The popover and the menu bar icon show the real Time Machine backup percentage again. Current macOS reports it in a different place, so the app only ever showed "Backing up…".</p>
+<ul>
+<li>A new app icon, drawn natively for macOS 26 and sharp in Finder, notifications and the update window.</li>
+<li>About TM Eject Guard is now one click away in the menu bar popover.</li>
+<li>The update window shows these notes instead of the whole GitHub page.</li>
+</ul>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2.3/TM-Eject-Guard-1.2.3.zip"
-                 sparkle:edSignature="B5wmlaltr0hZoiVwR9QoTwvgpvBkkTxbXGRNrOppstB4lAQfq9Wzf7KfatN6UPlUNF42I6RJmJ8we+8jwLS0Dg=="
-                 length="1765293"
+      <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2.4/TM-Eject-Guard-1.2.4.zip"
+                 sparkle:edSignature="fE1ZK1NezsN8FooEkORvx5eYiOtqb1XtmeelArnAy/gvbmsbtbZBMhx41XZs1x0GTN2NJyt9vBzwjMJ3QbJDAA=="
+                 length="2974972"
                  type="application/octet-stream" />
     </item>
   </channel>
