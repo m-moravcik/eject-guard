@@ -23,11 +23,18 @@ struct BackupStatus {
     init(plist root: [String: Any]) {
         running = (root["Running"] as? NSNumber)?.boolValue ?? false
         mountPoint = root["DestinationMountPoint"] as? String
+        // Current macOS nests the figure in `Progress`; older releases put it
+        // at the top level. Not `FractionOfProgressBar`: that one spans every
+        // phase of the job and sat at 0.9 while the copy was a quarter done.
         // tmutil reports -1 while it is still sizing the job up.
-        if let raw = (root["Percent"] as? NSNumber)?.doubleValue
-            ?? Double(root["Percent"] as? String ?? ""), raw >= 0 {
+        let progress = root["Progress"] as? [String: Any]
+        if let raw = Self.number(progress?["Percent"]) ?? Self.number(root["Percent"]), raw >= 0 {
             percent = min(max(raw, 0), 1)
         }
+    }
+
+    private static func number(_ value: Any?) -> Double? {
+        (value as? NSNumber)?.doubleValue ?? (value as? String).flatMap(Double.init)
     }
 
     init() {}

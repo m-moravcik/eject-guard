@@ -22,6 +22,26 @@ final class BackupStatusTests: XCTestCase {
         XCTAssertFalse(status.isBackingUp(to: "/Volumes/Other"))
     }
 
+    /// The shape `tmutil status -X` really returns on macOS 26: the figure sits
+    /// inside `Progress`, and nothing called Percent exists at the top level.
+    func testPercentNestedUnderProgress() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true),
+            "BackupPhase": "Copying",
+            "DestinationMountPoint": "/Volumes/WD",
+            "FractionOfProgressBar": NSNumber(value: 0.9),
+            "Progress": ["Percent": NSNumber(value: 0.2464), "TimeRemaining": NSNumber(value: 341.7)],
+        ])
+        XCTAssertEqual(status.percent ?? 0, 0.2464, accuracy: 0.0001)
+    }
+
+    func testMinusOneNestedUnderProgressIsStillUnknown() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true), "Progress": ["Percent": NSNumber(value: -1)],
+        ])
+        XCTAssertNil(status.percent)
+    }
+
     func testMinusOnePercentMeansUnknownNotZero() {
         // tmutil reports -1 while it is still sizing the job up.
         let status = BackupStatus(plist: [
