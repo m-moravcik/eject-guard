@@ -10,6 +10,10 @@
     <string>TM Eject Guard</string>
     <key>CFBundleDisplayName</key>
     <string>TM Eject Guard</string>
+    <!-- No Dock icon, but Finder, notifications and Sparkle's windows still
+         show this. Rendered from AppIcon.svg by make-icon.sh. -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

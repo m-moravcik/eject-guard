@@ -38,6 +38,8 @@ swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
     -o "$APP/Contents/MacOS/TMEjectGuard"
 
 cp App/Info.plist "$APP/Contents/Info.plist"
+# Checked in, not rendered here, so a build needs no SVG renderer.
+cp App/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Interface translations. SwiftUI resolves these against the bundle at runtime,
 # so a missing .lproj silently falls back to the English in the source; the
