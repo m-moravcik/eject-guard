@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>TM Eject Guard</title>
-    <link>https://raw.githubusercontent.com/m-moravcik/tm-eject-guard/main/appcast.xml</link>
+    <title>Eject Guard</title>
+    <link>https://raw.githubusercontent.com/m-moravcik/eject-guard/main/appcast.xml</link>
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.2.4</title>
-      <pubDate>Thu, 24 Sep 2026 15:26:53 +0000</pubDate>
-      <sparkle:version>25</sparkle:version>
-      <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
+      <title>Version 1.3</title>
+      <pubDate>Thu, 24 Sep 2026 18:49:45 +0000</pubDate>
+      <sparkle:version>28</sparkle:version>
+      <sparkle:shortVersionString>1.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
 <ul>
-<li>A new app icon, drawn natively for macOS 26 and sharp in Finder, notifications and the update window.</li>
-<li>About TM Eject Guard is now one click away in the menu bar popover.</li>
-<li>The update window shows these notes instead of the whole GitHub page.</li>
+<li>TM Eject Guard is now Eject Guard. It guards any external disk you tick, not only a Time Machine drive, and the name now says so.</li>
+<li>Your settings come along: they move to the new folder on first launch.</li>
+<li>The command line tool is now <code>eject-guard</code>.</li>
 </ul>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
-      <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2.4/TM-Eject-Guard-1.2.4.zip"
-                 sparkle:edSignature="fE1ZK1NezsN8FooEkORvx5eYiOtqb1XtmeelArnAy/gvbmsbtbZBMhx41XZs1x0GTN2NJyt9vBzwjMJ3QbJDAA=="
-                 length="2974972"
+      <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3/Eject-Guard-1.3.zip"
+                 sparkle:edSignature="OFUFSALAlApFAUce/Q392hz0jyaS8ffp9NbgQuwRrgjjh0I++0m01zBrTovy1m6PtD9IXt5OUIfzhNSWxom4Ag=="
+                 length="2973294"
                  type="application/octet-stream" />
     </item>
   </channel>
