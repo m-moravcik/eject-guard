@@ -38,6 +38,7 @@
 "footer.ejectNow" = "Eject now";
 "footer.ejectOne" = "Eject %@";
 "footer.ejecting" = "Ejecting…";
+"footer.about" = "About TM Eject Guard";
 "footer.quit" = "Quit";
 "footer.resume" = "Resume guarding";
 "footer.settings" = "Settings…";

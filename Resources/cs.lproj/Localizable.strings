@@ -38,6 +38,7 @@
 "footer.ejectNow" = "Vysunout nyní";
 "footer.ejectOne" = "Vysunout %@";
 "footer.ejecting" = "Vysouvá se…";
+"footer.about" = "O aplikaci TM Eject Guard";
 "footer.quit" = "Ukončit";
 "footer.resume" = "Obnovit hlídání";
 "footer.settings" = "Nastavení…";

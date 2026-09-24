@@ -38,6 +38,7 @@
 "footer.ejectNow" = "Jetzt auswerfen";
 "footer.ejectOne" = "%@ auswerfen";
 "footer.ejecting" = "Wird ausgeworfen…";
+"footer.about" = "Über TM Eject Guard";
 "footer.quit" = "Beenden";
 "footer.resume" = "Überwachung fortsetzen";
 "footer.settings" = "Einstellungen…";

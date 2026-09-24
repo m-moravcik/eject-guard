@@ -451,6 +451,17 @@ private struct FooterBar: View {
         }
     }
 
+    /// The standard panel, as in VibeRes: version, icon and the one sentence
+    /// that says what the app is for, without opening Settings to find it.
+    private func showAbout() {
+        let credits = NSAttributedString(
+            string: Loc.t("about.description", "Ejects your external disks a few minutes before a meeting starts, so a spinning drive is never unplugged while it is still mounted.")
+                + "\n\nMIT · github.com/m-moravcik/tm-eject-guard",
+            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+    }
+
     private var ejectHelp: String {
         let volumes = controller.guardedVolumes
         guard !volumes.isEmpty else { return Loc.t("footer.ejectHelpNone", "No guarded disk is connected.") }
@@ -515,6 +526,10 @@ private struct FooterBar: View {
                     openSettings()
                 }
                 .keyboardShortcut(",")
+
+                MenuRow(icon: "info.circle", label: Loc.t("footer.about", "About TM Eject Guard")) {
+                    showAbout()
+                }
 
                 MenuRow(icon: "power", label: Loc.t("footer.quit", "Quit"), shortcut: "⌘Q") {
                     NSApp.terminate(nil)
