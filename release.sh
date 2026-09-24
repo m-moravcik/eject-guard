@@ -132,6 +132,13 @@ step "Staple"
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 
+# The archive submitted above predates the ticket, so zip again: the published
+# asset must carry the stapled app, or Gatekeeper has to fetch the ticket online
+# on first launch. Stapling adds a file outside the code signature, so the
+# notarization still matches.
+rm -f "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP"
+
 step "Gatekeeper assessment"
 spctl --assess --type execute --verbose=4 "$APP"
 
