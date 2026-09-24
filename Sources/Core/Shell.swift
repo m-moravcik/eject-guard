@@ -4,7 +4,13 @@ import Foundation
 
 enum Shell {
     private final class Box: @unchecked Sendable {
-        var data = Data()
+        private let lock = NSLock()
+        private var stored = Data()
+
+        var data: Data {
+            get { lock.lock(); defer { lock.unlock() }; return stored }
+            set { lock.lock(); defer { lock.unlock() }; stored = newValue }
+        }
     }
 
     /// Run a command and wait for it.
@@ -16,12 +22,16 @@ enum Shell {
     /// semaphore blocks the calling thread and nothing else.
     ///
     /// The timeout is the second half of the same lesson: a wedged child process
-    /// must never be able to hold anything forever.
+    /// must never be able to hold anything forever. A child that ignores SIGTERM
+    /// gets SIGKILL after `killGrace`, and the exit status is only read once the
+    /// child is really gone: `Process.terminationStatus` raises an Objective-C
+    /// exception on a running task, which is how a hung `tmutil` crashed the app.
     @discardableResult
     static func run(
         _ launchPath: String,
         _ arguments: [String],
-        timeout: TimeInterval = 20
+        timeout: TimeInterval = 20,
+        killGrace: TimeInterval = 5
     ) -> (status: Int32, output: String) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: launchPath)
@@ -47,12 +57,21 @@ enum Shell {
         if finished.wait(timeout: .now() + timeout) == .timedOut {
             Log.write("timeout after \(Int(timeout))s: \(launchPath) \(arguments.joined(separator: " "))")
             task.terminate()
-            _ = finished.wait(timeout: .now() + 5)
+            if finished.wait(timeout: .now() + killGrace) == .timedOut {
+                Log.write("SIGTERM ignored, sending SIGKILL: \(launchPath)")
+                kill(task.processIdentifier, SIGKILL)
+                _ = finished.wait(timeout: .now() + killGrace)
+            }
         }
-        _ = drained.wait(timeout: .now() + 5)
+        _ = drained.wait(timeout: .now() + killGrace)
 
         let out = String(data: box.data, encoding: .utf8) ?? ""
-        return (task.terminationStatus, out.trimmingCharacters(in: .whitespacesAndNewlines))
+        let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !task.isRunning else {
+            Log.write("still running after SIGKILL, abandoning: \(launchPath)")
+            return (-1, trimmed)
+        }
+        return (task.terminationStatus, trimmed)
     }
 
     static func plist(from output: String) -> [String: Any]? {
