@@ -6,15 +6,15 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.2.1</title>
-      <pubDate>Thu, 24 Sep 2026 14:16:53 +0000</pubDate>
-      <sparkle:version>14</sparkle:version>
-      <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+      <title>Version 1.2.2</title>
+      <pubDate>Thu, 24 Sep 2026 15:13:37 +0000</pubDate>
+      <sparkle:version>18</sparkle:version>
+      <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases/tag/v1.2.1</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2.1/TM-Eject-Guard-1.2.1.zip"
-                 sparkle:edSignature="B//cSazX77NyMdSs557mH6OJ+nNWwqqjAIbbiZwfx6P2jnJZyNqrFSHQBTwA2b6hpfxgSZjXOUoVUq2p9aOECA=="
-                 length="1421984"
+      <sparkle:releaseNotesLink>https://github.com/m-moravcik/tm-eject-guard/releases/tag/v1.2.2</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/m-moravcik/tm-eject-guard/releases/download/v1.2.2/TM-Eject-Guard-1.2.2.zip"
+                 sparkle:edSignature="EAZD/4qc4h2hRMu9V2Fwy6V1eRxGFCt+FLR4puFVuBzhgNTHzph3SddGcOnQTIHDC19SWhIIzBBP4xYHIGFUCg=="
+                 length="1764904"
                  type="application/octet-stream" />
     </item>
   </channel>
