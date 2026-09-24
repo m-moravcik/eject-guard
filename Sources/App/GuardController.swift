@@ -579,10 +579,19 @@ extension GuardController {
         status.percent = 0.42
         backup = status
 
+        // In the language being rendered, so a Slovak shot has no English
+        // meeting in it.
+        let names: [String: (meeting: String, calendar: String)] = [
+            "sk": ("Porada k návrhu", "Práca"),
+            "cs": ("Porada k návrhu", "Práce"),
+            "de": ("Design-Review", "Arbeit"),
+        ]
+        let language = Bundle.main.preferredLocalizations.first ?? "en"
+        let demoNames = names[language] ?? ("Design review", "Work")
         let calendar = EKCalendar(for: .event, eventStore: store)
-        calendar.title = "Work"
+        calendar.title = demoNames.calendar
         let meeting = EKEvent(eventStore: store)
-        meeting.title = "Design review"
+        meeting.title = demoNames.meeting
         meeting.calendar = calendar
         meeting.startDate = Date().addingTimeInterval(12 * 60)
         meeting.endDate = meeting.startDate.addingTimeInterval(45 * 60)

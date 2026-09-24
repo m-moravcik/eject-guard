@@ -22,7 +22,8 @@ MainActor.assumeIsolated {
     // README. Without it the shot shows this Mac's real calendar and disks.
     // Hero wraps the demo popover in a menu bar and a desktop, as it looks
     // open: the published screenshot.
-    let hero = CommandLine.arguments.contains("hero")
+    let banner = CommandLine.arguments.contains("banner")
+    let hero = banner || CommandLine.arguments.contains("hero")
     let demo = hero || CommandLine.arguments.contains("demo")
     let controller = GuardController()
     if demo { controller.loadDemo() } else { controller.start() }
@@ -52,7 +53,7 @@ MainActor.assumeIsolated {
 
             let view = Group {
                 if hero {
-                    HeroScene(popover: popover, scheme: scheme, percent: controller.backup.percent)
+                    HeroScene(popover: popover, scheme: scheme, banner: banner)
                 } else {
                     popover
                 }
@@ -170,7 +171,9 @@ func renderIconSheet() {
 struct HeroScene<Popover: View>: View {
     let popover: Popover
     let scheme: ColorScheme
-    let percent: Double?
+    /// Banner is the 16:9 portfolio image: the same scene, wider, with the
+    /// app's icon and name on the empty half of the desktop.
+    var banner = false
 
     private var dark: Bool { scheme == .dark }
 
@@ -178,7 +181,11 @@ struct HeroScene<Popover: View>: View {
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 Spacer()
-                StatusIconArt(state: .backingUp, percent: percent)
+                // Only the symbol: a MenuBarExtra label keeps the image and
+                // drops the track StatusIconArt stacks under it, so that is
+                // all the real menu bar shows.
+                Image(systemName: StatusIconState.backingUp.symbol)
+                    .font(.system(size: 15))
                     .frame(width: 30, height: 22)
                     .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(Color.primary.opacity(0.14)))
@@ -192,8 +199,22 @@ struct HeroScene<Popover: View>: View {
             .frame(height: 24)
             .background(dark ? Color.black.opacity(0.35) : Color.white.opacity(0.45))
 
-            HStack {
-                Spacer()
+            HStack(spacing: 0) {
+                if banner {
+                    VStack(spacing: 20) {
+                        if let icon = NSImage(contentsOfFile: "docs/icon.png") {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .frame(width: 168, height: 168)
+                        }
+                        Text("TM Eject Guard")
+                            .font(.system(size: 40, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 30)
+                } else {
+                    Spacer()
+                }
                 popover
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -203,10 +224,11 @@ struct HeroScene<Popover: View>: View {
             .padding(.top, 6)
             // Near the right edge macOS keeps the window on screen rather than
             // centring it under the icon, so it sits flush with a small margin.
-            .padding(.trailing, 10)
-            .padding(.bottom, 48)
+            .padding(.trailing, banner ? 96 : 10)
+            .padding(.bottom, banner ? 0 : 48)
+            .frame(maxHeight: banner ? .infinity : nil, alignment: .top)
         }
-        .frame(width: 480)
+        .frame(width: banner ? 960 : 480, height: banner ? 540 : nil)
         .background(
             LinearGradient(colors: dark
                            ? [Color(red: 0.10, green: 0.13, blue: 0.24), Color(red: 0.20, green: 0.14, blue: 0.30)]
