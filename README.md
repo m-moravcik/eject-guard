@@ -9,7 +9,7 @@ starts, so you can grab the laptop and go.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/popover-dark.png">
-    <img src="docs/popover-light.png" width="300" alt="The TM Eject Guard popover: a Time Machine disk backing up at 42%, two more disks, and the next meeting with the time the disks will be ejected">
+    <img src="docs/popover-light.png" width="480" alt="TM Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42%, two more disks, and the next meeting with the time the disks will be ejected">
   </picture>
 </p>
 

@@ -128,11 +128,22 @@ instead.
 Releasing:
 
 ```sh
+echo 1.2.4 > VERSION                # and write release-notes/1.2.4.md
 ./release.sh                        # sign, notarize, staple
-./make-appcast.sh build/TM-Eject-Guard-1.2.zip
-gh release create v1.2 build/TM-Eject-Guard-1.2.zip
-git add appcast.xml && git commit -m "Release 1.2" && git push
+./make-appcast.sh build/TM-Eject-Guard-1.2.4.zip
+git add VERSION appcast.xml release-notes && git commit -m "Release 1.2.4"
+git push && git tag v1.2.4 && git push origin v1.2.4
+gh release create v1.2.4 build/TM-Eject-Guard-1.2.4.zip --verify-tag \
+    --title v1.2.4 --notes-file release-notes/1.2.4.md
 ```
+
+Push `main` before tagging: a release created with `--target main` tags
+whatever GitHub's `main` is at that moment, which is not necessarily the
+commit that was built.
+
+The notes in `release-notes/<version>.md` are embedded in the appcast as HTML,
+so Sparkle's update window shows only them. Paragraphs, `- ` bullets and
+backtick code are the whole format.
 
 **The repository has to be public for updates to work.** Sparkle carries no
 GitHub credentials, so on a private repository both the feed on
@@ -221,6 +232,14 @@ is banned.
 ./uninstall.sh  # stop and remove, keeping config and log
 ```
 
+### The app icon
+
+`App/AppIcon.icon` is an Icon Composer document and the source of truth.
+`./make-icon.sh` compiles it with `actool` into `App/Icon/Assets.car`, which
+macOS 26 draws, and `App/Icon/AppIcon.icns` for macOS 14 and 15. Both outputs
+are checked in, so a build does not depend on which Xcode is installed. A bare
+`.icns` is not enough on macOS 26: Finder shrinks it into a grey tile.
+
 ### Signing and notarization
 
 ```sh
@@ -252,7 +271,8 @@ the popover straight to PNG in both appearances:
 
 ```sh
 ./preview.sh          # this Mac's real disks and calendar
-./preview.sh demo     # invented data - how docs/popover-*.png is made
+./preview.sh demo     # invented data, the bare popover
+./preview.sh hero     # the same, open under the menu bar: docs/popover-*.png
 ./preview.sh icons    # every menu bar icon state
 PREVIEW_LANG=sk ./preview.sh demo
 ```

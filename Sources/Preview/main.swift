@@ -20,7 +20,10 @@ MainActor.assumeIsolated {
 
     // Demo mode renders invented disks and a meeting, for the screenshot in the
     // README. Without it the shot shows this Mac's real calendar and disks.
-    let demo = CommandLine.arguments.contains("demo")
+    // Hero wraps the demo popover in a menu bar and a desktop, as it looks
+    // open: the published screenshot.
+    let hero = CommandLine.arguments.contains("hero")
+    let demo = hero || CommandLine.arguments.contains("demo")
     let controller = GuardController()
     if demo { controller.loadDemo() } else { controller.start() }
 
@@ -34,7 +37,7 @@ MainActor.assumeIsolated {
         // Render both appearances: a menu bar utility is judged in whichever
         // one the user runs, and contrast bugs only show up in one of them.
         for scheme in [ColorScheme.light, .dark] {
-            let view = MenuContent()
+            let popover = MenuContent()
                 .environment(controller)
                 // The harness never updates itself; this is only here because
                 // the popover reads the status out of the environment.
@@ -47,6 +50,13 @@ MainActor.assumeIsolated {
                             ? Color(red: 0.14, green: 0.14, blue: 0.15)
                             : Color(red: 0.96, green: 0.96, blue: 0.97))
 
+            let view = Group {
+                if hero {
+                    HeroScene(popover: popover, scheme: scheme, percent: controller.backup.percent)
+                } else {
+                    popover
+                }
+            }
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
 
@@ -150,4 +160,58 @@ func renderIconSheet() {
         exit(1)
     }
     print("wrote \(path)")
+}
+
+
+/// The popover as it looks when it is open: hanging under its menu bar icon,
+/// with the window's rounded corners and shadow, over a plain desktop. Every
+/// part that carries information is the real view; only the desktop, the
+/// menu bar strip and the clock are scenery.
+struct HeroScene<Popover: View>: View {
+    let popover: Popover
+    let scheme: ColorScheme
+    let percent: Double?
+
+    private var dark: Bool { scheme == .dark }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Spacer()
+                StatusIconArt(state: .backingUp, percent: percent)
+                    .frame(width: 30, height: 22)
+                    .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(0.14)))
+                Image(systemName: "wifi")
+                    .font(.system(size: 13, weight: .medium))
+                Text(Format.clock(Date()))
+                    .font(.system(size: 13, weight: .medium))
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 24)
+            .background(dark ? Color.black.opacity(0.35) : Color.white.opacity(0.45))
+
+            HStack {
+                Spacer()
+                popover
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(dark ? Color.white.opacity(0.14) : Color.black.opacity(0.10), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(dark ? 0.5 : 0.22), radius: 24, y: 12)
+            }
+            .padding(.top, 6)
+            // Near the right edge macOS keeps the window on screen rather than
+            // centring it under the icon, so it sits flush with a small margin.
+            .padding(.trailing, 10)
+            .padding(.bottom, 48)
+        }
+        .frame(width: 480)
+        .background(
+            LinearGradient(colors: dark
+                           ? [Color(red: 0.10, green: 0.13, blue: 0.24), Color(red: 0.20, green: 0.14, blue: 0.30)]
+                           : [Color(red: 0.72, green: 0.83, blue: 0.95), Color(red: 0.86, green: 0.80, blue: 0.93)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing))
+        .environment(\.colorScheme, scheme)
+    }
 }
