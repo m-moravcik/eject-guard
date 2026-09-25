@@ -3,8 +3,14 @@
 import Foundation
 
 enum Log {
-    static let url = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/eject-guard.log")
+    // Under `swift test` the log goes to a temporary file: tests drive Shell
+    // timeouts and eject failures on purpose, and those lines have no place in
+    // the log you read after a real failure. The app and the CLI never load
+    // XCTest, so this only ever decides for the test runner.
+    static let url: URL = NSClassFromString("XCTestCase") != nil
+        ? FileManager.default.temporaryDirectory.appendingPathComponent("eject-guard-tests.log")
+        : FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/eject-guard.log")
 
     // Entries come from the main actor and from the work queue, so appends are
     // serialised: two interleaved writes would corrupt the one record you go
