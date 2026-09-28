@@ -191,6 +191,7 @@ this project has been so far:
 | `Disks.merge` | Identity of a disk, and whether re-keying it silently unguards it. |
 | `Disks.guardedVolumes` | An unticked disk must never become a target. |
 | `Disks.isMountedVolume` | The boot volume must never be an eject candidate. |
+| `Disks.mayChangeDiskList` | Time Machine's own mounts set off rescans whose `tmutil` hung past SIGKILL; a plugged-in disk must still rescan. |
 | `Sanitize.oneLine` | Untrusted titles must not forge log lines or break AppleScript. |
 | `BackupStatus` | `Percent: -1` means unknown, not zero. |
 

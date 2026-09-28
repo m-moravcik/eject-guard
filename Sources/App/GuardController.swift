@@ -231,7 +231,11 @@ final class GuardController {
 
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
-            workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                // Time Machine mounts snapshots all through a backup. None of
+                // them can change the list, and every rescan spawns tmutil.
+                let volume = note.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
+                guard Disks.mayChangeDiskList(volumePath: volume?.path) else { return }
                 MainActor.assumeIsolated {
                     self?.reloadDisks()
                     self?.scheduleReschedule()

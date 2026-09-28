@@ -157,14 +157,33 @@ enum Disks {
     /// A path is only a candidate if it is a directory directly inside /Volumes.
     /// Last line of defence before anything reaches `diskutil eject`.
     static func isMountedVolume(_ path: String) -> Bool {
-        guard path.hasPrefix("/Volumes/"), path.count > "/Volumes/".count else { return false }
-        guard URL(fileURLWithPath: path).deletingLastPathComponent().path == "/Volumes" else {
-            return false
-        }
+        guard isDirectlyInVolumes(path) else { return false }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
               isDirectory.boolValue else { return false }
         return true
+    }
+
+    /// Whether a volume that mounted or unmounted at `path` can change the
+    /// disk list, and so is worth a rescan.
+    ///
+    /// Time Machine mounts snapshots and backups deeper inside /Volumes, under
+    /// `com.apple.TimeMachine.localsnapshots` and `.timemachine`, all through
+    /// a backup. Each one used to set off a rescan, and a `tmutil
+    /// destinationinfo` started while such a mount settles can block in the
+    /// kernel past every timeout `Shell.run` has, SIGKILL included.
+    ///
+    /// Judged by shape alone: after an unmount there is nothing left on disk
+    /// to look at. No path at all rescans - a missed disk is worse than one
+    /// extra scan.
+    static func mayChangeDiskList(volumePath path: String?) -> Bool {
+        guard let path else { return true }
+        return isDirectlyInVolumes(path)
+    }
+
+    private static func isDirectlyInVolumes(_ path: String) -> Bool {
+        guard path.hasPrefix("/Volumes/"), path.count > "/Volumes/".count else { return false }
+        return URL(fileURLWithPath: path).deletingLastPathComponent().path == "/Volumes"
     }
 
     /// Fold a snapshot into the remembered list. Disks are never dropped unless

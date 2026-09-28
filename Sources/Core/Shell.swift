@@ -22,10 +22,12 @@ enum Shell {
     /// semaphore blocks the calling thread and nothing else.
     ///
     /// The timeout is the second half of the same lesson: a wedged child process
-    /// must never be able to hold anything forever. A child that ignores SIGTERM
-    /// gets SIGKILL after `killGrace`, and the exit status is only read once the
-    /// child is really gone: `Process.terminationStatus` raises an Objective-C
-    /// exception on a running task, which is how a hung `tmutil` crashed the app.
+    /// must never be able to hold anything forever. A child still running
+    /// `killGrace` after SIGTERM gets SIGKILL - it may be ignoring the signal,
+    /// or blocked in the kernel, where no signal lands until the call returns.
+    /// Either way the exit status is only read once the child is really gone:
+    /// `Process.terminationStatus` raises an Objective-C exception on a running
+    /// task, which is how a hung `tmutil` crashed the app.
     @discardableResult
     static func run(
         _ launchPath: String,
@@ -58,7 +60,7 @@ enum Shell {
             Log.write("timeout after \(Int(timeout))s: \(launchPath) \(arguments.joined(separator: " "))")
             task.terminate()
             if finished.wait(timeout: .now() + killGrace) == .timedOut {
-                Log.write("SIGTERM ignored, sending SIGKILL: \(launchPath)")
+                Log.write("still running after SIGTERM, sending SIGKILL: \(launchPath)")
                 kill(task.processIdentifier, SIGKILL)
                 _ = finished.wait(timeout: .now() + killGrace)
             }

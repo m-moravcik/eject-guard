@@ -93,3 +93,37 @@ final class VolumeEligibilityTests: XCTestCase {
         XCTAssertTrue(real, "a fixed external disk reports ejectable == false")
     }
 }
+
+/// Which volume notifications are worth a rescan. Paths are the mounts seen in
+/// the system log on 2026-09-26..28, each one second before a `tmutil
+/// destinationinfo` that hung past SIGKILL.
+final class RescanTriggerTests: XCTestCase {
+    func testAPluggedInDiskIsNeverMissed() {
+        XCTAssertTrue(Disks.mayChangeDiskList(volumePath: "/Volumes/Time Machine WD"))
+        XCTAssertTrue(Disks.mayChangeDiskList(volumePath: "/Volumes/cmux"))
+    }
+
+    func testAnUnknownPathRescans() {
+        // A missed disk is worse than one extra scan.
+        XCTAssertTrue(Disks.mayChangeDiskList(volumePath: nil))
+    }
+
+    func testTimeMachineSnapshotMountsDoNot() {
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath:
+            "/Volumes/com.apple.TimeMachine.localsnapshots/Backups.backupdb/MekBuk-Pro/2026-09-20-223706/Data"))
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath:
+            "/Volumes/.timemachine/4F85D473-0835-475D-951B-EAB250EC9492/2026-09-12-170727.backup/2026-09-12-170727.backup"))
+    }
+
+    func testANetworkBackupShareDoesNot() {
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath:
+            "/Volumes/.timemachine/10.2.0.180/DB1BA805-F5F5-47F4-A054-D0DA4C4AA85B/time_mbp_m5"))
+    }
+
+    func testMountsOutsideVolumesDoNot() {
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath: "/"))
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath: "/System/Volumes/Update/mnt1"))
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath: "/private/tmp/mnt"))
+        XCTAssertFalse(Disks.mayChangeDiskList(volumePath: "/Volumes"))
+    }
+}
