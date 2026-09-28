@@ -60,7 +60,8 @@ struct StatusIcon: View {
         StatusIconArt(state: state,
                       percent: controller.guardedBackupPercent,
                       phase: controller.backupPhase)
-            .accessibilityLabel("Eject Guard: \(label)")
+            // `label` is already translated; the name in front of it never is.
+            .accessibilityLabel(Text(verbatim: "Eject Guard: \(label)"))
     }
 }
 

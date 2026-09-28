@@ -209,7 +209,8 @@ private struct AboutSettings: View {
                 .padding(.top, Design.Spacing.l)
 
             VStack(spacing: Design.Spacing.s) {
-                Text("Eject Guard")
+                // A name, not a sentence: it reads the same in every language.
+                Text(verbatim: "Eject Guard")
                     .font(.system(size: 16, weight: .semibold))
                 Text(version)
                     .font(Design.Typography.cardSubtitle)
