@@ -89,6 +89,32 @@ final class DiskMergeTests: XCTestCase {
                        "you pick from this list while the disk is in a drawer")
     }
 
+    func testADiskImageAnEarlierReleaseRememberedIsForgotten() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "IMG-1", name: "cmux", volumeUUID: "IMG-1")]
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["IMG-1"]),
+                    into: &config)
+
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    func testAGuardedDiskIsNeverForgottenForSharingAnImagesUUID() {
+        // A block-level image of a real disk carries the same volume UUID.
+        var config = GuardConfig()
+        config.knownDisks = [
+            KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1"),
+            KnownDisk(id: "VOL-2", name: "TM", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
+        ]
+        config.watchedDiskIDs = ["VOL-1"]
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-1", "VOL-2"]),
+                    into: &config)
+
+        XCTAssertEqual(Set(config.knownDisks.map(\.id)), ["VOL-1", "VOL-2"])
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"], "an image must never unguard a disk")
+    }
+
     func testOnlyTickedDisksThatArePresentAreGuarded() {
         var config = GuardConfig()
         let present = volume("WD", uuid: "VOL-1")

@@ -1,5 +1,6 @@
 // Finding disks. Scanning spawns processes; merging is pure.
 
+import DiskArbitration
 import Foundation
 
 /// A local Time Machine destination. Network destinations are dropped at the
@@ -17,6 +18,10 @@ struct TimeMachineDestination: Equatable {
 struct DiskSnapshot: Equatable {
     var destinations: [TimeMachineDestination] = []
     var attached: [AttachedVolume] = []
+    /// Mounted disk images, keyed the way `merge` keys a disk. They are never
+    /// offered, and are listed only so that `merge` can forget one an earlier
+    /// release remembered.
+    var diskImageIDs: [String] = []
 }
 
 enum Disks {
@@ -24,9 +29,11 @@ enum Disks {
 
     static func scan() -> DiskSnapshot {
         let destinations = readDestinations()
+        let volumes = mountedVolumes(destinations: destinations)
         return DiskSnapshot(
             destinations: destinations,
-            attached: attachedVolumes(destinations: destinations))
+            attached: volumes.attached,
+            diskImageIDs: volumes.diskImageIDs)
     }
 
     private static func readDestinations() -> [TimeMachineDestination] {
@@ -47,11 +54,13 @@ enum Disks {
         }
     }
 
-    /// External, ejectable volumes that are mounted right now.
+    /// External volumes that are mounted right now, split into the disks we
+    /// may offer and the disk images we never do.
     ///
     /// Internal and non-ejectable volumes are filtered out here, which is what
     /// keeps the boot disk out of reach of every later step.
-    static func attachedVolumes(destinations: [TimeMachineDestination]) -> [AttachedVolume] {
+    static func mountedVolumes(destinations: [TimeMachineDestination])
+        -> (attached: [AttachedVolume], diskImageIDs: [String]) {
         // Every key the predicate reads must be requested here, or it comes
         // back nil and the volume is silently rejected.
         let keys: [URLResourceKey] = [
@@ -60,23 +69,41 @@ enum Disks {
         ]
         guard let urls = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes])
-        else { return [] }
+        else { return ([], []) }
 
-        return urls.compactMap { url -> AttachedVolume? in
-            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
+        let session = DASessionCreate(kCFAllocatorDefault)
+        var attached: [AttachedVolume] = []
+        var diskImageIDs: [String] = []
+        for url in urls {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
             let path = url.path
             guard isMountedVolume(path),
                   isGuardable(isInternal: values.volumeIsInternal,
                               isLocal: values.volumeIsLocal,
                               isRootFileSystem: values.volumeIsRootFileSystem)
-            else { return nil }
+            else { continue }
 
-            return AttachedVolume(
+            if isDiskImage(deviceModel: deviceModel(of: url, session: session)) {
+                diskImageIDs.append(values.volumeUUIDString ?? path)
+                continue
+            }
+            attached.append(AttachedVolume(
                 path: path,
                 name: values.volumeLocalizedName ?? url.lastPathComponent,
                 volumeUUID: values.volumeUUIDString,
-                tmDestinationID: destinations.first { $0.mountPoint == path }?.id)
+                tmDestinationID: destinations.first { $0.mountPoint == path }?.id))
         }
+        return (attached, diskImageIDs)
+    }
+
+    /// The device model DiskArbitration reports for the disk behind a volume.
+    /// This asks `diskarbitrationd` over IPC; no process is launched.
+    private static func deviceModel(of url: URL, session: DASession?) -> String? {
+        guard let session,
+              let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
+              let description = DADiskCopyDescription(disk) as? [String: Any]
+        else { return nil }
+        return description[kDADiskDescriptionDeviceModelKey as String] as? String
     }
 
     // MARK: Pure logic (no processes, no I/O - this is the part under test)
@@ -103,14 +130,28 @@ enum Disks {
     /// | Time Machine snapshots    | nil      | true  | false     |
     /// | autofs network mount      | nil      | false | false     |
     ///
-    /// So: never internal, always local. `nil` is allowed because a disk image
-    /// reports it, and the user still has to tick a disk before anything
-    /// happens to it.
+    /// So: never internal, always local. An unknown `internal` is not read as
+    /// internal, and the user still has to tick a disk before anything happens
+    /// to it. A disk image passes this check; it is turned away by
+    /// `isDiskImage`, since none of these values tell it apart.
     static func isGuardable(isInternal: Bool?, isLocal: Bool?, isRootFileSystem: Bool?) -> Bool {
         guard isInternal != true else { return false }
         guard isLocal == true else { return false }
         guard isRootFileSystem != true else { return false }
         return true
+    }
+
+    /// Whether DiskArbitration's device model is that of a mounted disk image:
+    /// a `.dmg` installer, a sparse bundle. There is nothing to unplug, so it
+    /// is never offered.
+    ///
+    /// Observed on an installer image: model `Disk Image`, protocol `Virtual
+    /// Interface`, while an external disk reports its vendor's model.
+    ///
+    /// An unknown model counts as a real disk. Listing an image by mistake is
+    /// one extra row; hiding a real disk by mistake means it is never guarded.
+    static func isDiskImage(deviceModel: String?) -> Bool {
+        deviceModel?.trimmingCharacters(in: .whitespaces) == "Disk Image"
     }
 
     /// A path is only a candidate if it is a directory directly inside /Volumes.
@@ -185,6 +226,17 @@ enum Disks {
                 volumeUUID: volume.volumeUUID,
                 tmDestinationID: volume.tmDestinationID,
                 lastSeen: Date()))
+        }
+
+        // Earlier releases offered disk images, and remembered every one that
+        // was ever mounted. Forget one the next time it shows up - unless it is
+        // guarded or a Time Machine destination: a block-level copy of a real
+        // disk carries that disk's volume UUID, and quietly unguarding the
+        // real one is the failure this app exists to prevent.
+        let watched = Set(config.watchedDiskIDs)
+        let images = Set(snapshot.diskImageIDs)
+        known.removeAll { disk in
+            images.contains(disk.id) && !watched.contains(disk.id) && !disk.isTimeMachineDestination
         }
 
         let dismissed = Set(config.dismissedDiskIDs)

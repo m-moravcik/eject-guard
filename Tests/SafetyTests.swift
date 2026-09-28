@@ -49,9 +49,23 @@ final class VolumeEligibilityTests: XCTestCase {
         XCTAssertTrue(Disks.isGuardable(isInternal: false, isLocal: true, isRootFileSystem: false))
     }
 
-    func testDiskImageIsGuardable() {
-        // Reports internal as nil rather than false.
+    func testDiskImageIsTurnedAwayByItsDeviceModel() {
+        // /Volumes/cmux, an app installer .dmg, read on 2026-09-28. It passes
+        // the volume checks - internal nil, local true - so only the device
+        // model tells it apart from an external disk.
         XCTAssertTrue(Disks.isGuardable(isInternal: nil, isLocal: true, isRootFileSystem: false))
+        XCTAssertTrue(Disks.isDiskImage(deviceModel: "Disk Image"))
+    }
+
+    func testARealDiskIsNotADiskImage() {
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: "APPLE SSD AP1024Z"))
+        // USB bridges pad their model strings.
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: "Elements 25A3    "))
+    }
+
+    func testAnUnknownDeviceModelCountsAsARealDisk() {
+        // Hiding a real disk is the silent failure; listing an image is not.
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: nil))
     }
 
     func testBootVolumeIsNot() {

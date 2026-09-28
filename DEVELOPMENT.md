@@ -205,6 +205,9 @@ is banned.
 
 - Only volumes that are **external, ejectable and directly under `/Volumes`** are
   ever considered. The boot disk cannot be reached by any code path.
+- Disk images (an installer `.dmg`, a sparse bundle) are never offered: there
+  is nothing to unplug. DiskArbitration reports their device model as
+  `Disk Image`; the volume keys alone cannot tell one from an external disk.
 - Disks are identified by **volume UUID**, not by name, so another volume that
   happens to share a name is not touched.
 - A Time Machine backup is stopped only when it is writing to the disk being
