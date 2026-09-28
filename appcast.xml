@@ -6,19 +6,19 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.3.1</title>
-      <pubDate>Mon, 28 Sep 2026 13:33:26 +0000</pubDate>
-      <sparkle:version>31</sparkle:version>
-      <sparkle:shortVersionString>1.3.1</sparkle:shortVersionString>
+      <title>Version 1.3.2</title>
+      <pubDate>Mon, 28 Sep 2026 15:28:59 +0000</pubDate>
+      <sparkle:version>34</sparkle:version>
+      <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>Disk images no longer show up in the disk list. An installer <code>.dmg</code> you opened was listed as a disk to guard, and stayed there after you ejected it. There is nothing to unplug, so the app now skips them, and forgets any it remembered the next time that image is opened.</p>
+<p>Fewer stalls while Time Machine backs up. Every snapshot Time Machine mounted during a backup made the app read the disk list again, and the Time Machine tool it asks could hang for half a minute, which could hold up an eject that was due. The app now looks again only when a disk it could guard comes or goes.</p>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3.1/Eject-Guard-1.3.1.zip"
-                 sparkle:edSignature="Pnx/P7IcyFfmL8rxwGpyFrGpgi/59M/d5aRSG8lITefhmQYFwB6FZhgvUN/96m4XPMlNk09agVt6WT1Y6OicAQ=="
-                 length="2975701"
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3.2/Eject-Guard-1.3.2.zip"
+                 sparkle:edSignature="S5tNyf3KzVIVj3ZhF1qmltZITsydwngLP2guXfd9awIbSwCtB/MfTC1BfhjeiGvjozugYFagMpRd5WGDnq6MBg=="
+                 length="2976581"
                  type="application/octet-stream" />
     </item>
   </channel>
