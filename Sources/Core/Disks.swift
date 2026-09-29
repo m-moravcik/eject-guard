@@ -9,6 +9,10 @@ struct TimeMachineDestination: Equatable {
     var id: String
     var name: String
     var mountPoint: String?
+    /// The volumes Time Machine itself records for this destination. The only
+    /// link between the two while the disk is unplugged, when there is no
+    /// mount point to go by.
+    var volumeUUIDs: [String] = []
 }
 
 /// One reading of what is plugged in. Producing this spawns processes;
@@ -43,6 +47,7 @@ enum Disks {
               let destinations = root["Destinations"] as? [[String: Any]]
         else { return [] }
 
+        let volumes = destinationVolumeUUIDs(fromPreferences: timeMachinePreferences())
         return destinations.compactMap { destination in
             // Network destinations have no local disk to eject.
             guard (destination["Kind"] as? String) == "Local",
@@ -50,8 +55,22 @@ enum Disks {
             return TimeMachineDestination(
                 id: id,
                 name: (destination["Name"] as? String) ?? "Time Machine",
-                mountPoint: destination["MountPoint"] as? String)
+                mountPoint: destination["MountPoint"] as? String,
+                volumeUUIDs: volumes[id] ?? [])
         }
+    }
+
+    /// Time Machine's own preferences, which `tmutil destinationinfo` does not
+    /// expose all of. Readable by every user. Not a documented interface, so
+    /// it may only ever add a link: missing or reshaped, and merging falls back
+    /// to mount points as before.
+    private static func timeMachinePreferences() -> [String: Any] {
+        let url = URL(fileURLWithPath: "/Library/Preferences/com.apple.TimeMachine.plist")
+        guard let data = try? Data(contentsOf: url),
+              let root = try? PropertyListSerialization.propertyList(
+                  from: data, options: [], format: nil) as? [String: Any]
+        else { return [:] }
+        return root
     }
 
     /// External volumes that are mounted right now, split into the disks we
@@ -107,6 +126,20 @@ enum Disks {
     }
 
     // MARK: Pure logic (no processes, no I/O - this is the part under test)
+
+    /// Destination ID to the volume UUIDs behind it, from Time Machine's
+    /// preferences. Entries missing either half are skipped.
+    static func destinationVolumeUUIDs(fromPreferences preferences: [String: Any]) -> [String: [String]] {
+        guard let destinations = preferences["Destinations"] as? [[String: Any]] else { return [:] }
+        var result: [String: [String]] = [:]
+        for destination in destinations {
+            guard let id = destination["DestinationID"] as? String,
+                  let uuids = destination["DestinationUUIDs"] as? [String], !uuids.isEmpty
+            else { continue }
+            result[id] = uuids
+        }
+        return result
+    }
 
     /// Whether a mounted volume is one we may offer to guard.
     ///
@@ -192,12 +225,29 @@ enum Disks {
     static func merge(_ snapshot: DiskSnapshot, into config: inout GuardConfig) {
         var known = config.knownDisks
 
-        func upsert(_ disk: KnownDisk) {
+        /// Move the user's tick to the identity that replaces an old one,
+        /// without ever ticking the same disk twice.
+        func rekeyWatch(from old: String, to new: String) {
+            guard old != new, let watchIndex = config.watchedDiskIDs.firstIndex(of: old) else { return }
+            if config.watchedDiskIDs.contains(new) {
+                config.watchedDiskIDs.remove(at: watchIndex)
+            } else {
+                config.watchedDiskIDs[watchIndex] = new
+            }
+        }
+
+        func upsert(_ disk: KnownDisk, timeMachineVolumes: [String] = []) {
             // Match on either identity, so a Time Machine placeholder and the
             // volume we later see plugged in collapse into one entry.
             if let index = known.firstIndex(where: { existing in
                 if let a = existing.volumeUUID, a == disk.volumeUUID { return true }
                 if let a = existing.tmDestinationID, a == disk.tmDestinationID { return true }
+                // A disk remembered as a plain volume and made a destination
+                // later: while it is unplugged, Time Machine's own record is the
+                // only link. Only for an entry not yet tied to a destination, so
+                // a volume listed under two of them does not flip between them.
+                if existing.tmDestinationID == nil, let a = existing.volumeUUID,
+                   timeMachineVolumes.contains(a) { return true }
                 // A Time Machine destination we have never seen mounted carries
                 // no volume UUID. Fall back to the name so it does not show up
                 // twice once the disk is actually plugged in.
@@ -217,13 +267,44 @@ enum Disks {
                 merged.volumeUUID = disk.volumeUUID ?? merged.volumeUUID
                 merged.tmDestinationID = disk.tmDestinationID ?? merged.tmDestinationID
                 merged.lastSeen = disk.lastSeen ?? merged.lastSeen
+
+                // Another entry sharing an identity is this same disk, written
+                // down before the link between its volume and its destination
+                // was known - an earlier release listed such a disk twice. Fold
+                // it in, Time Machine's own record counting as a shared
+                // identity. One naming a different volume or destination is a
+                // different disk and stays.
+                func differ(_ a: String?, _ b: String?) -> Bool {
+                    guard let a, let b else { return false }
+                    return a != b
+                }
+                let duplicates = known.indices.filter { other in
+                    guard other != index else { return false }
+                    let candidate = known[other]
+                    let shared = (candidate.volumeUUID != nil && candidate.volumeUUID == merged.volumeUUID)
+                        || (candidate.tmDestinationID != nil && candidate.tmDestinationID == merged.tmDestinationID)
+                        || (candidate.tmDestinationID == nil
+                            && candidate.volumeUUID.map(timeMachineVolumes.contains) == true)
+                    return shared
+                        && !differ(candidate.volumeUUID, merged.volumeUUID)
+                        && !differ(candidate.tmDestinationID, merged.tmDestinationID)
+                }
+                for other in duplicates {
+                    let duplicate = known[other]
+                    merged.volumeUUID = merged.volumeUUID ?? duplicate.volumeUUID
+                    merged.tmDestinationID = merged.tmDestinationID ?? duplicate.tmDestinationID
+                    if let seen = duplicate.lastSeen, seen > merged.lastSeen ?? .distantPast {
+                        merged.lastSeen = seen
+                    }
+                }
+
                 // Prefer the volume UUID as the stable key once we know it.
                 merged.id = merged.volumeUUID ?? merged.tmDestinationID ?? merged.id
+                rekeyWatch(from: previousID, to: merged.id)
+                for other in duplicates { rekeyWatch(from: known[other].id, to: merged.id) }
                 known[index] = merged
-                if previousID != merged.id,
-                   let watchIndex = config.watchedDiskIDs.firstIndex(of: previousID) {
-                    config.watchedDiskIDs[watchIndex] = merged.id
-                }
+                let dropped = Set(duplicates)
+                known = known.indices.filter { !dropped.contains($0) }.map { known[$0] }
             } else {
                 known.append(disk)
             }
@@ -235,7 +316,8 @@ enum Disks {
                 name: destination.name,
                 volumeUUID: nil,
                 tmDestinationID: destination.id,
-                lastSeen: nil))
+                lastSeen: nil),
+                timeMachineVolumes: destination.volumeUUIDs)
         }
 
         for volume in snapshot.attached {

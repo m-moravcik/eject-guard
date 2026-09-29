@@ -57,6 +57,87 @@ final class DiskMergeTests: XCTestCase {
                        "re-keying a disk must not silently unguard it")
     }
 
+    // A disk remembered as a plain volume, then made a Time Machine
+    // destination: the destination arrives with no volume UUID and the entry
+    // with no destination ID, so neither identity matched and the disk was
+    // listed twice.
+
+    func testADiskThatBecomesATimeMachineDestinationIsStillListedOnce() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+        config.watchedDiskIDs = ["VOL-1"]
+
+        Disks.merge(DiskSnapshot(
+            destinations: [TimeMachineDestination(id: "TM-1", name: "WD", mountPoint: "/Volumes/WD")],
+            attached: [volume("WD", uuid: "VOL-1", tm: "TM-1")]), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "the same disk must not be listed twice")
+        XCTAssertEqual(config.knownDisks[0].tmDestinationID, "TM-1")
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"])
+    }
+
+    func testTimeMachinesOwnRecordLinksTheDestinationWhileTheDiskIsUnplugged() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+
+        Disks.merge(DiskSnapshot(
+            destinations: [TimeMachineDestination(
+                id: "TM-1", name: "WD", mountPoint: nil, volumeUUIDs: ["VOL-1"])],
+            attached: []), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(config.knownDisks[0].tmDestinationID, "TM-1")
+    }
+
+    func testADuplicateAnEarlierReleaseLeftBehindCollapsesOnceTheDiskIsPluggedIn() {
+        var config = GuardConfig()
+        config.knownDisks = [
+            KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1", tmDestinationID: "TM-1"),
+            KnownDisk(id: "TM-1", name: "WD", tmDestinationID: "TM-1"),
+        ]
+        // Ticked on the duplicate: the tick has to survive the collapse.
+        config.watchedDiskIDs = ["TM-1"]
+
+        Disks.merge(DiskSnapshot(
+            destinations: [TimeMachineDestination(id: "TM-1", name: "WD", mountPoint: "/Volumes/WD")],
+            attached: [volume("WD", uuid: "VOL-1", tm: "TM-1")]), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"], "collapsing a duplicate must not unguard the disk")
+    }
+
+    func testTimeMachinesOwnRecordAlsoCollapsesADuplicateWhileTheDiskIsUnplugged() {
+        var config = GuardConfig()
+        // The placeholder first, so it is the entry the destination lands on.
+        config.knownDisks = [
+            KnownDisk(id: "TM-1", name: "WD", tmDestinationID: "TM-1"),
+            KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1"),
+        ]
+        config.watchedDiskIDs = ["VOL-1"]
+
+        Disks.merge(DiskSnapshot(
+            destinations: [TimeMachineDestination(
+                id: "TM-1", name: "WD", mountPoint: nil, volumeUUIDs: ["VOL-1"])],
+            attached: []), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(config.knownDisks[0].tmDestinationID, "TM-1")
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"])
+    }
+
+    func testTimeMachinePreferencesMapEachDestinationToItsVolumes() {
+        let preferences: [String: Any] = [
+            "Destinations": [
+                ["DestinationID": "TM-1", "DestinationUUIDs": ["VOL-1"]],
+                ["DestinationID": "TM-2"],
+                ["DestinationUUIDs": ["VOL-3"]],
+            ],
+        ]
+
+        XCTAssertEqual(Disks.destinationVolumeUUIDs(fromPreferences: preferences), ["TM-1": ["VOL-1"]])
+        XCTAssertEqual(Disks.destinationVolumeUUIDs(fromPreferences: [:]), [:])
+    }
+
     func testHiddenDisksStayHiddenEvenThoughTimeMachineKeepsReportingThem() {
         var config = GuardConfig()
         config.dismissedDiskIDs = ["TM-2"]
