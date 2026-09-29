@@ -6,19 +6,20 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.3.2</title>
-      <pubDate>Mon, 28 Sep 2026 15:28:59 +0000</pubDate>
-      <sparkle:version>34</sparkle:version>
-      <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
+      <title>Version 1.3.3</title>
+      <pubDate>Tue, 29 Sep 2026 15:43:46 +0000</pubDate>
+      <sparkle:version>37</sparkle:version>
+      <sparkle:shortVersionString>1.3.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>Fewer stalls while Time Machine backs up. Every snapshot Time Machine mounted during a backup made the app read the disk list again, and the Time Machine tool it asks could hang for half a minute, which could hold up an eject that was due. The app now looks again only when a disk it could guard comes or goes.</p>
+<p>A disk you do not guard is now forgotten a week after you unplug it. A volume that only existed for a moment, such as one made while formatting a disk, used to stay in the list until you hid it. Guarded disks and Time Machine disks are never forgotten, and a forgotten disk is listed again the next time you plug it in.</p>
+<p>A disk that became a Time Machine disk after the app first saw it is no longer listed twice. The app now reads the link between the two from Time Machine's own settings, so it holds while the disk is unplugged, and a disk already listed twice is merged back into one row without losing its guard.</p>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3.2/Eject-Guard-1.3.2.zip"
-                 sparkle:edSignature="S5tNyf3KzVIVj3ZhF1qmltZITsydwngLP2guXfd9awIbSwCtB/MfTC1BfhjeiGvjozugYFagMpRd5WGDnq6MBg=="
-                 length="2976581"
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3.3/Eject-Guard-1.3.3.zip"
+                 sparkle:edSignature="UcAZhxUwd9U3mVThT54Wr95En6wzGDzDGlwvzOP7Bcl+n4+u08vM6qVJbL0N9J7q9ji3irXFHX+KA6//thG4CA=="
+                 length="2983920"
                  type="application/octet-stream" />
     </item>
   </channel>
