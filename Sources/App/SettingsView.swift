@@ -203,9 +203,14 @@ private struct AboutSettings: View {
 
     var body: some View {
         VStack(spacing: Design.Spacing.l) {
-            Image(systemName: "externaldrive.badge.checkmark")
-                .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor)
+            // The app's own icon, as Finder and the Dock show it: on macOS 26
+            // the system renders it from Assets.car, glass included. At the
+            // size the standard About panel uses.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 64, height: 64)
+                // The name right below says the same thing.
+                .accessibilityHidden(true)
                 .padding(.top, Design.Spacing.l)
 
             VStack(spacing: Design.Spacing.s) {
