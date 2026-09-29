@@ -13,6 +13,9 @@ struct KnownDisk: Codable, Equatable {
     var volumeUUID: String?
     var tmDestinationID: String?
     var lastSeen: Date?
+    /// When a pass first found the disk unplugged; nil while it is plugged
+    /// in. What forgetting a disk nobody guards counts from.
+    var absentSince: Date?
 
     var isTimeMachineDestination: Bool { tmDestinationID != nil }
 }

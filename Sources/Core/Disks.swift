@@ -219,10 +219,13 @@ enum Disks {
         return URL(fileURLWithPath: path).deletingLastPathComponent().path == "/Volumes"
     }
 
-    /// Fold a snapshot into the remembered list. Disks are never dropped unless
-    /// the user hid them: the list is what you pick from while the disk sits in
-    /// a drawer.
-    static func merge(_ snapshot: DiskSnapshot, into config: inout GuardConfig) {
+    static let forgetUnguardedAfter: TimeInterval = 7 * 24 * 60 * 60
+
+    /// Fold a snapshot into the remembered list. A guarded disk is never
+    /// dropped unless the user hid it: the list is what you pick from while the
+    /// disk sits in a drawer. One nobody guards is forgotten a week after it
+    /// was unplugged.
+    static func merge(_ snapshot: DiskSnapshot, into config: inout GuardConfig, now: Date = Date()) {
         var known = config.knownDisks
 
         /// Move the user's tick to the identity that replaces an old one,
@@ -326,7 +329,7 @@ enum Disks {
                 name: volume.name,
                 volumeUUID: volume.volumeUUID,
                 tmDestinationID: volume.tmDestinationID,
-                lastSeen: Date()))
+                lastSeen: now))
         }
 
         // Earlier releases offered disk images, and remembered every one that
@@ -338,6 +341,32 @@ enum Disks {
         let images = Set(snapshot.diskImageIDs)
         known.removeAll { disk in
             images.contains(disk.id) && !watched.contains(disk.id) && !disk.isTimeMachineDestination
+        }
+
+        // Counted from the first pass that finds the disk gone, not from
+        // `lastSeen`: the app rescans only when something mounts, unmounts or
+        // wakes, so a disk left plugged into a Mac that never sleeps can carry
+        // a `lastSeen` weeks old the moment it is pulled out.
+        for index in known.indices {
+            if attachedVolume(for: known[index], among: snapshot.attached) != nil {
+                known[index].absentSince = nil
+            } else if known[index].absentSince == nil {
+                known[index].absentSince = now
+            }
+        }
+
+        // A disk nobody guards, unplugged for a week, is most likely gone for
+        // good: a volume made while formatting, a stick handed on. Forgetting
+        // it costs nothing, it is listed again the moment it is plugged in.
+        // Never a guarded disk, and never a Time Machine destination, which
+        // Time Machine reports again on every pass.
+        known.removeAll { disk in
+            guard let since = disk.absentSince,
+                  now.timeIntervalSince(since) >= forgetUnguardedAfter,
+                  !watched.contains(disk.id), !disk.isTimeMachineDestination
+            else { return false }
+            Log.write("forgot \"\(disk.name)\" - not guarded and unplugged for a week")
+            return true
         }
 
         let dismissed = Set(config.dismissedDiskIDs)

@@ -53,7 +53,8 @@ The menu bar popover shows your disks and today's next meeting:
 
 - **Click a disk** to guard it. Disks are remembered once you plug them in,
   and Time Machine destinations appear straight away. ⌘1 to ⌘9 toggle them
-  from the keyboard.
+  from the keyboard. A disk you do not guard is forgotten a week after you
+  unplug it, and listed again the next time you plug it in.
 - **Next meeting** shows what the guard will do and when it will eject.
   **Skip this meeting** leaves your disks alone for that one event.
 - **Eject now**, **Pause** and **Settings** sit at the bottom.

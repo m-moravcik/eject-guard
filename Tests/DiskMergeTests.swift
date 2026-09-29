@@ -170,6 +170,84 @@ final class DiskMergeTests: XCTestCase {
                        "you pick from this list while the disk is in a drawer")
     }
 
+    // A disk nobody guards is forgotten a week after it was unplugged: a
+    // volume made while formatting a disk otherwise stayed listed for good,
+    // and hiding it by hand was the only way out.
+
+    private let week: TimeInterval = 7 * 24 * 60 * 60
+    private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    private let unplugged = DiskSnapshot(destinations: [], attached: [])
+
+    func testAnUnguardedDiskUnpluggedForAWeekIsForgotten() {
+        var config = GuardConfig()
+        Disks.merge(DiskSnapshot(destinations: [], attached: [volume("TmpInit", uuid: "VOL-1")]),
+                    into: &config, now: start)
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60))
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + week - 1))
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "not a week yet")
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + week))
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    func testAGuardedDiskIsNeverForgotten() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+        config.watchedDiskIDs = ["VOL-1"]
+
+        Disks.merge(unplugged, into: &config, now: start)
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(52 * week))
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"],
+                       "you pick from this list while the disk is in a drawer")
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"])
+    }
+
+    func testATimeMachineDiskIsNeverForgotten() {
+        // Time Machine reports it again on every pass, so forgetting it would
+        // only make the row flicker. One it no longer backs up to is hidden.
+        var config = GuardConfig()
+        config.knownDisks = [
+            KnownDisk(id: "VOL-2", name: "TM MBP", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
+        ]
+
+        Disks.merge(unplugged, into: &config, now: start)
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(52 * week))
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2"])
+    }
+
+    func testTheWeekCountsFromWhenTheDiskWasFoundMissing() {
+        // The app rescans only when something mounts, unmounts or wakes, so a
+        // disk left plugged into a Mac that never sleeps, or one an earlier
+        // release remembered, can carry a `lastSeen` weeks old the moment it
+        // is found missing.
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "Archive", volumeUUID: "VOL-1",
+                                       lastSeen: start.addingTimeInterval(-4 * week))]
+
+        Disks.merge(unplugged, into: &config, now: start)
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "found missing just now")
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(week))
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    func testPluggingTheDiskBackInStartsTheWeekAgain() {
+        let day: TimeInterval = 24 * 60 * 60
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "Archive", volumeUUID: "VOL-1")]
+        let pluggedIn = DiskSnapshot(destinations: [], attached: [volume("Archive", uuid: "VOL-1")])
+
+        Disks.merge(unplugged, into: &config, now: start)
+        Disks.merge(pluggedIn, into: &config, now: start.addingTimeInterval(6 * day))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(6 * day + 60))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(week + 1))
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+    }
+
     func testADiskImageAnEarlierReleaseRememberedIsForgotten() {
         var config = GuardConfig()
         config.knownDisks = [KnownDisk(id: "IMG-1", name: "cmux", volumeUUID: "IMG-1")]

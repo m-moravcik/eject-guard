@@ -188,7 +188,7 @@ this project has been so far:
 | Area | Why it is tested |
 |---|---|
 | Config decoding | A key added later once wiped every setting the user had. |
-| `Disks.merge` | Identity of a disk, and whether re-keying it silently unguards it. A disk made a Time Machine destination after it was remembered was listed twice; while it is unplugged, only Time Machine's own preferences (`/Library/Preferences/com.apple.TimeMachine.plist`, undocumented, so used for matching only) link the two. |
+| `Disks.merge` | Identity of a disk, and whether re-keying it silently unguards it. A disk made a Time Machine destination after it was remembered was listed twice; while it is unplugged, only Time Machine's own preferences (`/Library/Preferences/com.apple.TimeMachine.plist`, undocumented, so used for matching only) link the two. A disk nobody guards is forgotten a week after it was unplugged, counted from the first pass that found it gone: `lastSeen` is written only on a rescan, so it can be weeks old the moment a disk is pulled out. |
 | `Disks.guardedVolumes` | An unticked disk must never become a target. |
 | `Disks.isMountedVolume` | The boot volume must never be an eject candidate. |
 | `Disks.mayChangeDiskList` | Time Machine's own mounts set off rescans whose `tmutil` hung past SIGKILL; a plugged-in disk must still rescan. |
