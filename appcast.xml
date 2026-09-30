@@ -6,19 +6,23 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.3.4</title>
-      <pubDate>Tue, 29 Sep 2026 16:13:12 +0000</pubDate>
-      <sparkle:version>39</sparkle:version>
-      <sparkle:shortVersionString>1.3.4</sparkle:shortVersionString>
+      <title>Version 1.3.5</title>
+      <pubDate>Wed, 30 Sep 2026 05:31:32 +0000</pubDate>
+      <sparkle:version>41</sparkle:version>
+      <sparkle:shortVersionString>1.3.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>The About tab in Settings now shows the app's icon instead of a generic disk symbol.</p>
+<p>A downloaded update now shows as a green card at the top of the popover, the way VibeRes shows it. Click it to restart into the new version.</p>
+<p>The popover reads a little larger and sits like a native macOS menu: notes and section headings went up a point, and the rows at the bottom have the height and spacing of a system menu. A failed eject is shown at the top in red, with a cross to dismiss it.</p>
+<p>A new install opens on a short welcome tour: what the app does, how to pick the disks it guards, and which events count as meetings. You can replay it from Settings. Updating from an earlier version skips it.</p>
+<p>"Launch at login" now remembers what you asked for. If macOS drops the registration, as it can when the app is replaced or moved, the app registers itself again the next time it starts instead of quietly showing the setting as off.</p>
+<p>Settings always opens on General, and explains that updates are downloaded in the background but the app never restarts on its own.</p>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3.4/Eject-Guard-1.3.4.zip"
-                 sparkle:edSignature="FcG9wWYpZ2OEv8vkGSUFe/kzwoTd+rKSwg2LuJye9V7ahQ16nJXux1bdegwpRiR/VdlWkLohpOWKdkba5MiEAQ=="
-                 length="2984268"
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.3.5/Eject-Guard-1.3.5.zip"
+                 sparkle:edSignature="fwgiN9jGE0H7hdXubihW02P4vSyE+BWPIxD00VobhqBOpDTZ+R25ct/+wT2RlpWBEgaiKWsuF6cahxnjY6LoBA=="
+                 length="3020758"
                  type="application/octet-stream" />
     </item>
   </channel>
