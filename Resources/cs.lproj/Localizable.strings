@@ -3,6 +3,7 @@
    Plurals live in Localizable.stringsdict. */
 
 "about.checkAutomatically" = "Kontrolovat automaticky";
+"about.checkAutomaticallyFooter" = "Aktualizace stahuje na pozadí a když je některá připravená, nabídne restart. Eject Guard se nikdy nerestartuje sám.";
 "about.checkForUpdates" = "Zkontrolovat aktualizace…";
 "about.description" = "Vysune externí disky pár minut před začátkem schůzky, abys roztočený disk nikdy neodpojil, dokud je ještě připojený.";
 "about.developmentBuild" = "vývojové sestavení";
@@ -18,6 +19,9 @@
 "banner.notificationsOffDetail" = "Disky se budou vysouvat dál, ale potichu.";
 "banner.pausedDetail" = "Do té doby se nic nevysune.";
 "banner.pausedUntil" = "Pozastaveno do %@";
+"banner.updateReady" = "Aktualizace je připravená";
+"banner.updateReadyDetail" = "Klikni a restartuj do nové verze";
+"banner.updateReadyHelp" = "Nainstaluje staženou aktualizaci a znovu spustí Eject Guard.";
 "calendar.accessDetail" = "Bez něj hlídání nevidí tvoje schůzky.";
 "calendar.accessNeeded" = "Je potřeba přístup ke kalendáři";
 "disk.backingUp" = "Zálohuje se…";
@@ -32,7 +36,6 @@
 "disks.empty" = "Zatím žádný externí disk.\nPřipoj ho a objeví se tady.";
 "disks.hint" = "Klikni na disk a bude hlídaný.";
 "failure.heldBy" = "%1$@: drží ho %2$@";
-"footer.dismiss" = "Zavřít";
 "footer.ejectHelp" = "Vysune %@. Nezaškrtnutých disků se nedotkne.";
 "footer.ejectHelpNone" = "Není připojený žádný hlídaný disk.";
 "footer.ejectNow" = "Vysunout nyní";
@@ -42,8 +45,6 @@
 "footer.quit" = "Ukončit";
 "footer.resume" = "Obnovit hlídání";
 "footer.settings" = "Nastavení…";
-"footer.updateReady" = "Aktualizace je připravená - restartuj";
-"footer.updateReadyHelp" = "Restartuje Eject Guard a dokončí instalaci stažené aktualizace.";
 "meeting.checking" = "Kontroluji kalendář…";
 "meeting.ejectsAt" = "Vysune v %@";
 "meeting.guardOff" = "Hlídání je vypnuté";
@@ -65,6 +66,18 @@
 "notify.reason.sleep" = "Mac jde spát";
 "notify.safeToUnplug" = "%@. Můžeš ho odpojit.";
 "notify.unknownProcess" = "neznámý proces";
+"onboarding.back" = "Zpět";
+"onboarding.done" = "Hotovo";
+"onboarding.guard.body" = "Klikni na disk a hlídá se. Vysouvají se jen hlídané disky a běžící záloha Time Machine se nejdřív zastaví.";
+"onboarding.guard.title" = "Vyber disky k hlídání";
+"onboarding.meetings.body" = "Za schůzku se berou události s dalšími účastníky. To, předstih i kalendáře změníš v Nastavení.";
+"onboarding.meetings.title" = "Čte tvůj kalendář";
+"onboarding.next" = "Další";
+"onboarding.skip" = "Přeskočit";
+"onboarding.step" = "%d z %d";
+"onboarding.welcome.body" = "Pár minut před schůzkou vysune tvoje externí disky, takže můžeš vzít notebook a jít.";
+"onboarding.welcome.title" = "Vítej v Eject Guard";
+"problem.dismiss" = "Zavřít";
 "relative.hours" = "za %d h";
 "relative.hoursMinutes" = "za %1$d h %2$d min";
 "relative.minutes" = "za %d min";
@@ -78,6 +91,7 @@
 "settings.ignoreFree" = "Ignorovat události označené jako Volno";
 "settings.launchAtLogin" = "Spouštět při přihlášení";
 "settings.pauseFor" = "Pozastavit na";
+"settings.replayTour" = "Znovu ukázat úvodní prohlídku";
 "settings.restoreHidden" = "Obnovit skryté disky (%d)";
 "settings.section.behaviour" = "Chování";
 "settings.section.timing" = "Načasování";

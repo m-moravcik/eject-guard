@@ -3,6 +3,7 @@
    Plurals live in Localizable.stringsdict. */
 
 "about.checkAutomatically" = "Automatisch prüfen";
+"about.checkAutomaticallyFooter" = "Lädt Updates im Hintergrund und bietet einen Neustart an, sobald eines bereit ist. Eject Guard startet nie von selbst neu.";
 "about.checkForUpdates" = "Nach Updates suchen…";
 "about.description" = "Wirft externe Laufwerke einige Minuten vor Besprechungsbeginn aus, damit eine laufende Festplatte nie im eingebundenen Zustand abgezogen wird.";
 "about.developmentBuild" = "Entwicklungsversion";
@@ -18,6 +19,9 @@
 "banner.notificationsOffDetail" = "Laufwerke werden weiterhin ausgeworfen, aber ohne Hinweis.";
 "banner.pausedDetail" = "Bis dahin wird nichts ausgeworfen.";
 "banner.pausedUntil" = "Pausiert bis %@";
+"banner.updateReady" = "Update bereit";
+"banner.updateReadyDetail" = "Klicken für Neustart in die neue Version";
+"banner.updateReadyHelp" = "Installiert das geladene Update und startet Eject Guard neu.";
 "calendar.accessDetail" = "Ohne ihn sieht die Überwachung deine Besprechungen nicht.";
 "calendar.accessNeeded" = "Kalenderzugriff erforderlich";
 "disk.backingUp" = "Sicherung läuft…";
@@ -32,7 +36,6 @@
 "disks.empty" = "Noch keine externen Laufwerke gesehen.\nSchließe eines an, dann erscheint es hier.";
 "disks.hint" = "Auf ein Laufwerk klicken, um es zu überwachen.";
 "failure.heldBy" = "%1$@: belegt von %2$@";
-"footer.dismiss" = "Ausblenden";
 "footer.ejectHelp" = "Wirft %@ aus. Nicht angehakte Laufwerke bleiben unberührt.";
 "footer.ejectHelpNone" = "Es ist kein überwachtes Laufwerk verbunden.";
 "footer.ejectNow" = "Jetzt auswerfen";
@@ -42,8 +45,6 @@
 "footer.quit" = "Beenden";
 "footer.resume" = "Überwachung fortsetzen";
 "footer.settings" = "Einstellungen…";
-"footer.updateReady" = "Update bereit - jetzt neu starten";
-"footer.updateReadyHelp" = "Startet Eject Guard neu, um das geladene Update zu installieren.";
 "meeting.checking" = "Kalender wird geprüft…";
 "meeting.ejectsAt" = "Wirft um %@ aus";
 "meeting.guardOff" = "Überwachung ist aus";
@@ -65,6 +66,18 @@
 "notify.reason.sleep" = "Der Mac wechselt in den Ruhezustand";
 "notify.safeToUnplug" = "%@. Kann abgezogen werden.";
 "notify.unknownProcess" = "ein unbekannter Prozess";
+"onboarding.back" = "Zurück";
+"onboarding.done" = "Fertig";
+"onboarding.guard.body" = "Klicke auf ein Laufwerk, um es zu überwachen. Nur überwachte Laufwerke werden ausgeworfen, und ein laufendes Time-Machine-Backup wird vorher gestoppt.";
+"onboarding.guard.title" = "Laufwerke zum Überwachen wählen";
+"onboarding.meetings.body" = "Termine mit weiteren Teilnehmern zählen als Besprechung. Das, die Vorlaufzeit und die Kalender änderst du in den Einstellungen.";
+"onboarding.meetings.title" = "Es liest deinen Kalender";
+"onboarding.next" = "Weiter";
+"onboarding.skip" = "Überspringen";
+"onboarding.step" = "%d von %d";
+"onboarding.welcome.body" = "Es wirft deine externen Laufwerke ein paar Minuten vor einer Besprechung aus, damit du den Laptop einfach mitnehmen kannst.";
+"onboarding.welcome.title" = "Willkommen bei Eject Guard";
+"problem.dismiss" = "Ausblenden";
 "relative.hours" = "in %d Std.";
 "relative.hoursMinutes" = "in %1$d Std. %2$d Min.";
 "relative.minutes" = "in %d Min.";
@@ -78,6 +91,7 @@
 "settings.ignoreFree" = "Als frei markierte Ereignisse ignorieren";
 "settings.launchAtLogin" = "Beim Anmelden starten";
 "settings.pauseFor" = "Pausieren für";
+"settings.replayTour" = "Einführung erneut zeigen";
 "settings.restoreHidden" = "Ausgeblendete Laufwerke wiederherstellen (%d)";
 "settings.section.behaviour" = "Verhalten";
 "settings.section.timing" = "Zeitpunkt";

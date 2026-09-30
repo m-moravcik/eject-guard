@@ -26,6 +26,21 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(config.watchAllCalendars, "a key added later must fall back to its default")
         XCTAssertFalse(config.ejectOnSleep)
         XCTAssertEqual(config.minAttendees, 2)
+        XCTAssertNil(config.launchAtLoginIntent, "never asked is not the same as off")
+    }
+
+    /// The welcome tour is for new installs. Someone updating from a version
+    /// without it must not be walked through the app they already use.
+    func testAnOlderFileSkipsTheWelcomeTour() throws {
+        let config = try decode(#"{ "watchedDiskIDs": ["DISK-A"] }"#)
+        XCTAssertTrue(config.onboardingShown)
+    }
+
+    func testAFreshInstallStartsWithTheWelcomeTour() throws {
+        XCTAssertFalse(GuardConfig().onboardingShown)
+        // Written and read back before the tour was finished: still due.
+        let config = try decode(#"{ "onboardingShown": false }"#)
+        XCTAssertFalse(config.onboardingShown)
     }
 
     func testUnknownKeysAreIgnored() throws {

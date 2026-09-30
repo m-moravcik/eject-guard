@@ -4,40 +4,65 @@ import SwiftUI
 struct MenuContent: View {
     @Environment(GuardController.self) private var controller
     @Environment(\.openSettings) private var openSettings
+    @Environment(UpdateStatus.self) private var updateStatus
+    @Environment(\.updater) private var updater
 
     var body: some View {
-        VStack(spacing: 0) {
-            if controller.calendarAccess == .denied {
-                CalendarAccessBanner()
-            } else if let until = controller.config.pausedUntil, until > Date() {
-                StateBanner(icon: "pause.circle.fill",
-                            tint: .orange,
-                            title: Loc.t("banner.pausedUntil", "Paused until %@", Format.clock(until)),
-                            detail: Loc.t("banner.pausedDetail", "Nothing will be ejected until then."))
-            } else if !controller.config.enabled {
-                StateBanner(icon: "xmark.circle.fill",
-                            tint: .orange,
-                            title: Loc.t("banner.guardingOff", "Guarding is off"),
-                            detail: Loc.t("banner.guardingOffDetail", "Turn it back on in Settings."))
-            } else if controller.notificationsEnabled == false {
-                StateBanner(icon: "bell.slash.fill",
-                            tint: .orange,
-                            title: Loc.t("banner.notificationsOff", "Notifications are off"),
-                            detail: Loc.t("banner.notificationsOffDetail", "Disks will still be ejected, but silently."))
+        Group {
+            // A fresh install gets the welcome tour in place of the popover,
+            // as in VibeRes, until it is finished or skipped.
+            if !controller.config.onboardingShown {
+                OnboardingView()
+            } else {
+                VStack(spacing: 0) {
+                    // A failed eject first, as VibeRes puts its problems: it
+                    // is about something that just went wrong and still needs
+                    // dealing with.
+                    if let failure = controller.lastFailure {
+                        ProblemRow(message: failure) { controller.dismissFailure() }
+                    }
+
+                    // Only when there is something staged. Sparkle installs on
+                    // quit by default, and a menu bar app can go weeks without
+                    // quitting, so this is the moment the update becomes real.
+                    // Near the top, as in VibeRes: it asks for a click.
+                    if updateStatus.isUpdateReady {
+                        UpdateReadyBanner { updater?.installUpdate() }
+                    }
+
+                    if controller.calendarAccess == .denied {
+                        CalendarAccessBanner()
+                    } else if let until = controller.config.pausedUntil, until > Date() {
+                        StateBanner(icon: "pause.circle.fill",
+                                    tint: .orange,
+                                    title: Loc.t("banner.pausedUntil", "Paused until %@", Format.clock(until)),
+                                    detail: Loc.t("banner.pausedDetail", "Nothing will be ejected until then."))
+                    } else if !controller.config.enabled {
+                        StateBanner(icon: "xmark.circle.fill",
+                                    tint: .orange,
+                                    title: Loc.t("banner.guardingOff", "Guarding is off"),
+                                    detail: Loc.t("banner.guardingOffDetail", "Turn it back on in Settings."))
+                    } else if controller.notificationsEnabled == false {
+                        StateBanner(icon: "bell.slash.fill",
+                                    tint: .orange,
+                                    title: Loc.t("banner.notificationsOff", "Notifications are off"),
+                                    detail: Loc.t("banner.notificationsOffDetail", "Disks will still be ejected, but silently."))
+                    }
+
+                    VStack(spacing: 0) {
+                        DisksSection()
+
+                        Divider()
+                            .padding(.horizontal, Design.Spacing.m)
+                            .padding(.vertical, Design.Spacing.m)
+
+                        NextMeetingSection()
+                    }
+                    .padding(.top, Design.Spacing.m)
+
+                    FooterBar()
+                }
             }
-
-            VStack(spacing: 0) {
-                DisksSection()
-
-                Divider()
-                    .padding(.horizontal, Design.Spacing.m)
-                    .padding(.vertical, Design.Spacing.m)
-
-                NextMeetingSection()
-            }
-            .padding(.top, Design.Spacing.m)
-
-            FooterBar()
         }
         .frame(width: Design.Layout.popoverWidth)
         .frame(maxHeight: Design.Layout.popoverMaxHeight)
@@ -179,6 +204,77 @@ private struct CalendarAccessBanner: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// The error row, drawn as VibeRes draws it: red, the whole message, and a
+/// small cross to acknowledge it.
+private struct ProblemRow: View {
+    let message: String
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Design.Spacing.s) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(Design.Typography.note)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(Design.Typography.note)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Design.Spacing.s)
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Loc.t("problem.dismiss", "Dismiss"))
+            .help(Loc.t("problem.dismiss", "Dismiss"))
+        }
+        .foregroundStyle(.red)
+        .padding(.horizontal, Design.Spacing.l)
+        .padding(.top, Design.Spacing.m)
+    }
+}
+
+/// The VibeRes update card: green, at the top, the whole card is the button.
+/// Insets match `DiskCard` so its edges line up with the disks under it.
+private struct UpdateReadyBanner: View {
+    let install: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: install) {
+            HStack(spacing: Design.Spacing.m) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.green)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(Loc.t("banner.updateReady", "Update ready"))
+                        .font(Design.Typography.cardTitle)
+                    Text(Loc.t("banner.updateReadyDetail", "Click to restart into the new version"))
+                        .font(Design.Typography.note)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, Design.Spacing.l)
+            .padding(.vertical, Design.Spacing.m)
+            .background(RoundedRectangle(cornerRadius: Design.Radius.card)
+                .fill(isHovering ? Design.Palette.updateFillHover : Design.Palette.updateFill))
+            .contentShape(RoundedRectangle(cornerRadius: Design.Radius.card))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .padding(.horizontal, Design.Spacing.m)
+        .padding(.top, Design.Spacing.m)
+        .accessibilityElement(children: .combine)
+        .help(Loc.t("banner.updateReadyHelp", "Installs the downloaded update and relaunches Eject Guard."))
     }
 }
 
@@ -429,8 +525,6 @@ private struct NextMeetingSection: View {
 private struct FooterBar: View {
     @Environment(GuardController.self) private var controller
     @Environment(\.openSettings) private var openSettings
-    @Environment(UpdateStatus.self) private var updateStatus
-    @Environment(\.updater) private var updater
 
     private var paused: Bool { (controller.config.pausedUntil ?? .distantPast) > Date() }
 
@@ -470,27 +564,12 @@ private struct FooterBar: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Native NSMenu metrics, measured on macOS 26: a separator item is
+            // 11pt (5 + 1 + 5) and the menu keeps 5pt at its bottom edge.
             Divider()
-                .padding(.top, Design.Spacing.s)
+                .padding(.top, Design.Layout.menuInset)
 
             VStack(spacing: 0) {
-                if let failure = controller.lastFailure {
-                    HStack(spacing: Design.Spacing.s) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text(failure)
-                            .font(Design.Typography.note)
-                            .lineLimit(2)
-                        Spacer(minLength: Design.Spacing.s)
-                        Button(Loc.t("footer.dismiss", "Dismiss")) { controller.dismissFailure() }
-                            .font(Design.Typography.note)
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, Design.Spacing.l)
-                    .padding(.vertical, Design.Spacing.s)
-                }
-
                 MenuRow(
                     icon: "eject",
                     label: ejectLabel,
@@ -510,17 +589,6 @@ private struct FooterBar: View {
                     }
                 }
 
-                // Only when there is something staged. Sparkle installs on
-                // quit by default, and a menu bar app can go weeks without
-                // quitting, so this is the moment the update becomes real.
-                if updateStatus.isUpdateReady {
-                    MenuRow(icon: "arrow.down.circle.fill",
-                            label: Loc.t("footer.updateReady", "Update ready - restart now")) {
-                        updater?.installUpdate()
-                    }
-                    .help(Loc.t("footer.updateReadyHelp", "Restarts Eject Guard to finish installing the downloaded update."))
-                }
-
                 MenuRow(icon: "gearshape", label: Loc.t("footer.settings", "Settings…"), shortcut: "⌘,") {
                     NSApp.activate(ignoringOtherApps: true)
                     openSettings()
@@ -536,7 +604,7 @@ private struct FooterBar: View {
                 }
                 .keyboardShortcut("q")
             }
-            .padding(.vertical, Design.Spacing.m)
+            .padding(.vertical, Design.Layout.menuInset)
         }
     }
 }

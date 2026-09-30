@@ -3,6 +3,7 @@
    Plurals live in Localizable.stringsdict. */
 
 "about.checkAutomatically" = "Kontrolovať automaticky";
+"about.checkAutomaticallyFooter" = "Aktualizácie sťahuje na pozadí a keď je niektorá pripravená, ponúkne reštart. Eject Guard sa nikdy nereštartuje sám.";
 "about.checkForUpdates" = "Skontrolovať aktualizácie…";
 "about.description" = "Vysunie externé disky pár minút pred začiatkom stretnutia, aby si roztočený disk nikdy neodpojil, kým je ešte pripojený.";
 "about.developmentBuild" = "vývojové zostavenie";
@@ -18,6 +19,9 @@
 "banner.notificationsOffDetail" = "Disky sa budú vysúvať ďalej, ale potichu.";
 "banner.pausedDetail" = "Dovtedy sa nič nevysunie.";
 "banner.pausedUntil" = "Pozastavené do %@";
+"banner.updateReady" = "Aktualizácia je pripravená";
+"banner.updateReadyDetail" = "Klikni a reštartuj do novej verzie";
+"banner.updateReadyHelp" = "Nainštaluje stiahnutú aktualizáciu a znova spustí Eject Guard.";
 "calendar.accessDetail" = "Bez neho stráž nevidí tvoje stretnutia.";
 "calendar.accessNeeded" = "Treba prístup ku kalendáru";
 "disk.backingUp" = "Zálohuje sa…";
@@ -32,7 +36,6 @@
 "disks.empty" = "Zatiaľ žiadny externý disk.\nPripoj ho a objaví sa tu.";
 "disks.hint" = "Klikni na disk a bude strážený.";
 "failure.heldBy" = "%1$@: drží ho %2$@";
-"footer.dismiss" = "Zavrieť";
 "footer.ejectHelp" = "Vysunie %@. Nezaškrtnutých diskov sa nedotkne.";
 "footer.ejectHelpNone" = "Nie je pripojený žiadny strážený disk.";
 "footer.ejectNow" = "Vysunúť teraz";
@@ -42,8 +45,6 @@
 "footer.quit" = "Ukončiť";
 "footer.resume" = "Obnoviť stráženie";
 "footer.settings" = "Nastavenia…";
-"footer.updateReady" = "Aktualizácia je pripravená - reštartuj";
-"footer.updateReadyHelp" = "Reštartuje Eject Guard a dokončí inštaláciu stiahnutej aktualizácie.";
 "meeting.checking" = "Kontrolujem kalendár…";
 "meeting.ejectsAt" = "Vysunie o %@";
 "meeting.guardOff" = "Stráž je vypnutá";
@@ -65,6 +66,18 @@
 "notify.reason.sleep" = "Mac ide spať";
 "notify.safeToUnplug" = "%@. Môžeš ho odpojiť.";
 "notify.unknownProcess" = "neznámy proces";
+"onboarding.back" = "Späť";
+"onboarding.done" = "Hotovo";
+"onboarding.guard.body" = "Klikni na disk a stráži sa. Vysúvajú sa len strážené disky a bežiaca záloha Time Machine sa najprv zastaví.";
+"onboarding.guard.title" = "Vyber disky na stráženie";
+"onboarding.meetings.body" = "Za stretnutie sa berú udalosti s ďalšími účastníkmi. To, predstih aj kalendáre zmeníš v Nastaveniach.";
+"onboarding.meetings.title" = "Číta tvoj kalendár";
+"onboarding.next" = "Ďalej";
+"onboarding.skip" = "Preskočiť";
+"onboarding.step" = "%d z %d";
+"onboarding.welcome.body" = "Pár minút pred stretnutím vysunie tvoje externé disky, takže môžeš zobrať notebook a ísť.";
+"onboarding.welcome.title" = "Vitaj v Eject Guard";
+"problem.dismiss" = "Zavrieť";
 "relative.hours" = "o %d h";
 "relative.hoursMinutes" = "o %1$d h %2$d min";
 "relative.minutes" = "o %d min";
@@ -78,6 +91,7 @@
 "settings.ignoreFree" = "Ignorovať udalosti označené ako Voľný";
 "settings.launchAtLogin" = "Spúšťať pri prihlásení";
 "settings.pauseFor" = "Pozastaviť na";
+"settings.replayTour" = "Znova ukázať úvodnú prehliadku";
 "settings.restoreHidden" = "Obnoviť skryté disky (%d)";
 "settings.section.behaviour" = "Správanie";
 "settings.section.timing" = "Načasovanie";

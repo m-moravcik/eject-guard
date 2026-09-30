@@ -276,6 +276,8 @@ the popover straight to PNG in both appearances:
 ```sh
 ./preview.sh          # this Mac's real disks and calendar
 ./preview.sh demo     # invented data, the bare popover
+./preview.sh update   # the demo popover with an update ready to install
+./preview.sh onboarding  # the welcome tour a fresh install opens on
 ./preview.sh hero     # the same, open under the menu bar: docs/popover-*.png
 ./preview.sh icons    # every menu bar icon state
 PREVIEW_LANG=sk ./preview.sh demo
@@ -285,6 +287,14 @@ Output lands in `build/preview/`. The published screenshot always comes from
 `demo`: the plain mode shows whatever is on this Mac's calendar.
 
 Requires macOS 14 or newer.
+
+### Menu metrics
+
+The action rows copy a native `NSMenu`, measured on macOS 26 with `NSMenu.size`
+rather than eyeballed: a 24 pt row, an 11 pt separator (5 + 1 + 5) and 5 pt at
+the bottom edge. The `MenuBarExtra` panel adds no inset of its own at the
+bottom, so the numbers in `DesignTokens` are the ones on screen. VibeRes uses
+the same values, and the two apps are meant to feel like one family.
 
 ## The rename
 

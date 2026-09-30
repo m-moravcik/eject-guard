@@ -18,7 +18,11 @@ enum Design {
     enum Layout {
         static let popoverWidth: CGFloat = 300
         static let popoverMaxHeight: CGFloat = 620
-        static let rowVerticalPadding: CGFloat = 3
+        /// A 13pt line plus 4 + 4 is 24pt, the height of a native menu item
+        /// on macOS 26 (measured with `NSMenu.size`).
+        static let rowVerticalPadding: CGFloat = 4
+        /// Space a native menu keeps around a separator and at its edges.
+        static let menuInset: CGFloat = 5
         static let iconColumn: CGFloat = 16
     }
 
@@ -27,9 +31,12 @@ enum Design {
         static let cardSubtitle: Font = .system(size: 11).monospacedDigit()
         static let badge: Font = .system(size: 9, weight: .bold)
         static let row: Font = .system(size: 13)
-        static let note: Font = .system(size: 10)
-        /// All-caps section labels ("NEXT MEETING", "DISKS").
-        static let sectionHeader: Font = .system(size: 9, weight: .semibold, design: .rounded)
+        /// Secondary annotations under a control. 11pt, as in VibeRes: macOS
+        /// treats 11pt as the floor for text that carries meaning, and these
+        /// render in `.secondary`, which takes the contrast down with them.
+        static let note: Font = .system(size: 11)
+        /// All-caps section labels ("NEXT MEETING", "DISKS"). VibeRes' size.
+        static let sectionHeader: Font = .system(size: 10, weight: .semibold, design: .rounded)
     }
 
     enum Palette {
@@ -37,5 +44,8 @@ enum Design {
         static let cardFillHover = Color.secondary.opacity(0.18)
         static let cardFillActive = Color.accentColor.opacity(0.14)
         static let separator = Color.secondary.opacity(0.15)
+        /// The update-ready card, the same green wash as VibeRes.
+        static let updateFill = Color.green.opacity(0.10)
+        static let updateFillHover = Color.green.opacity(0.18)
     }
 }

@@ -15,6 +15,11 @@ struct EjectGuardApp: App {
         AppNotifier.install()
         let controller = GuardController()
         controller.start()
+        // Repair a login item registration that dropped without the user
+        // touching the toggle, as a replaced or moved bundle makes it do.
+        let storedIntent = ConfigStore.load().launchAtLoginIntent
+        let intent = LoginItem.reconcile(storedIntent: storedIntent)
+        if intent != storedIntent { controller.update { $0.launchAtLoginIntent = intent } }
         _controller = State(initialValue: controller)
         // Returns the no-op updater unless this is an installed, Developer ID
         // signed bundle. See UpdaterGate.

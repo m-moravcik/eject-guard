@@ -208,6 +208,11 @@ final class GuardController {
 
     func dismissFailure() { lastFailure = nil }
 
+    /// Ends the welcome tour, finished or skipped. Settings can clear it again.
+    func setOnboardingShown(_ shown: Bool) {
+        update { $0.onboardingShown = shown }
+    }
+
     func isAttached(_ disk: KnownDisk) -> Bool {
         Disks.attachedVolume(for: disk, among: attached) != nil
     }
@@ -559,7 +564,9 @@ final class GuardController {
 /// whatever is on the calendar and plugged in on the machine that renders it.
 /// Compiled into the preview harness only; the app never sets it.
 extension GuardController {
-    func loadDemo() {
+    /// - Parameter showingTour: render the welcome tour instead of the
+    ///   popover it covers on a fresh install.
+    func loadDemo(showingTour: Bool = false) {
         let timeMachine = KnownDisk(id: "demo-tm", name: "Time Machine",
                                     volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest")
         let archive = KnownDisk(id: "demo-archive", name: "Archive HDD", volumeUUID: "demo-archive-uuid")
@@ -568,6 +575,7 @@ extension GuardController {
         var demo = GuardConfig()
         demo.knownDisks = [timeMachine, archive, portable]
         demo.watchedDiskIDs = [timeMachine.id, archive.id]
+        demo.onboardingShown = !showingTour
         config = demo
 
         attached = [

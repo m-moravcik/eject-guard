@@ -24,9 +24,14 @@ MainActor.assumeIsolated {
     // open: the published screenshot.
     let banner = CommandLine.arguments.contains("banner")
     let hero = banner || CommandLine.arguments.contains("hero")
-    let demo = hero || CommandLine.arguments.contains("demo")
+    // Update shows the demo popover with an update staged, for the card that
+    // otherwise only appears once a release is actually downloaded.
+    let update = CommandLine.arguments.contains("update")
+    // Onboarding shows the welcome tour a fresh install opens on.
+    let tour = CommandLine.arguments.contains("onboarding")
+    let demo = hero || update || tour || CommandLine.arguments.contains("demo")
     let controller = GuardController()
-    if demo { controller.loadDemo() } else { controller.start() }
+    if demo { controller.loadDemo(showingTour: tour) } else { controller.start() }
 
     let output = CommandLine.arguments.count > 1
         ? CommandLine.arguments[1]
@@ -40,9 +45,9 @@ MainActor.assumeIsolated {
         for scheme in [ColorScheme.light, .dark] {
             let popover = MenuContent()
                 .environment(controller)
-                // The harness never updates itself; this is only here because
-                // the popover reads the status out of the environment.
-                .environment(UpdateStatus())
+                // The harness never updates itself; the status is only here
+                // because the popover reads it out of the environment.
+                .environment(UpdateStatus(isUpdateReady: update))
                 .environment(\.colorScheme, scheme)
                 // The real popover sits on ultraThinMaterial over the desktop,
                 // which an offscreen render has nothing to blur. Substitute a

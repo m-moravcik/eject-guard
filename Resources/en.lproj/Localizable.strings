@@ -3,6 +3,7 @@
    Plurals live in Localizable.stringsdict. */
 
 "about.checkAutomatically" = "Check automatically";
+"about.checkAutomaticallyFooter" = "Downloads updates in the background and offers to restart when one is ready. Eject Guard never restarts on its own.";
 "about.checkForUpdates" = "Check for Updates…";
 "about.description" = "Ejects your external disks a few minutes before a meeting starts, so a spinning drive is never unplugged while it is still mounted.";
 "about.developmentBuild" = "development build";
@@ -18,6 +19,9 @@
 "banner.notificationsOffDetail" = "Disks will still be ejected, but silently.";
 "banner.pausedDetail" = "Nothing will be ejected until then.";
 "banner.pausedUntil" = "Paused until %@";
+"banner.updateReady" = "Update ready";
+"banner.updateReadyDetail" = "Click to restart into the new version";
+"banner.updateReadyHelp" = "Installs the downloaded update and relaunches Eject Guard.";
 "calendar.accessDetail" = "Without it the guard cannot see your meetings.";
 "calendar.accessNeeded" = "Calendar access needed";
 "disk.backingUp" = "Backing up…";
@@ -32,7 +36,6 @@
 "disks.empty" = "No external disks seen yet.\nPlug one in and it shows up here.";
 "disks.hint" = "Click a disk to guard it.";
 "failure.heldBy" = "%1$@: held by %2$@";
-"footer.dismiss" = "Dismiss";
 "footer.ejectHelp" = "Ejects %@. Disks you have not ticked are left alone.";
 "footer.ejectHelpNone" = "No guarded disk is connected.";
 "footer.ejectNow" = "Eject now";
@@ -42,8 +45,6 @@
 "footer.quit" = "Quit";
 "footer.resume" = "Resume guarding";
 "footer.settings" = "Settings…";
-"footer.updateReady" = "Update ready - restart now";
-"footer.updateReadyHelp" = "Restarts Eject Guard to finish installing the downloaded update.";
 "meeting.checking" = "Checking your calendar…";
 "meeting.ejectsAt" = "Ejects at %@";
 "meeting.guardOff" = "Guard is off";
@@ -65,6 +66,18 @@
 "notify.reason.sleep" = "The Mac is going to sleep";
 "notify.safeToUnplug" = "%@. Safe to unplug.";
 "notify.unknownProcess" = "an unknown process";
+"onboarding.back" = "Back";
+"onboarding.done" = "Done";
+"onboarding.guard.body" = "Click a disk to guard it. Only guarded disks are ever ejected, and a running Time Machine backup is stopped first.";
+"onboarding.guard.title" = "Pick the disks to guard";
+"onboarding.meetings.body" = "Events with other attendees count as meetings. Change that, the lead time and the calendars in Settings.";
+"onboarding.meetings.title" = "It reads your calendar";
+"onboarding.next" = "Next";
+"onboarding.skip" = "Skip";
+"onboarding.step" = "%d of %d";
+"onboarding.welcome.body" = "It ejects your external disks a few minutes before a meeting, so you can pick up the laptop and go.";
+"onboarding.welcome.title" = "Welcome to Eject Guard";
+"problem.dismiss" = "Dismiss";
 "relative.hours" = "in %d h";
 "relative.hoursMinutes" = "in %1$d h %2$d min";
 "relative.minutes" = "in %d min";
@@ -78,6 +91,7 @@
 "settings.ignoreFree" = "Ignore events marked as Free";
 "settings.launchAtLogin" = "Launch at login";
 "settings.pauseFor" = "Pause for";
+"settings.replayTour" = "Replay welcome tour";
 "settings.restoreHidden" = "Restore hidden disks (%d)";
 "settings.section.behaviour" = "Behaviour";
 "settings.section.timing" = "Timing";

@@ -1,18 +1,28 @@
 import EventKit
-import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
+    enum Tab: Hashable { case general, calendars, about }
+
+    /// SwiftUI keeps this view alive between opens, so without a reset the
+    /// window reopens on whichever tab was left - as VibeRes found. Every
+    /// open starts on General, where the settings people change live.
+    @State private var selectedTab: Tab = .general
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             GeneralSettings()
                 .tabItem { Label(Loc.t("settings.tab.general", "General"), systemImage: "gearshape") }
+                .tag(Tab.general)
             CalendarSettings()
                 .tabItem { Label(Loc.t("settings.tab.calendars", "Calendars"), systemImage: "calendar") }
+                .tag(Tab.calendars)
             AboutSettings()
                 .tabItem { Label(Loc.t("settings.tab.about", "About"), systemImage: "info.circle") }
+                .tag(Tab.about)
         }
         .frame(width: 440)
+        .task { selectedTab = .general }
     }
 }
 
@@ -20,7 +30,7 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @Environment(GuardController.self) private var controller
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = LoginItem.isEnabled
 
     private let leadOptions: [Double] = [3, 5, 10, 15, 20]
 
@@ -67,10 +77,7 @@ private struct GeneralSettings: View {
                     Text(Loc.t("settings.hours", "%d hours", 8)).tag(8.0)
                 }
 
-                Toggle(Loc.t("settings.launchAtLogin", "Launch at login"), isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, wanted in
-                        setLoginItem(wanted)
-                    }
+                Toggle(Loc.t("settings.launchAtLogin", "Launch at login"), isOn: launchAtLoginBinding)
             } header: {
                 Text(Loc.t("settings.section.behaviour", "Behaviour"))
             }
@@ -81,10 +88,22 @@ private struct GeneralSettings: View {
                     controller.restoreHiddenDisks()
                 }
                 .disabled(controller.hiddenDiskCount == 0)
+                // Only once the tour is behind the user: on a fresh install
+                // they are already in it.
+                if controller.config.onboardingShown {
+                    Button(Loc.t("settings.replayTour", "Replay welcome tour")) {
+                        controller.setOnboardingShown(false)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
-        .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
+        .onAppear {
+            // The recorded intent, not the registration: if that dropped and
+            // re-registering failed, the toggle should still show what the
+            // user asked for rather than silently reading off.
+            launchAtLogin = controller.config.launchAtLoginIntent ?? LoginItem.isEnabled
+        }
     }
 
     private var leadBinding: Binding<Double> {
@@ -112,18 +131,20 @@ private struct GeneralSettings: View {
                 set: { value in controller.update { $0.ejectOnSleep = value } })
     }
 
-    private func setLoginItem(_ wanted: Bool) {
-        do {
-            if wanted {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(get: { launchAtLogin }, set: { wanted in
+            // The intent first: it is what the user asked for, and it has to
+            // outlive a failed registration so the next launch can retry.
+            controller.update { $0.launchAtLoginIntent = wanted }
+            launchAtLogin = wanted
+            guard LoginItem.setEnabled(wanted) else { return }
+            // SMAppService applies asynchronously; give it a moment before
+            // reading back what the system actually did.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                launchAtLogin = LoginItem.isEnabled
             }
-        } catch {
-            Log.write("login item toggle failed: \(error.localizedDescription)")
-        }
-        // Report what the system actually did, not what was asked for.
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        })
     }
 }
 
@@ -238,6 +259,14 @@ private struct AboutSettings: View {
                     ))
                     .toggleStyle(.checkbox)
                     .font(Design.Typography.note)
+                    // What "automatically" commits to, in VibeRes' words: the
+                    // download happens on its own, the restart never does.
+                    Text(Loc.t("about.checkAutomaticallyFooter", "Downloads updates in the background and offers to restart when one is ready. Eject Guard never restarts on its own."))
+                        .font(Design.Typography.note)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, Design.Spacing.l)
                 }
             } else {
                 Text(updatesOffReason)

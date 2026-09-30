@@ -55,6 +55,12 @@ struct GuardConfig: Codable, Equatable {
     var pauseHours: Double = 1
     /// Events the user chose to ignore once. Bounded - see `skip(_:)`.
     var skippedEventIDs: [String] = []
+    /// What the user last asked "Launch at login" to be. Nil until they have
+    /// been asked. Kept apart from the system's registration because that one
+    /// can drop without anyone touching it - see `LoginItemPolicy`.
+    var launchAtLoginIntent: Bool?
+    /// The welcome tour in the popover has been finished or skipped.
+    var onboardingShown: Bool = false
 
     static let maxSkippedEvents = 50
 
@@ -89,6 +95,7 @@ struct GuardConfig: Codable, Equatable {
         case watchAllCalendars, watchedCalendarIDs
         case leadMinutes, minAttendees, enabled, ignoreFreeEvents, ejectOnSleep
         case pausedUntil, pauseHours, skippedEventIDs, ejectAttempts, ejectRetryDelay
+        case launchAtLoginIntent, onboardingShown
     }
 
     init(from decoder: Decoder) throws {
@@ -114,6 +121,11 @@ struct GuardConfig: Codable, Equatable {
         skippedEventIDs = value(.skippedEventIDs, fallback.skippedEventIDs)
         ejectAttempts = value(.ejectAttempts, fallback.ejectAttempts)
         ejectRetryDelay = value(.ejectRetryDelay, fallback.ejectRetryDelay)
+        launchAtLoginIntent = try? container.decodeIfPresent(Bool.self, forKey: .launchAtLoginIntent)
+        // A file without the key was written by a version that had no tour,
+        // so its owner is already using the app and should not be walked
+        // through it after an update. Only a fresh install starts at false.
+        onboardingShown = value(.onboardingShown, true)
     }
 }
 
