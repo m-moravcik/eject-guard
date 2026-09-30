@@ -104,14 +104,12 @@
 "settings.pauseFor" = "Pause for";
 "settings.replayTour" = "Replay welcome tour";
 "settings.restoreHidden" = "Restore hidden disks (%d)";
-"settings.section.behaviour" = "Behaviour";
-"settings.section.timing" = "Timing";
-"settings.section.whatCounts" = "What counts";
 "settings.tab.about" = "About";
 "settings.tab.calendars" = "Calendars";
 "settings.tab.general" = "General";
+"settings.tab.meetings" = "Meetings";
 "settings.tickedCalendarsCount" = "Only the ticked calendars count.";
-"settings.timingFooter" = "Stopping a running Time Machine backup takes around ten seconds, so leave a few minutes of room.";
+"settings.timingFooter" = "Stopping a running Time Machine backup can take up to a minute, so leave a few minutes of room.";
 "settings.treatAsMeeting" = "Treat as a meeting";
 "settings.watchAllCalendars" = "Watch all calendars";
 "settings.whatCountsFooter" = "Attendees are what separate a real meeting from blocks like Focus or Home-office, without matching on titles.";

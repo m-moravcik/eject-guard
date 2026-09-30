@@ -10,6 +10,11 @@ import SwiftUI
 MainActor.assumeIsolated {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
+    // A bare executable has no bundle icon and draws a folder where the app
+    // shows its own. preview.sh runs from the repository root.
+    if let icon = NSImage(contentsOfFile: "App/Icon/AppIcon.icns") {
+        app.applicationIconImage = icon
+    }
 
     // Icon mode renders the menu bar icon instead of the popover. It needs no
     // controller and no calendar, because StatusIconArt takes plain values.
@@ -37,13 +42,26 @@ MainActor.assumeIsolated {
         ? CommandLine.arguments[1]
         : NSTemporaryDirectory() + "menu-content.png"
 
+    // Settings mode renders the Settings window. Its grouped Form is backed
+    // by AppKit, which ImageRenderer cannot draw, so it goes through a real
+    // hosting view in a window that is never shown.
+    if CommandLine.arguments.contains("settings") {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            renderSettings(controller: controller, output: output)
+            app.terminate(nil)
+        }
+        app.run()
+    }
+
     // Let the calendar permission callback and the first disk scan land before
     // rendering, otherwise the shot shows a half populated view.
     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
         // Render both appearances: a menu bar utility is judged in whichever
         // one the user runs, and contrast bugs only show up in one of them.
+        // The tour renders every step; everything else is a single shot.
+        for step in 0..<(tour ? 3 : 1) {
         for scheme in [ColorScheme.light, .dark] {
-            let popover = MenuContent()
+            let popover = MenuContent(onboardingStep: step)
                 .environment(controller)
                 // The harness never updates itself; the status is only here
                 // because the popover reads it out of the environment.
@@ -76,7 +94,8 @@ MainActor.assumeIsolated {
             }
 
             let suffix = scheme == .dark ? "-dark" : "-light"
-            let path = output.replacingOccurrences(of: ".png", with: "\(suffix).png")
+            let stepSuffix = tour ? "-\(step + 1)" : ""
+            let path = output.replacingOccurrences(of: ".png", with: "\(stepSuffix)\(suffix).png")
             do {
                 try png.write(to: URL(fileURLWithPath: path))
                 print("wrote \(path)  \(Int(image.size.width))x\(Int(image.size.height)) pt")
@@ -84,6 +103,7 @@ MainActor.assumeIsolated {
                 FileHandle.standardError.write("write failed: \(error)\n".data(using: .utf8)!)
                 exit(1)
             }
+        }
         }
         app.terminate(nil)
     }
@@ -240,5 +260,37 @@ struct HeroScene<Popover: View>: View {
                            : [Color(red: 0.72, green: 0.83, blue: 0.95), Color(red: 0.86, green: 0.80, blue: 0.93)],
                            startPoint: .topLeading, endPoint: .bottomTrailing))
         .environment(\.colorScheme, scheme)
+    }
+}
+
+
+/// Every tab of the Settings window at the size it opens at, in both
+/// appearances. Anything that would scroll shows up cut off at the bottom.
+@MainActor
+func renderSettings(controller: GuardController, output: String) {
+    let tabs: [(SettingsView.Tab, String)] = [(.general, "general"), (.meetings, "meetings"),
+                                              (.calendars, "calendars"), (.about, "about")]
+    for (tab, tabName) in tabs {
+    for scheme in [ColorScheme.light, .dark] {
+        let root = SettingsView(initialTab: tab)
+            .environment(controller)
+            .environment(UpdateStatus(isUpdateReady: false))
+        let host = NSHostingView(rootView: root)
+        let size = host.fittingSize
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        host.display()
+
+        guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { exit(1) }
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        guard let png = bitmap.representation(using: .png, properties: [:]) else { exit(1) }
+        let suffix = scheme == .dark ? "-dark" : "-light"
+        let path = output.replacingOccurrences(of: ".png", with: "-\(tabName)\(suffix).png")
+        try? png.write(to: URL(fileURLWithPath: path))
+        print("wrote \(path)  \(Int(size.width))x\(Int(size.height)) pt")
+    }
     }
 }

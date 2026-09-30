@@ -104,14 +104,12 @@
 "settings.pauseFor" = "Pausieren für";
 "settings.replayTour" = "Einführung erneut zeigen";
 "settings.restoreHidden" = "Ausgeblendete Laufwerke wiederherstellen (%d)";
-"settings.section.behaviour" = "Verhalten";
-"settings.section.timing" = "Zeitpunkt";
-"settings.section.whatCounts" = "Was zählt";
 "settings.tab.about" = "Über";
 "settings.tab.calendars" = "Kalender";
 "settings.tab.general" = "Allgemein";
+"settings.tab.meetings" = "Besprechungen";
 "settings.tickedCalendarsCount" = "Es zählen nur die angehakten Kalender.";
-"settings.timingFooter" = "Eine laufende Time-Machine-Sicherung zu stoppen dauert etwa zehn Sekunden, plane also ein paar Minuten Puffer ein.";
+"settings.timingFooter" = "Eine laufende Time-Machine-Sicherung zu stoppen kann bis zu einer Minute dauern, plane also ein paar Minuten Puffer ein.";
 "settings.treatAsMeeting" = "Als Besprechung behandeln";
 "settings.watchAllCalendars" = "Alle Kalender beobachten";
 "settings.whatCountsFooter" = "Teilnehmer unterscheiden eine echte Besprechung von Blöcken wie Focus oder Homeoffice, ohne auf Titel zu raten.";

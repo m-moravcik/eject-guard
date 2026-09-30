@@ -104,14 +104,12 @@
 "settings.pauseFor" = "Pozastaviť na";
 "settings.replayTour" = "Znova ukázať úvodnú prehliadku";
 "settings.restoreHidden" = "Obnoviť skryté disky (%d)";
-"settings.section.behaviour" = "Správanie";
-"settings.section.timing" = "Načasovanie";
-"settings.section.whatCounts" = "Čo sa počíta";
 "settings.tab.about" = "O aplikácii";
 "settings.tab.calendars" = "Kalendáre";
 "settings.tab.general" = "Všeobecné";
+"settings.tab.meetings" = "Stretnutia";
 "settings.tickedCalendarsCount" = "Počítajú sa len zaškrtnuté kalendáre.";
-"settings.timingFooter" = "Zastavenie bežiacej zálohy Time Machine trvá asi desať sekúnd, tak nechaj pár minút rezervu.";
+"settings.timingFooter" = "Zastavenie bežiacej zálohy Time Machine môže trvať až minútu, tak nechaj pár minút rezervu.";
 "settings.treatAsMeeting" = "Považovať za stretnutie";
 "settings.watchAllCalendars" = "Sledovať všetky kalendáre";
 "settings.whatCountsFooter" = "Účastníci sú to, čo odlíši skutočné stretnutie od blokov ako Focus či Home-office, bez hádania podľa názvu.";

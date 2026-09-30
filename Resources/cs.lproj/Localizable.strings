@@ -104,14 +104,12 @@
 "settings.pauseFor" = "Pozastavit na";
 "settings.replayTour" = "Znovu ukázat úvodní prohlídku";
 "settings.restoreHidden" = "Obnovit skryté disky (%d)";
-"settings.section.behaviour" = "Chování";
-"settings.section.timing" = "Načasování";
-"settings.section.whatCounts" = "Co se počítá";
 "settings.tab.about" = "O aplikaci";
 "settings.tab.calendars" = "Kalendáře";
 "settings.tab.general" = "Obecné";
+"settings.tab.meetings" = "Schůzky";
 "settings.tickedCalendarsCount" = "Počítají se jen zaškrtnuté kalendáře.";
-"settings.timingFooter" = "Zastavení běžící zálohy Time Machine trvá asi deset sekund, tak nech pár minut rezervu.";
+"settings.timingFooter" = "Zastavení běžící zálohy Time Machine může trvat až minutu, tak nech pár minut rezervu.";
 "settings.treatAsMeeting" = "Považovat za schůzku";
 "settings.watchAllCalendars" = "Sledovat všechny kalendáře";
 "settings.whatCountsFooter" = "Účastníci jsou to, co odliší skutečnou schůzku od bloků jako Focus či Home-office, bez hádání podle názvu.";

@@ -6,20 +6,26 @@ import SwiftUI
 /// records it in the config; Settings can replay it.
 struct OnboardingView: View {
     @Environment(GuardController.self) private var controller
-    @State private var step = 0
+    @State private var step: Int
+
+    /// `initialStep` exists for the preview harness, which renders each step.
+    init(initialStep: Int = 0) {
+        _step = State(initialValue: initialStep)
+    }
 
     private struct Step {
-        let symbol: String
+        /// Nil shows the app's own icon: the welcome step introduces the app.
+        let symbol: String?
         let title: String
         let body: String
     }
 
     private var steps: [Step] {
         [
-            Step(symbol: "externaldrive.fill.badge.checkmark",
+            Step(symbol: nil,
                  title: Loc.t("onboarding.welcome.title", "Welcome to Eject Guard"),
                  body: Loc.t("onboarding.welcome.body", "It ejects your external disks a few minutes before a meeting, so you can pick up the laptop and go.")),
-            Step(symbol: "checkmark.circle.fill",
+            Step(symbol: "externaldrive.fill.badge.checkmark",
                  title: Loc.t("onboarding.guard.title", "Pick the disks to guard"),
                  body: Loc.t("onboarding.guard.body", "Click a disk to guard it. Only guarded disks are ever ejected, and a running Time Machine backup is stopped first.")),
             Step(symbol: "calendar.badge.clock",
@@ -47,11 +53,23 @@ struct OnboardingView: View {
 
             let current = steps[step]
             VStack(spacing: 10) {
-                Image(systemName: current.symbol)
-                    .font(.system(size: 36))
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
-                    .padding(.top, Design.Spacing.s)
+                Group {
+                    if let symbol = current.symbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 36))
+                            .foregroundStyle(.tint)
+                    } else {
+                        // As Finder and the Dock draw it, glass included on
+                        // macOS 26. The icon art carries its own margin, so it
+                        // is drawn larger than the symbols to look the same size.
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable()
+                            .frame(width: 56, height: 56)
+                    }
+                }
+                .frame(height: 56)
+                .accessibilityHidden(true)
+                .padding(.top, Design.Spacing.s)
                 Text(current.title)
                     .font(.headline)
                     .multilineTextAlignment(.center)

@@ -325,6 +325,7 @@ the popover straight to PNG in both appearances:
 ./preview.sh onboarding  # the welcome tour a fresh install opens on
 ./preview.sh hero     # the same, open under the menu bar: docs/popover-*.png
 ./preview.sh icons    # every menu bar icon state
+./preview.sh settings # every Settings tab at the window's real size
 PREVIEW_LANG=sk ./preview.sh demo
 ```
 

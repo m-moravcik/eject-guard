@@ -2,6 +2,8 @@ import EventKit
 import SwiftUI
 
 struct MenuContent: View {
+    /// Which welcome step to open on. Only the preview harness sets it.
+    var onboardingStep = 0
     @Environment(GuardController.self) private var controller
     @Environment(\.openSettings) private var openSettings
     @Environment(UpdateStatus.self) private var updateStatus
@@ -12,7 +14,7 @@ struct MenuContent: View {
             // A fresh install gets the welcome tour in place of the popover,
             // as in VibeRes, until it is finished or skipped.
             if !controller.config.onboardingShown {
-                OnboardingView()
+                OnboardingView(initialStep: onboardingStep)
             } else {
                 VStack(spacing: 0) {
                     // A failed eject first, as VibeRes puts its problems: it
