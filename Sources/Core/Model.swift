@@ -16,8 +16,18 @@ struct KnownDisk: Codable, Equatable {
     /// When a pass first found the disk unplugged; nil while it is plugged
     /// in. What forgetting a disk nobody guards counts from.
     var absentSince: Date?
+    /// True for a Time Machine destination on a network share. There is no
+    /// disk behind it to eject: guarding one means stopping a backup to it
+    /// before a meeting, so the laptop never leaves the network mid-write.
+    var network: Bool?
 
     var isTimeMachineDestination: Bool { tmDestinationID != nil }
+    var isNetworkDestination: Bool { network == true }
+}
+
+/// How a disk is plugged in, as far as the popover says it.
+enum Connection: Equatable {
+    case usb, thunderbolt, sdCard
 }
 
 /// A disk that is plugged in right now.
@@ -26,6 +36,8 @@ struct AttachedVolume: Equatable {
     var name: String
     var volumeUUID: String?
     var tmDestinationID: String?
+    /// Nil when DiskArbitration reports an interface we do not name.
+    var connection: Connection?
 }
 
 

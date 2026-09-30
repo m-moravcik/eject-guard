@@ -18,8 +18,8 @@ final class BackupStatusTests: XCTestCase {
         ])
         XCTAssertTrue(status.running)
         XCTAssertEqual(status.percent ?? 0, 0.42, accuracy: 0.0001)
-        XCTAssertTrue(status.isBackingUp(to: "/Volumes/WD"))
-        XCTAssertFalse(status.isBackingUp(to: "/Volumes/Other"))
+        XCTAssertTrue(status.isBackingUp(to: volume("/Volumes/WD")))
+        XCTAssertFalse(status.isBackingUp(to: volume("/Volumes/Other")))
     }
 
     /// The shape `tmutil status -X` really returns on macOS 26: the figure sits
@@ -58,8 +58,45 @@ final class BackupStatusTests: XCTestCase {
 
     func testARunningBackupWithNoDestinationCountsAgainstTheDiskWeAreEjecting() {
         let status = BackupStatus(plist: ["Running": NSNumber(value: true)])
-        XCTAssertTrue(status.isBackingUp(to: "/Volumes/WD"),
+        XCTAssertTrue(status.isBackingUp(to: volume("/Volumes/WD")),
                       "better to stop a backup that was not ours than eject under one that was")
+    }
+
+    /// What `tmutil status -X` reported during a real backup to an SMB share:
+    /// the mount point is the disk image inside it, and only the destination
+    /// ID says where the backup is going.
+    func testANetworkBackupIsMatchedByDestinationNotMountPoint() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true),
+            "BackupPhase": "PreparingSourceVolumes",
+            "DestinationID": "NET-1",
+            "DestinationMountPoint": "/Volumes/Backups of MekBuk-Pro",
+            "Percent": NSNumber(value: -1),
+        ])
+        XCTAssertEqual(status.destinationID, "NET-1")
+        XCTAssertTrue(status.isBackingUp(toDestination: "NET-1"))
+        XCTAssertFalse(status.isBackingUp(toDestination: "TM-1"))
+        XCTAssertFalse(status.isBackingUp(toDestination: nil))
+        XCTAssertFalse(status.isBackingUp(to: volume("/Volumes/WD", tm: "TM-1")),
+                       "a network backup must not show as one to a plugged-in disk")
+        XCTAssertFalse(status.isBackingUp(to: volume("/Volumes/WD")))
+    }
+
+    func testTheDestinationIDWinsOverTheMountPointForAPluggedInDisk() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true), "DestinationID": "TM-1",
+        ])
+        XCTAssertTrue(status.isBackingUp(to: volume("/Volumes/WD", tm: "TM-1")))
+        XCTAssertFalse(status.isBackingUp(to: volume("/Volumes/Other", tm: "TM-2")))
+    }
+
+    func testAnIdleStatusIsNotBackingUpToAnyDestination() {
+        let status = BackupStatus(plist: ["Running": NSNumber(value: false), "DestinationID": "NET-1"])
+        XCTAssertFalse(status.isBackingUp(toDestination: "NET-1"))
+    }
+
+    private func volume(_ path: String, tm: String? = nil) -> AttachedVolume {
+        AttachedVolume(path: path, name: "WD", volumeUUID: nil, tmDestinationID: tm)
     }
 
     func testGarbageIsNotRunning() {

@@ -346,8 +346,31 @@ private struct DiskCard: View {
             return Loc.t("disk.backingUp", "Backing up…")
         }
         let watch = guarded ? Loc.t("disk.guarded", "Guarded") : Loc.t("disk.notGuarded", "Not guarded")
-        let state = connected ? Loc.t("disk.connected", "Connected") : Loc.t("disk.disconnected", "Disconnected")
-        return "\(watch) · \(state)"
+        return "\(watch) · \(connectionLabel)"
+    }
+
+    /// How the disk reaches the Mac, named when we know it. "Connected" is
+    /// the fallback, never a guess.
+    private var connectionLabel: String {
+        if disk.isNetworkDestination { return Loc.t("disk.network", "Network") }
+        guard let volume = controller.attachedVolume(for: disk) else {
+            return Loc.t("disk.disconnected", "Disconnected")
+        }
+        switch volume.connection {
+        case .usb: return "USB"
+        case .thunderbolt: return "Thunderbolt"
+        case .sdCard: return Loc.t("disk.sdCard", "SD card")
+        case nil: return Loc.t("disk.connected", "Connected")
+        }
+    }
+
+    /// One shape per kind, filled while it is plugged in. A share is never
+    /// filled: whether it is reachable is not known until a backup starts.
+    private var symbol: String {
+        if disk.isNetworkDestination { return "externaldrive.connected.to.line.below" }
+        let base = disk.isTimeMachineDestination ? "externaldrive.badge.timemachine" : "externaldrive"
+        guard connected else { return base }
+        return disk.isTimeMachineDestination ? "externaldrive.fill.badge.timemachine" : "externaldrive.fill"
     }
 
     private var fill: Color {
@@ -358,7 +381,7 @@ private struct DiskCard: View {
     var body: some View {
         Button { controller.toggleGuard(disk) } label: {
             HStack(spacing: Design.Spacing.m) {
-                Image(systemName: connected ? "externaldrive.fill" : "externaldrive")
+                Image(systemName: symbol)
                     .font(.system(size: 18))
                     .foregroundStyle(guarded ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
                     .frame(width: 26)
@@ -510,7 +533,11 @@ private struct NextMeetingSection: View {
     private func detail(for meeting: EKEvent) -> String {
         var parts = ["\(Format.relative(meeting.startDate)) · \(meeting.calendar.title)"]
         if let ejectDate = controller.ejectDate {
-            parts.append(Loc.t("meeting.ejectsAt", "Ejects at %@", Format.clock(ejectDate)))
+            // With only a network destination guarded there is nothing to
+            // eject, and saying so would promise the wrong thing.
+            parts.append(controller.guardedVolumes.isEmpty
+                ? Loc.t("meeting.stopsBackupAt", "Stops a running backup at %@", Format.clock(ejectDate))
+                : Loc.t("meeting.ejectsAt", "Ejects at %@", Format.clock(ejectDate)))
         } else if controller.guardedVolumes.isEmpty {
             parts.append(Loc.t("meeting.noGuardedDisk", "No guarded disk connected"))
         } else if !controller.config.isActive {
@@ -536,9 +563,15 @@ private struct FooterBar: View {
     /// Naming the disk beats a bare "Eject now": this acts on guarded disks
     /// that are connected, which is not the same set as "everything plugged in".
     private var ejectLabel: String {
-        if controller.isBusy { return Loc.t("footer.ejecting", "Ejecting…") }
         let volumes = controller.guardedVolumes
+        if controller.isBusy {
+            return volumes.isEmpty
+                ? Loc.t("footer.stoppingBackup", "Stopping backup…")
+                : Loc.t("footer.ejecting", "Ejecting…")
+        }
         switch volumes.count {
+        case 0 where !controller.guardedNetworkBackups.isEmpty:
+            return Loc.t("footer.stopBackup", "Stop backup")
         case 0: return Loc.t("footer.ejectNow", "Eject now")
         case 1: return Loc.t("footer.ejectOne", "Eject %@", volumes[0].name)
         default: return Loc.t("footer.ejectMany", "Eject %d disks", volumes.count)
@@ -558,6 +591,10 @@ private struct FooterBar: View {
 
     private var ejectHelp: String {
         let volumes = controller.guardedVolumes
+        let backups = controller.guardedNetworkBackups
+        if volumes.isEmpty, !backups.isEmpty {
+            return Loc.t("footer.stopBackupHelp", "Stops the backup to %@.", backups.map(\.name).joined(separator: ", "))
+        }
         guard !volumes.isEmpty else { return Loc.t("footer.ejectHelpNone", "No guarded disk is connected.") }
         return Loc.t("footer.ejectHelp", "Ejects %@. Disks you have not ticked are left alone.", volumes.map(\.name).joined(separator: ", "))
     }
@@ -574,7 +611,7 @@ private struct FooterBar: View {
                     icon: "eject",
                     label: ejectLabel,
                     shortcut: "⌘E",
-                    isEnabled: !controller.guardedVolumes.isEmpty && !controller.isBusy
+                    isEnabled: controller.canEjectNow
                 ) { controller.ejectNow() }
                     .keyboardShortcut("e")
                     .help(ejectHelp)

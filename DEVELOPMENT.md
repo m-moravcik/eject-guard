@@ -31,6 +31,45 @@ If all three hold, it stops a Time Machine backup that is writing to that disk,
 ejects it with retries while Spotlight or `backupd` still holds it, and posts a
 notification.
 
+A guarded **network** Time Machine destination counts as attached for the first
+question: Time Machine reports it on every pass and a backup to it can start at
+any moment. For one there is nothing to eject, only a running backup to stop.
+
+## Network Time Machine destinations
+
+Listed, because leaving the network mid-backup is how a sparse bundle ends up
+needing a fresh backup. Plain SMB or NFS shares are not: there is no cable to
+pull and macOS drops them on its own.
+
+- **Matched by `DestinationID`, never by mount point.** While a backup to a
+  share runs, `tmutil status` reports the disk image inside it
+  (`/Volumes/Backups of <Mac>`) as `DestinationMountPoint`. That image is a
+  disk image, so it is never offered either.
+- **`tmutil stopbackup` is asynchronous for a share.** Measured: it returned 0
+  within half a second, the backup sat in `Stopping`, and it took ~55 s to end.
+  So the stop polls `tmutil status` for up to 120 s and only then says
+  whether it worked. A stop that did not finish says "stay on this network".
+- **Never on the eject path.** `Disks.attachedVolume(for:)` returns nil for a
+  network destination, so `guardedVolumes` cannot contain one, and no volume
+  is ever linked to it.
+- **Exact identity crosses kinds, guesses do not.** Matching by name or by
+  Time Machine's own volume record never folds a plugged-in disk into a share.
+  A shared destination ID does, because a release older than this one, running
+  at the same time, drops the `network` key it does not know.
+- `tmutil destinationinfo` took 21.7 s while a backup to a share was mounting
+  its disk image, past the 15 s the scan allows. That pass sees no
+  destinations and the merge keeps what it had.
+
+## How a disk is connected
+
+The popover names the interface DiskArbitration reports
+(`kDADiskDescriptionDeviceProtocolKey`): USB, Thunderbolt (also for
+`PCI-Express`, which is what an NVMe in a Thunderbolt enclosure reports), or SD
+card. Anything else shows as plain "Connected" rather than a guess. Observed
+values: `Apple Fabric` for the internal SSD and `Virtual Interface` for a disk
+image, neither of which is ever offered. It is the same IPC call that already
+tells a disk image apart, so no process is launched.
+
 Deciding happens on the main thread, where the event store lives. **Everything
 that launches a process runs on a background queue** - scanning disks, reading
 Time Machine status, and ejecting.
@@ -74,7 +113,9 @@ running.
 Knowing a backup is running costs one `tmutil status` every 5 s while one is,
 20 s while a guarded disk is merely attached, and nothing at all when none is.
 That is a deliberate exception to the event-driven rule in the rest of the app,
-and it is bounded by the thing that matters: the disk being plugged in.
+and it is bounded by the thing that matters: the disk being plugged in. A
+guarded network destination is always "plugged in", so ticking one keeps the
+20 s poll running for as long as guarding is on.
 
 The states are hard to review in place - the icon is 16 pt wide and some of them
 only appear mid-backup - so the preview harness renders them all side by side:
@@ -193,7 +234,9 @@ this project has been so far:
 | `Disks.isMountedVolume` | The boot volume must never be an eject candidate. |
 | `Disks.mayChangeDiskList` | Time Machine's own mounts set off rescans whose `tmutil` hung past SIGKILL; a plugged-in disk must still rescan. |
 | `Sanitize.oneLine` | Untrusted titles must not forge log lines or break AppleScript. |
-| `BackupStatus` | `Percent: -1` means unknown, not zero. |
+| `BackupStatus` | `Percent: -1` means unknown, not zero. A backup to a share is matched by destination ID; its mount point is a disk image. |
+| Network destinations | Never an eject target, never folded into a plugged-in disk by name, and an entry an older release stripped of its flag is still the same destination. |
+| `Disks.connection` | Only interfaces we recognise are named. |
 
 The tests were checked by putting two real bugs back in: removing the hand
 written config decoder, and dropping the ticked-disk filter. Both were caught.
@@ -212,7 +255,9 @@ is banned.
 - Disks are identified by **volume UUID**, not by name, so another volume that
   happens to share a name is not touched.
 - A Time Machine backup is stopped only when it is writing to the disk being
-  ejected. A backup to a different destination keeps running.
+  ejected, or to a network destination the user ticked. A backup to a
+  different destination keeps running.
+- A network destination is never ejected, unmounted or linked to a volume.
 - A failed eject is reported with the processes holding the volume, so you know
   not to pull the cable.
 - The eject targets the **whole physical disk**, not just the guarded volume,

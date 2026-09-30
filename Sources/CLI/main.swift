@@ -61,11 +61,18 @@ func printDisks() {
     for disk in config.knownDisks {
         let watched = config.watchedDiskIDs.contains(disk.id) ? "[x]" : "[ ]"
         let live = Disks.attachedVolume(for: disk, among: attached)
-        let state = live.map { "attached at \($0.path)" } ?? "not attached"
+        let state = disk.isNetworkDestination
+            ? "network - a running backup is stopped, nothing is ejected"
+            : live.map { "attached at \($0.path)" } ?? "not attached"
         let tm = disk.isTimeMachineDestination ? " (Time Machine)" : ""
         print("  \(watched) \(disk.name)\(tm) - \(state)")
         print("        id: \(disk.id)")
     }
+}
+
+func printBackupStops(_ outcome: GuardRunner.Outcome) {
+    for name in outcome.stoppedBackups { print("stopped backup: \(name)") }
+    for name in outcome.unstoppedBackups { print("FAILED: the backup to \(name) is still running") }
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
@@ -227,16 +234,18 @@ case "run", "dry-run":
     }
     if !outcome.ejected.isEmpty { print("ejected: \(outcome.ejected.joined(separator: ", "))") }
     for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
-    if !outcome.failed.isEmpty { exit(1) }
+    printBackupStops(outcome)
+    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
 
 case "eject-now":
     let outcome = GuardRunner.ejectGuarded(reason: .manual(), config: config, notifyOnSuccess: false)
-    if outcome.ejected.isEmpty && outcome.failed.isEmpty {
-        print("no guarded disk is attached")
+    if outcome.didNothing {
+        print("no guarded disk is attached, and no backup to a guarded share is running")
     }
     for name in outcome.ejected { print("ejected: \(name)") }
     for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
-    if !outcome.failed.isEmpty { exit(1) }
+    printBackupStops(outcome)
+    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
 
 default:
     printDisks()

@@ -31,10 +31,13 @@
 "disk.guarded" = "Überwacht";
 "disk.hide" = "Dieses Laufwerk ausblenden";
 "disk.hideHint" = "Später in den Einstellungen wiederherstellen";
+"disk.network" = "Netzwerk";
 "disk.notGuarded" = "Nicht überwacht";
+"disk.sdCard" = "SD-Karte";
 "disk.timeMachineBadge" = "Ein Time-Machine-Backupziel";
 "disks.empty" = "Noch keine externen Laufwerke gesehen.\nSchließe eines an, dann erscheint es hier.";
 "disks.hint" = "Auf ein Laufwerk klicken, um es zu überwachen.";
+"failure.backupNotStopped" = "%@: Das Backup konnte nicht gestoppt werden";
 "failure.heldBy" = "%1$@: belegt von %2$@";
 "footer.ejectHelp" = "Wirft %@ aus. Nicht angehakte Laufwerke bleiben unberührt.";
 "footer.ejectHelpNone" = "Es ist kein überwachtes Laufwerk verbunden.";
@@ -45,6 +48,9 @@
 "footer.quit" = "Beenden";
 "footer.resume" = "Überwachung fortsetzen";
 "footer.settings" = "Einstellungen…";
+"footer.stopBackup" = "Backup stoppen";
+"footer.stopBackupHelp" = "Stoppt das Backup auf %@.";
+"footer.stoppingBackup" = "Backup wird gestoppt…";
 "meeting.checking" = "Kalender wird geprüft…";
 "meeting.ejectsAt" = "Wirft um %@ aus";
 "meeting.guardOff" = "Überwachung ist aus";
@@ -53,10 +59,14 @@
 "meeting.noGuardedDisk" = "Kein überwachtes Laufwerk verbunden";
 "meeting.noneToday" = "Heute keine Besprechungen mehr.";
 "meeting.skip" = "Diese Besprechung überspringen";
+"meeting.stopsBackupAt" = "Stoppt ein laufendes Backup um %@";
 "meeting.undoSkip" = "Überspringen rückgängig: %@";
 "meeting.untitled" = "Besprechung";
 "meeting.untitledEvent" = "Ohne Titel";
+"notify.backupStopped" = "Backup auf %@ gestoppt";
+"notify.backupStoppedDetail" = "%@. Time Machine macht beim nächsten Backup weiter.";
 "notify.couldNotEject" = "%@ konnte nicht ausgeworfen werden";
+"notify.couldNotStopBackup" = "Das Backup auf %@ konnte nicht gestoppt werden";
 "notify.doNotUnplug" = "%@ Nicht abziehen.";
 "notify.ejected" = "%@ ausgeworfen";
 "notify.heldBy" = "Belegt von %@.";
@@ -65,6 +75,7 @@
 "notify.reason.menu" = "Über das Menü ausgeworfen";
 "notify.reason.sleep" = "Der Mac wechselt in den Ruhezustand";
 "notify.safeToUnplug" = "%@. Kann abgezogen werden.";
+"notify.stayOnNetwork" = "Bleib in diesem Netzwerk, bis es fertig ist.";
 "notify.unknownProcess" = "ein unbekannter Prozess";
 "onboarding.back" = "Zurück";
 "onboarding.done" = "Fertig";

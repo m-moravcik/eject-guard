@@ -294,4 +294,111 @@ final class DiskMergeTests: XCTestCase {
 
         XCTAssertTrue(Disks.guardedVolumes(config, among: [present]).isEmpty)
     }
+
+    // MARK: Network Time Machine destinations
+
+    private func network(_ id: String, name: String) -> TimeMachineDestination {
+        TimeMachineDestination(id: id, name: name, mountPoint: nil, isNetwork: true)
+    }
+
+    func testANetworkDestinationIsListedAndMarked() {
+        var config = GuardConfig()
+        Disks.merge(DiskSnapshot(destinations: [network("NET-1", name: "NAS")], attached: []), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["NET-1"])
+        XCTAssertTrue(config.knownDisks[0].isNetworkDestination)
+        XCTAssertTrue(config.knownDisks[0].isTimeMachineDestination)
+        XCTAssertNil(config.knownDisks[0].absentSince, "a share is never 'unplugged'")
+    }
+
+    func testANetworkDestinationIsNeverAnEjectTarget() {
+        var config = GuardConfig()
+        // A volume that shares everything it could with the destination: its
+        // name, and a destination ID a buggy scan could have attached to it.
+        let lookalike = volume("NAS", uuid: "VOL-1", tm: "NET-1")
+        Disks.merge(DiskSnapshot(destinations: [network("NET-1", name: "NAS")], attached: []), into: &config)
+        config.watchedDiskIDs = ["NET-1"]
+
+        XCTAssertTrue(Disks.guardedVolumes(config, among: [lookalike]).isEmpty,
+                      "a share must never resolve to a volume that could be ejected")
+        XCTAssertEqual(Disks.guardedNetworkDestinations(config).map(\.id), ["NET-1"])
+    }
+
+    func testAPluggedInDiskIsNeverFoldedIntoANetworkDestinationOfTheSameName() {
+        var config = GuardConfig()
+        Disks.merge(DiskSnapshot(
+            destinations: [network("NET-1", name: "Backup")],
+            attached: [volume("Backup", uuid: "VOL-1")]), into: &config)
+
+        XCTAssertEqual(Set(config.knownDisks.map(\.id)), ["NET-1", "VOL-1"],
+                       "matching by name must not cross from a disk to a share")
+        let disk = config.knownDisks.first { $0.id == "VOL-1" }
+        XCTAssertEqual(disk?.isNetworkDestination, false)
+        XCTAssertNil(disk?.tmDestinationID)
+    }
+
+    func testAGuardedNetworkDestinationKeepsItsTickAcrossPasses() {
+        var config = GuardConfig()
+        let snapshot = DiskSnapshot(destinations: [network("NET-1", name: "NAS")], attached: [])
+        Disks.merge(snapshot, into: &config)
+        config.watchedDiskIDs = ["NET-1"]
+
+        Disks.merge(snapshot, into: &config, now: Date().addingTimeInterval(30 * 24 * 3600))
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["NET-1"])
+        XCTAssertEqual(config.watchedDiskIDs, ["NET-1"])
+    }
+
+    /// What an older release running at the same time leaves behind: it
+    /// drops the `network` key it does not know and writes the entry back.
+    /// The destination ID is still an exact identity, so the entry is this
+    /// share and gets its flag back, rather than a second one with the same ID.
+    func testAnEntryThatLostItsNetworkFlagIsTheSameDestination() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "NET-1", name: "NAS", tmDestinationID: "NET-1",
+                                       absentSince: Date())]
+        config.watchedDiskIDs = ["NET-1"]
+
+        Disks.merge(DiskSnapshot(destinations: [network("NET-1", name: "NAS")], attached: []), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["NET-1"], "one share, listed once")
+        XCTAssertTrue(config.knownDisks[0].isNetworkDestination)
+        XCTAssertNil(config.knownDisks[0].absentSince)
+        XCTAssertEqual(config.watchedDiskIDs, ["NET-1"])
+    }
+
+    func testTwoEntriesWithTheSameDestinationIDCollapse() {
+        // The state the bug above wrote into a real config file.
+        var config = GuardConfig()
+        config.knownDisks = [
+            KnownDisk(id: "NET-1", name: "NAS", tmDestinationID: "NET-1"),
+            KnownDisk(id: "NET-1", name: "NAS", tmDestinationID: "NET-1", network: true),
+        ]
+
+        Disks.merge(DiskSnapshot(destinations: [network("NET-1", name: "NAS")], attached: []), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["NET-1"])
+        XCTAssertTrue(config.knownDisks[0].isNetworkDestination)
+    }
+
+    func testANetworkFlagWrittenByThisReleaseSurvivesAnOlderFile() throws {
+        // A file from before this release has no `network` key at all.
+        let old = #"{"id":"TM-1","name":"WD","tmDestinationID":"TM-1"}"#
+        let disk = try JSONDecoder().decode(KnownDisk.self, from: Data(old.utf8))
+        XCTAssertFalse(disk.isNetworkDestination)
+    }
+
+    // MARK: How a disk is connected
+
+    func testTheInterfaceIsNamedOnlyWhenWeRecogniseIt() {
+        XCTAssertEqual(Disks.connection(fromProtocol: "USB"), .usb)
+        XCTAssertEqual(Disks.connection(fromProtocol: "Thunderbolt"), .thunderbolt)
+        XCTAssertEqual(Disks.connection(fromProtocol: "PCI-Express"), .thunderbolt)
+        XCTAssertEqual(Disks.connection(fromProtocol: "Secure Digital"), .sdCard)
+        // Observed on this project's hardware: never offered, never named.
+        XCTAssertNil(Disks.connection(fromProtocol: "Apple Fabric"))
+        XCTAssertNil(Disks.connection(fromProtocol: "Virtual Interface"))
+        XCTAssertNil(Disks.connection(fromProtocol: "SATA"))
+        XCTAssertNil(Disks.connection(fromProtocol: nil))
+    }
 }

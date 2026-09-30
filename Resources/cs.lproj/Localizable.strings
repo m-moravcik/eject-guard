@@ -31,10 +31,13 @@
 "disk.guarded" = "Hlídaný";
 "disk.hide" = "Skrýt tento disk";
 "disk.hideHint" = "Později ho vrátíš v Nastavení";
+"disk.network" = "Síť";
 "disk.notGuarded" = "Nehlídaný";
+"disk.sdCard" = "SD karta";
 "disk.timeMachineBadge" = "Cíl zálohování Time Machine";
 "disks.empty" = "Zatím žádný externí disk.\nPřipoj ho a objeví se tady.";
 "disks.hint" = "Klikni na disk a bude hlídaný.";
+"failure.backupNotStopped" = "%@: zálohu se nepodařilo zastavit";
 "failure.heldBy" = "%1$@: drží ho %2$@";
 "footer.ejectHelp" = "Vysune %@. Nezaškrtnutých disků se nedotkne.";
 "footer.ejectHelpNone" = "Není připojený žádný hlídaný disk.";
@@ -45,6 +48,9 @@
 "footer.quit" = "Ukončit";
 "footer.resume" = "Obnovit hlídání";
 "footer.settings" = "Nastavení…";
+"footer.stopBackup" = "Zastavit zálohu";
+"footer.stopBackupHelp" = "Zastaví zálohu na %@.";
+"footer.stoppingBackup" = "Zastavuje se záloha…";
 "meeting.checking" = "Kontroluji kalendář…";
 "meeting.ejectsAt" = "Vysune v %@";
 "meeting.guardOff" = "Hlídání je vypnuté";
@@ -53,10 +59,14 @@
 "meeting.noGuardedDisk" = "Není připojený hlídaný disk";
 "meeting.noneToday" = "Dnes už žádné schůzky.";
 "meeting.skip" = "Přeskočit tuto schůzku";
+"meeting.stopsBackupAt" = "Zastaví běžící zálohu v %@";
 "meeting.undoSkip" = "Vrátit přeskočení: %@";
 "meeting.untitled" = "Schůzka";
 "meeting.untitledEvent" = "Bez názvu";
+"notify.backupStopped" = "Záloha na %@ zastavena";
+"notify.backupStoppedDetail" = "%@. Time Machine pokračuje při další záloze.";
 "notify.couldNotEject" = "Nepodařilo se vysunout %@";
+"notify.couldNotStopBackup" = "Zálohu na %@ se nepodařilo zastavit";
 "notify.doNotUnplug" = "%@ Neodpojuj ho.";
 "notify.ejected" = "%@ vysunutý";
 "notify.heldBy" = "Drží ho %@.";
@@ -65,6 +75,7 @@
 "notify.reason.menu" = "Vysunuto z menu";
 "notify.reason.sleep" = "Mac jde spát";
 "notify.safeToUnplug" = "%@. Můžeš ho odpojit.";
+"notify.stayOnNetwork" = "Zůstaň v této síti, dokud neskončí.";
 "notify.unknownProcess" = "neznámý proces";
 "onboarding.back" = "Zpět";
 "onboarding.done" = "Hotovo";

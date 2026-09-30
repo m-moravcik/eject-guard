@@ -48,10 +48,49 @@ enum Ejector {
     /// destination is left running.
     private static func stopBackupIfTargeting(_ volume: AttachedVolume) {
         let status = BackupStatus.current()
-        guard status.isBackingUp(to: volume.path) else { return }
+        guard status.isBackingUp(to: volume) else { return }
         // Measured at ~11 s on a real backup, so the default budget is too tight.
         let stop = Shell.run("/usr/bin/tmutil", ["stopbackup"], timeout: 120)
         Log.write("tmutil stopbackup -> status \(stop.status)\(stop.output.isEmpty ? "" : ": \(stop.output)")")
+    }
+
+    /// How long to wait for a stopped network backup to actually end. About
+    /// twice what was measured, and well inside the default lead time.
+    static let stopBackupBudget: TimeInterval = 120
+
+    struct BackupStop {
+        var name: String
+        var succeeded: Bool
+    }
+
+    /// Stop a backup that is writing to a network destination, so the laptop
+    /// can leave the network without cutting a write to the disk image short.
+    /// Nil when no backup is writing to it: then there is nothing to do and
+    /// nothing to say.
+    static func stopBackup(to destination: KnownDisk, dryRun: Bool = false) -> BackupStop? {
+        guard destination.isNetworkDestination,
+              BackupStatus.current().isBackingUp(toDestination: destination.tmDestinationID)
+        else { return nil }
+        if dryRun {
+            Log.write("dry-run: would stop the backup to \(destination.name)")
+            return BackupStop(name: destination.name, succeeded: true)
+        }
+        let stop = Shell.run("/usr/bin/tmutil", ["stopbackup"], timeout: 120)
+        // To a network destination the request is asynchronous: tmutil
+        // returned 0 within half a second, the backup sat in `Stopping`, and
+        // it took ~55 s to actually end. The exit status says the request was
+        // taken, not that the write ended, so wait for Time Machine to say so.
+        var stillRunning = true
+        let deadline = Date().addingTimeInterval(stopBackupBudget)
+        while true {
+            stillRunning = BackupStatus.current().isBackingUp(toDestination: destination.tmDestinationID)
+            guard stillRunning, Date() < deadline else { break }
+            Thread.sleep(forTimeInterval: 3)
+        }
+        Log.write("tmutil stopbackup for \(destination.name) -> status \(stop.status)"
+            + (stillRunning ? ", STILL BACKING UP" : ", stopped")
+            + (stop.output.isEmpty ? "" : ": \(stop.output)"))
+        return BackupStop(name: destination.name, succeeded: !stillRunning)
     }
 
     static func blockingProcesses(at path: String) -> String {

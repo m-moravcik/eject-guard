@@ -40,6 +40,18 @@ enum GuardRunner {
         var meeting: EKEvent?
         var ejected: [String] = []
         var failed: [(name: String, detail: String)] = []
+        /// Network destinations whose running backup was stopped, or could not be.
+        var stoppedBackups: [String] = []
+        var unstoppedBackups: [String] = []
+
+        var didNothing: Bool {
+            ejected.isEmpty && failed.isEmpty && stoppedBackups.isEmpty && unstoppedBackups.isEmpty
+        }
+
+        mutating func record(_ stop: Ejector.BackupStop?) {
+            guard let stop else { return }
+            if stop.succeeded { stoppedBackups.append(stop.name) } else { unstoppedBackups.append(stop.name) }
+        }
     }
 
     /// One full pass: scan, decide, eject. Used by the command line tool and by
@@ -56,7 +68,8 @@ enum GuardRunner {
 
         // Nothing guarded is plugged in, so do not touch the calendar at all.
         let targets = guardedAttachedVolumes(config)
-        guard !targets.isEmpty else { return outcome }
+        let networkTargets = Disks.guardedNetworkDestinations(config)
+        guard !targets.isEmpty || !networkTargets.isEmpty else { return outcome }
 
         guard let meeting = Meetings.nextMeeting(
             store, within: config.leadMinutes, config: config) else { return outcome }
@@ -74,6 +87,9 @@ enum GuardRunner {
                 outcome.failed.append((target.name, result.detail))
             }
         }
+        for destination in networkTargets {
+            outcome.record(Ejector.stopBackup(to: destination, dryRun: dryRun))
+        }
 
         announce(outcome, meetingTitle: title, minutesAhead: minutesAhead)
         return outcome
@@ -89,7 +105,8 @@ enum GuardRunner {
         Disks.guardedVolumes(config, among: Disks.scan().attached)
     }
 
-    /// Eject every guarded disk without consulting the calendar. Used by the
+    /// Eject every guarded disk, and stop a backup running to a guarded
+    /// network destination, without consulting the calendar. Used by the
     /// "eject now" menu item and by the optional eject-on-sleep hook.
     @discardableResult
     static func ejectGuarded(reason: Reason, config: GuardConfig, notifyOnSuccess: Bool = true) -> Outcome {
@@ -103,6 +120,9 @@ enum GuardRunner {
                 outcome.failed.append((volume.name, result.detail))
             }
         }
+        for destination in Disks.guardedNetworkDestinations(config) {
+            outcome.record(Ejector.stopBackup(to: destination))
+        }
         if notifyOnSuccess && !outcome.ejected.isEmpty {
             Notify.post(title: ejectedTitle(outcome.ejected),
                         body: Loc.t("notify.safeToUnplug", "%@. Safe to unplug.", reason.spoken))
@@ -111,7 +131,23 @@ enum GuardRunner {
             Notify.post(title: failedTitle(failure.name),
                         body: heldBy(failure.detail))
         }
+        announceBackups(outcome, reason: reason, notifyOnSuccess: notifyOnSuccess)
         return outcome
+    }
+
+    /// A stopped backup is said when an eject would be. A failed stop is
+    /// always said: the user is about to walk off the network.
+    private static func announceBackups(_ outcome: Outcome, reason: Reason, notifyOnSuccess: Bool) {
+        if notifyOnSuccess && !outcome.stoppedBackups.isEmpty {
+            Notify.post(title: Loc.t("notify.backupStopped", "Backup to %@ stopped",
+                                     outcome.stoppedBackups.joined(separator: ", ")),
+                        body: Loc.t("notify.backupStoppedDetail",
+                                    "%@. Time Machine carries on at its next backup.", reason.spoken))
+        }
+        for name in outcome.unstoppedBackups {
+            Notify.post(title: Loc.t("notify.couldNotStopBackup", "Could not stop the backup to %@", name),
+                        body: Loc.t("notify.stayOnNetwork", "Stay on this network until it finishes."))
+        }
     }
 
     static func announce(_ outcome: Outcome, meetingTitle: String, minutesAhead: Int) {
@@ -124,6 +160,8 @@ enum GuardRunner {
             Notify.post(title: failedTitle(failure.name),
                         body: Loc.t("notify.doNotUnplug", "%@ Do not unplug it.", heldBy(failure.detail)))
         }
+        announceBackups(outcome, reason: .meeting(title: meetingTitle, minutesAhead: minutesAhead),
+                        notifyOnSuccess: true)
     }
 
     // MARK: - Notification wording

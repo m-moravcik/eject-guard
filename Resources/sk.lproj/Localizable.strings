@@ -31,10 +31,13 @@
 "disk.guarded" = "Strážený";
 "disk.hide" = "Skryť tento disk";
 "disk.hideHint" = "Neskôr ho vrátiš v Nastaveniach";
+"disk.network" = "Sieť";
 "disk.notGuarded" = "Nestrážený";
+"disk.sdCard" = "SD karta";
 "disk.timeMachineBadge" = "Cieľ zálohovania Time Machine";
 "disks.empty" = "Zatiaľ žiadny externý disk.\nPripoj ho a objaví sa tu.";
 "disks.hint" = "Klikni na disk a bude strážený.";
+"failure.backupNotStopped" = "%@: zálohu sa nepodarilo zastaviť";
 "failure.heldBy" = "%1$@: drží ho %2$@";
 "footer.ejectHelp" = "Vysunie %@. Nezaškrtnutých diskov sa nedotkne.";
 "footer.ejectHelpNone" = "Nie je pripojený žiadny strážený disk.";
@@ -45,6 +48,9 @@
 "footer.quit" = "Ukončiť";
 "footer.resume" = "Obnoviť stráženie";
 "footer.settings" = "Nastavenia…";
+"footer.stopBackup" = "Zastaviť zálohu";
+"footer.stopBackupHelp" = "Zastaví zálohu na %@.";
+"footer.stoppingBackup" = "Zastavuje sa záloha…";
 "meeting.checking" = "Kontrolujem kalendár…";
 "meeting.ejectsAt" = "Vysunie o %@";
 "meeting.guardOff" = "Stráž je vypnutá";
@@ -53,10 +59,14 @@
 "meeting.noGuardedDisk" = "Nie je pripojený strážený disk";
 "meeting.noneToday" = "Dnes už žiadne stretnutia.";
 "meeting.skip" = "Preskočiť toto stretnutie";
+"meeting.stopsBackupAt" = "Zastaví bežiacu zálohu o %@";
 "meeting.undoSkip" = "Vrátiť preskočenie: %@";
 "meeting.untitled" = "Stretnutie";
 "meeting.untitledEvent" = "Bez názvu";
+"notify.backupStopped" = "Záloha na %@ zastavená";
+"notify.backupStoppedDetail" = "%@. Time Machine pokračuje pri ďalšej zálohe.";
 "notify.couldNotEject" = "Nepodarilo sa vysunúť %@";
+"notify.couldNotStopBackup" = "Zálohu na %@ sa nepodarilo zastaviť";
 "notify.doNotUnplug" = "%@ Neodpájaj ho.";
 "notify.ejected" = "%@ vysunutý";
 "notify.heldBy" = "Drží ho %@.";
@@ -65,6 +75,7 @@
 "notify.reason.menu" = "Vysunuté z menu";
 "notify.reason.sleep" = "Mac ide spať";
 "notify.safeToUnplug" = "%@. Môžeš ho odpojiť.";
+"notify.stayOnNetwork" = "Zostaň na tejto sieti, kým neskončí.";
 "notify.unknownProcess" = "neznámy proces";
 "onboarding.back" = "Späť";
 "onboarding.done" = "Hotovo";

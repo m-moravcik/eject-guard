@@ -3,8 +3,7 @@
 import DiskArbitration
 import Foundation
 
-/// A local Time Machine destination. Network destinations are dropped at the
-/// source: there is no local disk to eject on an SMB share.
+/// A Time Machine destination: a local disk, or a share on the network.
 struct TimeMachineDestination: Equatable {
     var id: String
     var name: String
@@ -13,6 +12,9 @@ struct TimeMachineDestination: Equatable {
     /// link between the two while the disk is unplugged, when there is no
     /// mount point to go by.
     var volumeUUIDs: [String] = []
+    /// A share on the network. Never tied to a mounted volume: what backs it
+    /// is a disk image, and there is nothing to eject.
+    var isNetwork = false
 }
 
 /// One reading of what is plugged in. Producing this spawns processes;
@@ -49,14 +51,17 @@ enum Disks {
 
         let volumes = destinationVolumeUUIDs(fromPreferences: timeMachinePreferences())
         return destinations.compactMap { destination in
-            // Network destinations have no local disk to eject.
-            guard (destination["Kind"] as? String) == "Local",
+            guard let kind = destination["Kind"] as? String, kind == "Local" || kind == "Network",
                   let id = destination["ID"] as? String else { return nil }
+            let isNetwork = kind == "Network"
+            // A network destination's volumes live inside a disk image, which
+            // must never be linked to anything we would eject.
             return TimeMachineDestination(
                 id: id,
                 name: (destination["Name"] as? String) ?? "Time Machine",
-                mountPoint: destination["MountPoint"] as? String,
-                volumeUUIDs: volumes[id] ?? [])
+                mountPoint: isNetwork ? nil : destination["MountPoint"] as? String,
+                volumeUUIDs: isNetwork ? [] : volumes[id] ?? [],
+                isNetwork: isNetwork)
         }
     }
 
@@ -102,7 +107,8 @@ enum Disks {
                               isRootFileSystem: values.volumeIsRootFileSystem)
             else { continue }
 
-            if isDiskImage(deviceModel: deviceModel(of: url, session: session)) {
+            let device = deviceDescription(of: url, session: session)
+            if isDiskImage(deviceModel: device.model) {
                 diskImageIDs.append(values.volumeUUIDString ?? path)
                 continue
             }
@@ -110,19 +116,23 @@ enum Disks {
                 path: path,
                 name: values.volumeLocalizedName ?? url.lastPathComponent,
                 volumeUUID: values.volumeUUIDString,
-                tmDestinationID: destinations.first { $0.mountPoint == path }?.id))
+                tmDestinationID: destinations.first { !$0.isNetwork && $0.mountPoint == path }?.id,
+                connection: connection(fromProtocol: device.protocol)))
         }
         return (attached, diskImageIDs)
     }
 
-    /// The device model DiskArbitration reports for the disk behind a volume.
-    /// This asks `diskarbitrationd` over IPC; no process is launched.
-    private static func deviceModel(of url: URL, session: DASession?) -> String? {
+    /// The device model and interface DiskArbitration reports for the disk
+    /// behind a volume. This asks `diskarbitrationd` over IPC; no process is
+    /// launched.
+    private static func deviceDescription(of url: URL, session: DASession?)
+        -> (model: String?, protocol: String?) {
         guard let session,
               let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
               let description = DADiskCopyDescription(disk) as? [String: Any]
-        else { return nil }
-        return description[kDADiskDescriptionDeviceModelKey as String] as? String
+        else { return (nil, nil) }
+        return (description[kDADiskDescriptionDeviceModelKey as String] as? String,
+                description[kDADiskDescriptionDeviceProtocolKey as String] as? String)
     }
 
     // MARK: Pure logic (no processes, no I/O - this is the part under test)
@@ -187,6 +197,21 @@ enum Disks {
         deviceModel?.trimmingCharacters(in: .whitespaces) == "Disk Image"
     }
 
+    /// The interface DiskArbitration reports, as the popover names it.
+    ///
+    /// Observed: `Apple Fabric` for the internal SSD and `Virtual Interface`
+    /// for a disk image, neither of which is ever offered. An external NVMe in
+    /// a Thunderbolt enclosure reports `PCI-Express`: on a Mac an external PCIe
+    /// device is a Thunderbolt one. Anything else is nil, and the popover falls
+    /// back to plain "Connected" rather than naming it wrong.
+    static func connection(fromProtocol value: String?) -> Connection? {
+        guard let value = value?.trimmingCharacters(in: .whitespaces).lowercased() else { return nil }
+        if value.hasPrefix("usb") { return .usb }
+        if value.hasPrefix("thunderbolt") || value.hasPrefix("pci") { return .thunderbolt }
+        if value == "secure digital" || value == "sd" { return .sdCard }
+        return nil
+    }
+
     /// A path is only a candidate if it is a directory directly inside /Volumes.
     /// Last line of defence before anything reaches `diskutil eject`.
     static func isMountedVolume(_ path: String) -> Bool {
@@ -245,6 +270,13 @@ enum Disks {
             if let index = known.firstIndex(where: { existing in
                 if let a = existing.volumeUUID, a == disk.volumeUUID { return true }
                 if let a = existing.tmDestinationID, a == disk.tmDestinationID { return true }
+                // Past the exact identities, only guesses are left, and a
+                // network destination and a disk are never guessed to be the
+                // same thing: folding a plugged-in disk into a share would take
+                // it off the eject path without a word. The exact matches above
+                // are not held to this, because an older release running at the
+                // same time drops the `network` flag it does not know.
+                guard existing.isNetworkDestination == disk.isNetworkDestination else { return false }
                 // A disk remembered as a plain volume and made a destination
                 // later: while it is unplugged, Time Machine's own record is the
                 // only link. Only for an entry not yet tied to a destination, so
@@ -270,6 +302,7 @@ enum Disks {
                 merged.volumeUUID = disk.volumeUUID ?? merged.volumeUUID
                 merged.tmDestinationID = disk.tmDestinationID ?? merged.tmDestinationID
                 merged.lastSeen = disk.lastSeen ?? merged.lastSeen
+                merged.network = disk.network ?? merged.network
 
                 // Another entry sharing an identity is this same disk, written
                 // down before the link between its volume and its destination
@@ -319,7 +352,8 @@ enum Disks {
                 name: destination.name,
                 volumeUUID: nil,
                 tmDestinationID: destination.id,
-                lastSeen: nil),
+                lastSeen: nil,
+                network: destination.isNetwork ? true : nil),
                 timeMachineVolumes: destination.volumeUUIDs)
         }
 
@@ -348,7 +382,8 @@ enum Disks {
         // wakes, so a disk left plugged into a Mac that never sleeps can carry
         // a `lastSeen` weeks old the moment it is pulled out.
         for index in known.indices {
-            if attachedVolume(for: known[index], among: snapshot.attached) != nil {
+            // A network destination is never plugged in, nor ever unplugged.
+            if known[index].isNetworkDestination || attachedVolume(for: known[index], among: snapshot.attached) != nil {
                 known[index].absentSince = nil
             } else if known[index].absentSince == nil {
                 known[index].absentSince = now
@@ -382,8 +417,11 @@ enum Disks {
     }
 
     /// The attached volume backing a remembered disk, if it is plugged in.
+    /// Never one for a network destination: that is what keeps a share out of
+    /// every eject.
     static func attachedVolume(for disk: KnownDisk, among volumes: [AttachedVolume]) -> AttachedVolume? {
-        volumes.first { volume in
+        guard !disk.isNetworkDestination else { return nil }
+        return volumes.first { volume in
             if let uuid = disk.volumeUUID, uuid == volume.volumeUUID { return true }
             if let tm = disk.tmDestinationID, tm == volume.tmDestinationID { return true }
             return false
@@ -395,5 +433,11 @@ enum Disks {
         config.knownDisks
             .filter { config.watchedDiskIDs.contains($0.id) }
             .compactMap { attachedVolume(for: $0, among: volumes) }
+    }
+
+    /// Network Time Machine destinations the user guards. Reported by Time
+    /// Machine on every pass, so there is no "present" to check.
+    static func guardedNetworkDestinations(_ config: GuardConfig) -> [KnownDisk] {
+        config.knownDisks.filter { $0.isNetworkDestination && config.watchedDiskIDs.contains($0.id) }
     }
 }

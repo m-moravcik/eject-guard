@@ -89,6 +89,34 @@ final class GuardController {
         Disks.guardedVolumes(config, among: attached)
     }
 
+    /// Guarded network Time Machine destinations. Nothing to eject; the guard
+    /// stops a backup running to one.
+    var guardedNetworkDestinations: [KnownDisk] {
+        Disks.guardedNetworkDestinations(config)
+    }
+
+    /// Anything the guard could act on right now: a guarded disk plugged in,
+    /// or a guarded network destination, which is always there.
+    var hasGuardedTargets: Bool {
+        !guardedVolumes.isEmpty || !guardedNetworkDestinations.isEmpty
+    }
+
+    /// Guarded network destinations Time Machine is writing to right now.
+    var guardedNetworkBackups: [KnownDisk] {
+        guardedNetworkDestinations.filter { backup.isBackingUp(toDestination: $0.tmDestinationID) }
+    }
+
+    /// What the menu bar icon names while armed.
+    var guardedTargetNames: [String] {
+        guardedVolumes.map(\.name) + guardedNetworkDestinations.map(\.name)
+    }
+
+    /// What the menu bar icon names while a guarded backup runs.
+    var backingUpGuardedNames: [String] {
+        guardedVolumes.filter { backup.isBackingUp(to: $0) }.map(\.name)
+            + guardedNetworkBackups.map(\.name)
+    }
+
     /// The scheduler looks a day ahead; the popover only reports what is still
     /// happening today. Tomorrow's first meeting is calendar noise here.
     var meetingIsToday: Bool {
@@ -108,13 +136,14 @@ final class GuardController {
     func isGuarded(_ disk: KnownDisk) -> Bool { config.watchedDiskIDs.contains(disk.id) }
 
     func isBackingUp(_ disk: KnownDisk) -> Bool {
+        if disk.isNetworkDestination { return backup.isBackingUp(toDestination: disk.tmDestinationID) }
         guard let volume = Disks.attachedVolume(for: disk, among: attached) else { return false }
-        return backup.isBackingUp(to: volume.path)
+        return backup.isBackingUp(to: volume)
     }
 
-    /// True when Time Machine is writing to a disk this app is guarding.
+    /// True when Time Machine is writing to a disk or share this app is guarding.
     var isGuardedBackupRunning: Bool {
-        guardedVolumes.contains { backup.isBackingUp(to: $0.path) }
+        !backingUpGuardedNames.isEmpty
     }
 
     /// 0...1, or nil while Time Machine is still sizing the job up.
@@ -149,9 +178,10 @@ final class GuardController {
     /// The cost of knowing is one `tmutil status` every few seconds, and only
     /// while a guarded disk is attached and guarding is on - which is exactly
     /// when a backup can be running and when the answer is worth showing. With
-    /// nothing plugged in, nothing is polled at all.
+    /// nothing plugged in, nothing is polled at all. A guarded network
+    /// destination counts as attached: a backup to it can start at any time.
     private func updateBackupWatch() {
-        let wanted = config.isActive && !guardedVolumes.isEmpty
+        let wanted = config.isActive && hasGuardedTargets
         guard wanted else {
             stopBackupWatch()
             if backup.running { backup = BackupStatus() }
@@ -214,7 +244,17 @@ final class GuardController {
     }
 
     func isAttached(_ disk: KnownDisk) -> Bool {
-        Disks.attachedVolume(for: disk, among: attached) != nil
+        attachedVolume(for: disk) != nil
+    }
+
+    func attachedVolume(for disk: KnownDisk) -> AttachedVolume? {
+        Disks.attachedVolume(for: disk, among: attached)
+    }
+
+    /// ⌘E has something to do: a guarded disk to eject, or a backup to a
+    /// guarded share to stop.
+    var canEjectNow: Bool {
+        !isBusy && (!guardedVolumes.isEmpty || !guardedNetworkBackups.isEmpty)
     }
 
     // MARK: - Lifecycle
@@ -308,9 +348,12 @@ final class GuardController {
                     return config
                 }
                 self.attached = snapshot.attached
-                // Once the disk that failed to eject is gone, the warning is
-                // stale - it must not sit in the popover for days.
-                if self.guardedVolumes.isEmpty { self.lastFailure = nil }
+                // Once the disk that failed to eject is gone, or the backup
+                // that would not stop has ended, the warning is stale - it
+                // must not sit in the popover for days.
+                if self.guardedVolumes.isEmpty && self.guardedNetworkBackups.isEmpty {
+                    self.lastFailure = nil
+                }
                 if self.rescanWhenIdle {
                     self.rescanWhenIdle = false
                     self.reloadDisks()
@@ -363,7 +406,7 @@ final class GuardController {
         let meeting = Meetings.nextMeeting(store, within: horizonMinutes, config: config)
         nextMeeting = meeting
 
-        guard config.isActive, !guardedVolumes.isEmpty, let meeting,
+        guard config.isActive, hasGuardedTargets, let meeting,
               !handledMeetings.contains(key(for: meeting)) else { return }
 
         let fireAt = meeting.startDate.addingTimeInterval(-config.leadMinutes * 60)
@@ -418,7 +461,7 @@ final class GuardController {
         let config = self.config
         // Check against the snapshot we already have; the eject itself rescans
         // on the work queue.
-        guard !guardedVolumes.isEmpty else { return }
+        guard hasGuardedTargets else { return }
         isBusy = true
         work.async { [weak self] in
             let outcome = GuardRunner.ejectGuarded(
@@ -428,6 +471,8 @@ final class GuardController {
                 self.isBusy = false
                 self.lastFailure = outcome.failed.first.map {
                     Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, $0.detail)
+                } ?? outcome.unstoppedBackups.first.map {
+                    Loc.t("failure.backupNotStopped", "%@: the backup could not be stopped", $0)
                 }
                 self.reloadDisks()
                 self.reschedule()
@@ -540,7 +585,7 @@ final class GuardController {
     /// sleeps first, the log says so.
     private func handleSleep() {
         var adjusted = config
-        guard adjusted.ejectOnSleep, adjusted.isActive, !guardedVolumes.isEmpty else { return }
+        guard adjusted.ejectOnSleep, adjusted.isActive, hasGuardedTargets else { return }
         adjusted.ejectAttempts = 1
         // An immutable copy crosses to the other queue; a captured var would not.
         let snapshot = adjusted
@@ -571,23 +616,27 @@ extension GuardController {
                                     volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest")
         let archive = KnownDisk(id: "demo-archive", name: "Archive HDD", volumeUUID: "demo-archive-uuid")
         let portable = KnownDisk(id: "demo-t7", name: "Samsung T7", volumeUUID: "demo-t7-uuid")
+        let share = KnownDisk(id: "demo-nas", name: "NAS Backup",
+                              tmDestinationID: "demo-nas", network: true)
 
         var demo = GuardConfig()
-        demo.knownDisks = [timeMachine, archive, portable]
-        demo.watchedDiskIDs = [timeMachine.id, archive.id]
+        demo.knownDisks = [archive, share, portable, timeMachine]
+        demo.watchedDiskIDs = [timeMachine.id, archive.id, share.id]
         demo.onboardingShown = !showingTour
         config = demo
 
         attached = [
             AttachedVolume(path: "/Volumes/Time Machine", name: timeMachine.name,
-                           volumeUUID: timeMachine.volumeUUID, tmDestinationID: timeMachine.tmDestinationID),
+                           volumeUUID: timeMachine.volumeUUID, tmDestinationID: timeMachine.tmDestinationID,
+                           connection: .usb),
             AttachedVolume(path: "/Volumes/Samsung T7", name: portable.name,
-                           volumeUUID: portable.volumeUUID),
+                           volumeUUID: portable.volumeUUID, connection: .thunderbolt),
         ]
 
         var status = BackupStatus()
         status.running = true
         status.mountPoint = "/Volumes/Time Machine"
+        status.destinationID = timeMachine.tmDestinationID
         status.percent = 0.42
         backup = status
 

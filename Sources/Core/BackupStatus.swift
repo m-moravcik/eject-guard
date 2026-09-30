@@ -7,6 +7,9 @@ import Foundation
 struct BackupStatus {
     var running = false
     var mountPoint: String?
+    /// The Time Machine destination being written to. The only reliable link
+    /// for a network destination, whose mount point is a disk image.
+    var destinationID: String?
     /// 0...1, or nil when Time Machine has not worked out a figure yet.
     var percent: Double?
 
@@ -23,6 +26,7 @@ struct BackupStatus {
     init(plist root: [String: Any]) {
         running = (root["Running"] as? NSNumber)?.boolValue ?? false
         mountPoint = root["DestinationMountPoint"] as? String
+        destinationID = root["DestinationID"] as? String
         // Current macOS nests the figure in `Progress`; older releases put it
         // at the top level. Not `FractionOfProgressBar`: that one spans every
         // phase of the job and sat at 0.9 while the copy was a quarter done.
@@ -39,9 +43,17 @@ struct BackupStatus {
 
     init() {}
 
-    func isBackingUp(to path: String) -> Bool {
+    func isBackingUp(to volume: AttachedVolume) -> Bool {
+        guard running else { return false }
+        if let destinationID, let target = volume.tmDestinationID { return destinationID == target }
+        if let mountPoint { return mountPoint == volume.path }
         // A running backup with no destination reported is still a reason to
         // show activity on the one disk being guarded.
-        running && (mountPoint == nil || mountPoint == path)
+        return destinationID == nil
+    }
+
+    func isBackingUp(toDestination id: String?) -> Bool {
+        guard running, let id else { return false }
+        return destinationID == id
     }
 }

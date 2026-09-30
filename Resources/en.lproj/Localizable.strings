@@ -31,10 +31,13 @@
 "disk.guarded" = "Guarded";
 "disk.hide" = "Hide this disk";
 "disk.hideHint" = "Restore it later in Settings";
+"disk.network" = "Network";
 "disk.notGuarded" = "Not guarded";
+"disk.sdCard" = "SD card";
 "disk.timeMachineBadge" = "A Time Machine backup destination";
 "disks.empty" = "No external disks seen yet.\nPlug one in and it shows up here.";
 "disks.hint" = "Click a disk to guard it.";
+"failure.backupNotStopped" = "%@: the backup could not be stopped";
 "failure.heldBy" = "%1$@: held by %2$@";
 "footer.ejectHelp" = "Ejects %@. Disks you have not ticked are left alone.";
 "footer.ejectHelpNone" = "No guarded disk is connected.";
@@ -45,6 +48,9 @@
 "footer.quit" = "Quit";
 "footer.resume" = "Resume guarding";
 "footer.settings" = "Settings…";
+"footer.stopBackup" = "Stop backup";
+"footer.stopBackupHelp" = "Stops the backup to %@.";
+"footer.stoppingBackup" = "Stopping backup…";
 "meeting.checking" = "Checking your calendar…";
 "meeting.ejectsAt" = "Ejects at %@";
 "meeting.guardOff" = "Guard is off";
@@ -53,10 +59,14 @@
 "meeting.noGuardedDisk" = "No guarded disk connected";
 "meeting.noneToday" = "No more meetings today.";
 "meeting.skip" = "Skip this meeting";
+"meeting.stopsBackupAt" = "Stops a running backup at %@";
 "meeting.undoSkip" = "Undo skip: %@";
 "meeting.untitled" = "Meeting";
 "meeting.untitledEvent" = "Untitled";
+"notify.backupStopped" = "Backup to %@ stopped";
+"notify.backupStoppedDetail" = "%@. Time Machine carries on at its next backup.";
 "notify.couldNotEject" = "Could not eject %@";
+"notify.couldNotStopBackup" = "Could not stop the backup to %@";
 "notify.doNotUnplug" = "%@ Do not unplug it.";
 "notify.ejected" = "%@ ejected";
 "notify.heldBy" = "Held by %@.";
@@ -65,6 +75,7 @@
 "notify.reason.menu" = "Ejected from the menu";
 "notify.reason.sleep" = "The Mac is going to sleep";
 "notify.safeToUnplug" = "%@. Safe to unplug.";
+"notify.stayOnNetwork" = "Stay on this network until it finishes.";
 "notify.unknownProcess" = "an unknown process";
 "onboarding.back" = "Back";
 "onboarding.done" = "Done";

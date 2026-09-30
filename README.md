@@ -10,7 +10,7 @@ SSD: whichever you tick.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/popover-dark.png">
-    <img src="docs/popover-light.png" width="480" alt="Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42%, two more disks, and the next meeting with the time the disks will be ejected">
+    <img src="docs/popover-light.png" width="480" alt="Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42% over USB, a network Time Machine share, two more disks, and the next meeting with the time the disks will be ejected">
   </picture>
 </p>
 
@@ -27,6 +27,10 @@ mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
   cancelled events are ignored.
 - **Takes care of Time Machine.** A running backup to that disk is stopped
   cleanly first. Backups to other destinations keep going.
+- **Guards network backups too.** Tick a Time Machine destination on a NAS and
+  a backup running to it is stopped before the meeting, so you never walk off
+  the network mid-write. Nothing is ejected: there is no cable to pull. Plain
+  network shares are not listed.
 - **Shows backup progress** in the menu bar icon while Time Machine writes to a
   guarded disk.
 - **Stays out of your way.** Skip a single meeting, pause for an hour, eject
@@ -52,7 +56,8 @@ signed and notarized by Apple and requires macOS 14 or newer.
 The menu bar popover shows your disks and today's next meeting:
 
 - **Click a disk** to guard it. Disks are remembered once you plug them in,
-  and Time Machine destinations appear straight away. ⌘1 to ⌘9 toggle them
+  and Time Machine destinations appear straight away. Each row says how the
+  disk is connected: USB, Thunderbolt, SD card, or network. ⌘1 to ⌘9 toggle them
   from the keyboard. A disk you do not guard is forgotten a week after you
   unplug it, and listed again the next time you plug it in.
 - **Next meeting** shows what the guard will do and when it will eject.

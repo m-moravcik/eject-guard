@@ -34,7 +34,7 @@ struct StatusIcon: View {
     private var state: StatusIconState {
         if controller.isBusy { return .ejecting }
         if !controller.config.isActive { return .off }
-        if controller.guardedVolumes.isEmpty { return .idle }
+        if !controller.hasGuardedTargets { return .idle }
         return controller.isGuardedBackupRunning ? .backingUp : .armed
     }
 
@@ -43,14 +43,14 @@ struct StatusIcon: View {
         case .ejecting: return Loc.t("status.ejecting", "Ejecting")
         case .off: return Loc.t("status.off", "Guarding is off")
         case .backingUp:
-            let names = controller.guardedVolumes.map(\.name).joined(separator: ", ")
+            let names = controller.backingUpGuardedNames.joined(separator: ", ")
             guard let percent = controller.guardedBackupPercent else {
                 return Loc.t("status.backingUp", "Backing up %@", names)
             }
             return Loc.t("status.backingUpPercent", "Backing up %1$@ - %2$d%%",
                          names, Int(percent * 100))
         case .armed:
-            let names = controller.guardedVolumes.map(\.name).joined(separator: ", ")
+            let names = controller.guardedTargetNames.joined(separator: ", ")
             return Loc.t("status.guarding", "Guarding %@", names)
         case .idle: return Loc.t("status.idle", "No guarded disk connected")
         }
