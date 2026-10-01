@@ -112,3 +112,5 @@ How it works inside, testing, and releasing: [DEVELOPMENT.md](DEVELOPMENT.md).
 ## License
 
 [MIT](LICENSE)
+
+Built by [Michal Moravčík](https://github.com/m-moravcik). [More projects](https://web.pexelo.com/portfolio).
