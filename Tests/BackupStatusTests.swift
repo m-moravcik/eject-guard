@@ -32,7 +32,45 @@ final class BackupStatusTests: XCTestCase {
             "FractionOfProgressBar": NSNumber(value: 0.9),
             "Progress": ["Percent": NSNumber(value: 0.2464), "TimeRemaining": NSNumber(value: 341.7)],
         ])
-        XCTAssertEqual(status.percent ?? 0, 0.2464, accuracy: 0.0001)
+        XCTAssertEqual(status.percent ?? 0, 0.1 + 0.9 * 0.2464, accuracy: 0.0001)
+    }
+
+    /// Read off a real backup to a share, next to the Time Machine menu bar
+    /// item, which said 13.5% while the copy alone was at 3.9%.
+    func testThePercentMatchesTheTimeMachineMenu() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true),
+            "BackupPhase": "Copying",
+            "FractionOfProgressBar": "0.9",
+            "Progress": ["Percent": "0.03888370181742058", "bytes": NSNumber(value: 9_788_899_328),
+                         "totalBytes": NSNumber(value: 657_068_568_576)],
+        ])
+        XCTAssertEqual(status.percent ?? 0, 0.135, accuracy: 0.0005)
+    }
+
+    func testWithoutABarShareTheCopyFigureIsTakenAsItComes() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true), "BackupPhase": "Copying",
+            "Progress": ["Percent": NSNumber(value: 0.25)],
+        ])
+        XCTAssertEqual(status.percent ?? 0, 0.25, accuracy: 0.0001)
+    }
+
+    func testNoNumberOutsideTheCopy() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true), "BackupPhase": "Finishing",
+            "FractionOfProgressBar": NSNumber(value: 0.9), "Progress": ["Percent": NSNumber(value: 1)],
+        ])
+        XCTAssertTrue(status.running)
+        XCTAssertNil(status.percent, "the system menu shows no number outside the copy")
+    }
+
+    func testAPercentPastTheEndStopsAtTheEnd() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true), "BackupPhase": "Copying",
+            "FractionOfProgressBar": NSNumber(value: 0.9), "Progress": ["Percent": NSNumber(value: 1.2)],
+        ])
+        XCTAssertEqual(status.percent ?? 0, 1, accuracy: 0.0001)
     }
 
     func testMinusOneNestedUnderProgressIsStillUnknown() {

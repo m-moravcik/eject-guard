@@ -49,8 +49,8 @@ struct StatusIcon: View {
             guard let percent = controller.backupPercent else {
                 return Loc.t("status.backingUp", "Backing up %@", names)
             }
-            return Loc.t("status.backingUpPercent", "Backing up %1$@ - %2$d%%",
-                         names, Int(percent * 100))
+            return Loc.t("status.backingUpPercent", "Backing up %1$@ - %2$@",
+                         names, Format.percent(percent))
         case .armed:
             let names = controller.guardedTargetNames.joined(separator: ", ")
             return Loc.t("status.guarding", "Guarding %@", names)

@@ -25,7 +25,7 @@
 "calendar.accessDetail" = "Without it the guard cannot see your meetings.";
 "calendar.accessNeeded" = "Calendar access needed";
 "disk.backingUp" = "Backing up…";
-"disk.backingUpPercent" = "Backing up… %d%%";
+"disk.backingUpPercent" = "Backing up… %@";
 "disk.connected" = "Connected";
 "disk.disconnected" = "Disconnected";
 "disk.guarded" = "Guarded";
@@ -115,7 +115,7 @@
 "settings.whatCountsFooter" = "Attendees are what separate a real meeting from blocks like Focus or Home-office, without matching on titles.";
 "settings.withAttendees" = "Events with other attendees";
 "status.backingUp" = "Backing up %@";
-"status.backingUpPercent" = "Backing up %1$@ - %2$d%%";
+"status.backingUpPercent" = "Backing up %1$@ - %2$@";
 "status.ejecting" = "Ejecting";
 "status.guarding" = "Guarding %@";
 "status.idle" = "No guarded disk connected";

@@ -10,7 +10,9 @@ struct BackupStatus {
     /// The Time Machine destination being written to. The only reliable link
     /// for a network destination, whose mount point is a disk image.
     var destinationID: String?
-    /// 0...1, or nil when Time Machine has not worked out a figure yet.
+    /// 0...1 on the scale the Time Machine menu bar item shows, or nil when
+    /// there is no figure to show: Time Machine is still sizing the job up, or
+    /// is in a phase other than copying, where it shows no number either.
     var percent: Double?
 
     /// Spawns `tmutil`, so never call this on the main thread.
@@ -27,13 +29,26 @@ struct BackupStatus {
         running = (root["Running"] as? NSNumber)?.boolValue ?? false
         mountPoint = root["DestinationMountPoint"] as? String
         destinationID = root["DestinationID"] as? String
+        // A number only while copying, as in the system menu. Older releases
+        // report no phase at all, and then the figure is taken as it comes.
+        if let phase = root["BackupPhase"] as? String, phase != "Copying" { return }
         // Current macOS nests the figure in `Progress`; older releases put it
-        // at the top level. Not `FractionOfProgressBar`: that one spans every
-        // phase of the job and sat at 0.9 while the copy was a quarter done.
-        // tmutil reports -1 while it is still sizing the job up.
+        // at the top level. tmutil reports -1 while it is still sizing the job up.
         let progress = root["Progress"] as? [String: Any]
-        if let raw = Self.number(progress?["Percent"]) ?? Self.number(root["Percent"]), raw >= 0 {
-            percent = min(max(raw, 0), 1)
+        guard let raw = Self.number(progress?["Percent"]) ?? Self.number(root["Percent"]), raw >= 0 else {
+            return
+        }
+        let copy = min(raw, 1)
+        // `Percent` covers the copy alone. `FractionOfProgressBar` is not
+        // progress but the share of the whole bar the copy is given; the
+        // phases before it fill the rest. The system bar is the sum, and
+        // matches it to the tenth: 0.1 + 0.9 x 0.0389 = 13.5% shown, against
+        // a bare 3.9%. One number everywhere beats a "correct" one that
+        // reads as a bug next to Apple's.
+        if let share = Self.number(root["FractionOfProgressBar"]), share > 0, share <= 1 {
+            percent = (1 - share) + share * copy
+        } else {
+            percent = copy
         }
     }
 

@@ -25,7 +25,7 @@
 "calendar.accessDetail" = "Bez neho stráž nevidí tvoje stretnutia.";
 "calendar.accessNeeded" = "Treba prístup ku kalendáru";
 "disk.backingUp" = "Zálohuje sa…";
-"disk.backingUpPercent" = "Zálohuje sa… %d%%";
+"disk.backingUpPercent" = "Zálohuje sa… %@";
 "disk.connected" = "Pripojený";
 "disk.disconnected" = "Odpojený";
 "disk.guarded" = "Strážený";
@@ -115,7 +115,7 @@
 "settings.whatCountsFooter" = "Účastníci sú to, čo odlíši skutočné stretnutie od blokov ako Focus či Home-office, bez hádania podľa názvu.";
 "settings.withAttendees" = "Udalosti s ďalšími účastníkmi";
 "status.backingUp" = "Zálohuje sa %@";
-"status.backingUpPercent" = "Zálohuje sa %1$@ - %2$d%%";
+"status.backingUpPercent" = "Zálohuje sa %1$@ - %2$@";
 "status.ejecting" = "Vysúva sa";
 "status.guarding" = "Stráži %@";
 "status.idle" = "Nie je pripojený strážený disk";

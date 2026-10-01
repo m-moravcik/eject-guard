@@ -234,7 +234,7 @@ this project has been so far:
 | `Disks.isMountedVolume` | The boot volume must never be an eject candidate. |
 | `Disks.mayChangeDiskList` | Time Machine's own mounts set off rescans whose `tmutil` hung past SIGKILL; a plugged-in disk must still rescan. |
 | `Sanitize.oneLine` | Untrusted titles must not forge log lines or break AppleScript. |
-| `BackupStatus` | `Percent: -1` means unknown, not zero. A backup to a share is matched by destination ID; its mount point is a disk image. |
+| `BackupStatus` | `Percent: -1` means unknown, not zero. The figure is the one the Time Machine menu shows, `(1 - FractionOfProgressBar) + FractionOfProgressBar x Percent`, and only while copying. A backup to a share is matched by destination ID; its mount point is a disk image. |
 | Network destinations | Never an eject target, never folded into a plugged-in disk by name, and an entry an older release stripped of its flag is still the same destination. |
 | `Disks.connection` | Only interfaces we recognise are named. |
 

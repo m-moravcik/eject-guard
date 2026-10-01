@@ -343,7 +343,7 @@ private struct DiskCard: View {
     private var subtitle: String {
         if backingUp {
             if let percent = controller.backup.percent {
-                return Loc.t("disk.backingUpPercent", "Backing up… %d%%", Int(percent * 100))
+                return Loc.t("disk.backingUpPercent", "Backing up… %@", Format.percent(percent))
             }
             return Loc.t("disk.backingUp", "Backing up…")
         }

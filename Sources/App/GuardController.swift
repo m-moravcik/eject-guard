@@ -687,6 +687,12 @@ enum Format {
             : Loc.t("relative.hoursMinutes", "in %1$d h %2$d min", hours, rest)
     }
 
+    /// A backup percentage the way the Time Machine menu shows it: one
+    /// decimal, in the user's locale ("13,5 %" in Slovak, "13.5%" in English).
+    static func percent(_ fraction: Double) -> String {
+        fraction.formatted(.percent.precision(.fractionLength(1)))
+    }
+
     static func clock(_ date: Date) -> String {
         DateFormatter.localizedString(from: date, dateStyle: .none, timeStyle: .short)
     }

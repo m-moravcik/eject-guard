@@ -25,7 +25,7 @@
 "calendar.accessDetail" = "Bez něj hlídání nevidí tvoje schůzky.";
 "calendar.accessNeeded" = "Je potřeba přístup ke kalendáři";
 "disk.backingUp" = "Zálohuje se…";
-"disk.backingUpPercent" = "Zálohuje se… %d%%";
+"disk.backingUpPercent" = "Zálohuje se… %@";
 "disk.connected" = "Připojený";
 "disk.disconnected" = "Odpojený";
 "disk.guarded" = "Hlídaný";
@@ -115,7 +115,7 @@
 "settings.whatCountsFooter" = "Účastníci jsou to, co odliší skutečnou schůzku od bloků jako Focus či Home-office, bez hádání podle názvu.";
 "settings.withAttendees" = "Události s dalšími účastníky";
 "status.backingUp" = "Zálohuje se %@";
-"status.backingUpPercent" = "Zálohuje se %1$@ - %2$d%%";
+"status.backingUpPercent" = "Zálohuje se %1$@ - %2$@";
 "status.ejecting" = "Vysouvá se";
 "status.guarding" = "Hlídá %@";
 "status.idle" = "Není připojený hlídaný disk";
