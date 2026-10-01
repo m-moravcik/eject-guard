@@ -437,6 +437,17 @@ enum Disks {
 
     /// Network Time Machine destinations the user guards. Reported by Time
     /// Machine on every pass, so there is no "present" to check.
+    /// Somewhere Time Machine could be writing to right now, guarded or not: a
+    /// destination plugged in, or a share, which is always reachable as far as
+    /// the app can tell. Nothing else can have a backup worth showing.
+    static func hasTimeMachineTarget(_ config: GuardConfig, among attached: [AttachedVolume]) -> Bool {
+        attached.contains { $0.tmDestinationID != nil }
+            || config.knownDisks.contains { disk in
+                disk.isNetworkDestination
+                    || (disk.isTimeMachineDestination && attachedVolume(for: disk, among: attached) != nil)
+            }
+    }
+
     static func guardedNetworkDestinations(_ config: GuardConfig) -> [KnownDisk] {
         config.knownDisks.filter { $0.isNetworkDestination && config.watchedDiskIDs.contains($0.id) }
     }

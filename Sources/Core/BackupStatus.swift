@@ -56,4 +56,20 @@ struct BackupStatus {
         guard running, let id else { return false }
         return destinationID == id
     }
+
+    /// The disks and shares this backup writes to, named as the popover names
+    /// them, whether or not they are guarded. Progress is worth showing for
+    /// any backup; guarding only decides what gets stopped or ejected.
+    ///
+    /// Empty when the backup reports no destination at all. `isBackingUp(to:)`
+    /// counts that against every disk, which is right before an eject and
+    /// wrong here: it would name every disk plugged in.
+    func destinationNames(attached: [AttachedVolume], known: [KnownDisk]) -> [String] {
+        guard running, destinationID != nil || mountPoint != nil else { return [] }
+        let volumes = attached.filter { isBackingUp(to: $0) }.map(\.name)
+        let shares = known
+            .filter { $0.isNetworkDestination && isBackingUp(toDestination: $0.tmDestinationID) }
+            .map(\.name)
+        return volumes + shares
+    }
 }

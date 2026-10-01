@@ -95,6 +95,55 @@ final class BackupStatusTests: XCTestCase {
         XCTAssertFalse(status.isBackingUp(toDestination: "NET-1"))
     }
 
+    /// The case that started this: a backup to a share nobody ticked. Progress
+    /// is shown for it all the same, under the share's own name.
+    func testAnUnguardedShareIsNamedWhileItBacksUp() {
+        let status = BackupStatus(plist: [
+            "Running": NSNumber(value: true),
+            "DestinationID": "NET-1",
+            "DestinationMountPoint": "/Volumes/Backups of MekBuk-Pro",
+            "Progress": ["Percent": NSNumber(value: 0.036)],
+        ])
+        let share = KnownDisk(id: "NET-1", name: "time_mbp_m5", tmDestinationID: "NET-1", network: true)
+        let names = status.destinationNames(attached: [volume("/Volumes/WD", tm: "TM-1")], known: [share])
+        XCTAssertEqual(names, ["time_mbp_m5"])
+    }
+
+    func testAPluggedInDiskIsNamedWhileItBacksUp() {
+        let status = BackupStatus(plist: ["Running": NSNumber(value: true), "DestinationID": "TM-1"])
+        let names = status.destinationNames(
+            attached: [volume("/Volumes/WD", tm: "TM-1"), volume("/Volumes/Sync")], known: [])
+        XCTAssertEqual(names, ["WD"])
+    }
+
+    func testABackupWithNoDestinationNamesNoDisk() {
+        let status = BackupStatus(plist: ["Running": NSNumber(value: true)])
+        XCTAssertEqual(status.destinationNames(attached: [volume("/Volumes/Sync")], known: []), [],
+                       "naming every disk plugged in would be a guess")
+    }
+
+    func testAnIdleStatusNamesNothing() {
+        let status = BackupStatus(plist: ["Running": NSNumber(value: false), "DestinationID": "TM-1"])
+        XCTAssertEqual(status.destinationNames(attached: [volume("/Volumes/WD", tm: "TM-1")], known: []), [])
+    }
+
+    func testAnyReachableDestinationIsWorthWatchingGuardedOrNot() {
+        var config = GuardConfig()
+        XCTAssertFalse(Disks.hasTimeMachineTarget(config, among: []))
+        XCTAssertFalse(Disks.hasTimeMachineTarget(config, among: [volume("/Volumes/Sync")]),
+                       "a plain disk can never be backed up to")
+        XCTAssertTrue(Disks.hasTimeMachineTarget(config, among: [volume("/Volumes/WD", tm: "TM-1")]))
+
+        config.knownDisks = [KnownDisk(id: "NET-1", name: "NAS", tmDestinationID: "NET-1", network: true)]
+        XCTAssertTrue(Disks.hasTimeMachineTarget(config, among: []), "a share is always reachable")
+
+        config.knownDisks = [KnownDisk(id: "UUID-1", name: "WD", volumeUUID: "UUID-1", tmDestinationID: "TM-1")]
+        XCTAssertFalse(Disks.hasTimeMachineTarget(config, among: []))
+        let plugged = AttachedVolume(path: "/Volumes/WD", name: "WD", volumeUUID: "UUID-1", tmDestinationID: nil)
+        XCTAssertTrue(Disks.hasTimeMachineTarget(config, among: [plugged]),
+                      "a known destination counts even when this scan missed its Time Machine link")
+    }
+
     private func volume(_ path: String, tm: String? = nil) -> AttachedVolume {
         AttachedVolume(path: path, name: "WD", volumeUUID: nil, tmDestinationID: tm)
     }

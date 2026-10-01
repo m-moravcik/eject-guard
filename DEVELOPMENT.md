@@ -91,7 +91,7 @@ swap is too quiet to notice during the few seconds an eject takes.
 |---|---|
 | `externaldrive` | No guarded disk connected. |
 | `externaldrive.fill.badge.checkmark` | A guarded disk is connected and armed. |
-| `externaldrive.fill.badge.timemachine` | Time Machine is writing to a guarded disk, with a progress bar under it. |
+| `externaldrive.fill.badge.timemachine` | Time Machine is backing up, with a progress bar under it. Any destination, guarded or not, and even with guarding off. |
 | `eject.fill` | Ejecting right now. |
 | `externaldrive.badge.xmark` | Guarding is off or paused. |
 

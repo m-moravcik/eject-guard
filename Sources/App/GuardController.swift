@@ -27,7 +27,7 @@ final class GuardController {
     private(set) var lastFailure: String?
 
     private(set) var backup = BackupStatus()
-    /// Advances while a guarded disk is being backed up, and is what makes the
+    /// Advances while Time Machine is backing up, and is what makes the
     /// menu bar icon move. A MenuBarExtra label is rendered to a static image,
     /// so SwiftUI's own symbol effects never run there - measured, not assumed.
     /// The only animation available is one we redraw ourselves.
@@ -46,8 +46,8 @@ final class GuardController {
 
     private var ejectTimer: Timer?
     private var heartbeat: Timer?
-    /// Asks Time Machine what it is doing, but only while a guarded disk is
-    /// plugged in - see `updateBackupWatch`.
+    /// Asks Time Machine what it is doing, but only while somewhere it could
+    /// be writing to is reachable - see `updateBackupWatch`.
     private var backupTimer: Timer?
     /// Advances `backupPhase`. Pure bookkeeping, no process is spawned.
     private var breatheTimer: Timer?
@@ -111,10 +111,13 @@ final class GuardController {
         guardedVolumes.map(\.name) + guardedNetworkDestinations.map(\.name)
     }
 
-    /// What the menu bar icon names while a guarded backup runs.
-    var backingUpGuardedNames: [String] {
-        guardedVolumes.filter { backup.isBackingUp(to: $0) }.map(\.name)
-            + guardedNetworkBackups.map(\.name)
+    /// What the menu bar icon names while a backup runs. Guarded or not:
+    /// progress is shown for every backup. A destination the app has never
+    /// seen still gets a name, since the backup is real either way.
+    var backingUpNames: [String] {
+        guard backup.running else { return [] }
+        let names = backup.destinationNames(attached: attached, known: config.knownDisks)
+        return names.isEmpty ? ["Time Machine"] : names
     }
 
     /// The scheduler looks a day ahead; the popover only reports what is still
@@ -141,22 +144,20 @@ final class GuardController {
         return backup.isBackingUp(to: volume)
     }
 
-    /// True when Time Machine is writing to a disk or share this app is guarding.
-    var isGuardedBackupRunning: Bool {
-        !backingUpGuardedNames.isEmpty
-    }
+    /// True when Time Machine is writing anywhere, guarded or not.
+    var isBackupRunning: Bool { backup.running }
 
     /// 0...1, or nil while Time Machine is still sizing the job up.
-    var guardedBackupPercent: Double? {
-        isGuardedBackupRunning ? backup.percent : nil
+    var backupPercent: Double? {
+        isBackupRunning ? backup.percent : nil
     }
 
     /// Reading this spawns `tmutil`, so that part stays off the main actor.
     ///
     /// Called both by the popover while it is open and, since the menu bar icon
     /// shows backup progress, by `backupTimer`. That timer only runs while a
-    /// guarded disk is actually plugged in, which is the only time the answer
-    /// can be anything but "no".
+    /// Time Machine destination is reachable, which is the only time the
+    /// answer can be anything but "no".
     func refreshBackupStatus() {
         work.async { [weak self] in
             let status = BackupStatus.current()
@@ -176,12 +177,14 @@ final class GuardController {
     /// Start, restart or stop the backup poll to match the current state.
     ///
     /// The cost of knowing is one `tmutil status` every few seconds, and only
-    /// while a guarded disk is attached and guarding is on - which is exactly
-    /// when a backup can be running and when the answer is worth showing. With
-    /// nothing plugged in, nothing is polled at all. A guarded network
-    /// destination counts as attached: a backup to it can start at any time.
+    /// while a Time Machine destination is reachable - which is exactly when a
+    /// backup can be running. Guarding has no say: progress is shown for a
+    /// disk nobody ticked, and with guarding off. With no destination plugged
+    /// in, nothing is polled at all. A network destination counts as attached:
+    /// a backup to it can start at any time. A guarded target counts too, in
+    /// case the scan that would have tied it to Time Machine timed out.
     private func updateBackupWatch() {
-        let wanted = config.isActive && hasGuardedTargets
+        let wanted = hasGuardedTargets || Disks.hasTimeMachineTarget(config, among: attached)
         guard wanted else {
             stopBackupWatch()
             if backup.running { backup = BackupStatus() }
@@ -189,6 +192,10 @@ final class GuardController {
         }
 
         let interval = backup.running ? backupPollWhileRunning : backupPollWhileIdle
+        // A backup already running at launch would otherwise wait out a whole
+        // idle interval before the icon shows it. The read lands back here
+        // with the timer in place, so this runs once per watch.
+        let starting = backupTimer == nil
         if backupTimer?.timeInterval != interval {
             backupTimer?.invalidate()
             backupTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
@@ -197,9 +204,10 @@ final class GuardController {
             // A backup is minutes long; the poll does not need to be punctual.
             backupTimer?.tolerance = interval / 4
         }
+        if starting { refreshBackupStatus() }
 
         // The breathing only exists while there is something to breathe about.
-        if isGuardedBackupRunning {
+        if isBackupRunning {
             if breatheTimer == nil {
                 breatheTimer = Timer.scheduledTimer(
                     withTimeInterval: breatheInterval, repeats: true) { _ in

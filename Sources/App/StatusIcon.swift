@@ -33,9 +33,11 @@ struct StatusIcon: View {
 
     private var state: StatusIconState {
         if controller.isBusy { return .ejecting }
+        // Ahead of off and idle: a backup is worth seeing whether or not
+        // anything is guarded.
+        if controller.isBackupRunning { return .backingUp }
         if !controller.config.isActive { return .off }
-        if !controller.hasGuardedTargets { return .idle }
-        return controller.isGuardedBackupRunning ? .backingUp : .armed
+        return controller.hasGuardedTargets ? .armed : .idle
     }
 
     private var label: String {
@@ -43,8 +45,8 @@ struct StatusIcon: View {
         case .ejecting: return Loc.t("status.ejecting", "Ejecting")
         case .off: return Loc.t("status.off", "Guarding is off")
         case .backingUp:
-            let names = controller.backingUpGuardedNames.joined(separator: ", ")
-            guard let percent = controller.guardedBackupPercent else {
+            let names = controller.backingUpNames.joined(separator: ", ")
+            guard let percent = controller.backupPercent else {
                 return Loc.t("status.backingUp", "Backing up %@", names)
             }
             return Loc.t("status.backingUpPercent", "Backing up %1$@ - %2$d%%",
@@ -58,7 +60,7 @@ struct StatusIcon: View {
 
     var body: some View {
         StatusIconArt(state: state,
-                      percent: controller.guardedBackupPercent,
+                      percent: controller.backupPercent,
                       phase: controller.backupPhase)
             // `label` is already translated; the name in front of it never is.
             .accessibilityLabel(Text(verbatim: "Eject Guard: \(label)"))

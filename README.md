@@ -31,8 +31,8 @@ mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
   a backup running to it is stopped before the meeting, so you never walk off
   the network mid-write. Nothing is ejected: there is no cable to pull. Plain
   network shares are not listed.
-- **Shows backup progress** in the menu bar icon while Time Machine writes to a
-  guarded disk.
+- **Shows backup progress** in the menu bar icon whenever Time Machine is
+  backing up, to a plugged-in disk or a network share, guarded or not.
 - **Stays out of your way.** Skip a single meeting, pause for an hour, eject
   now with ⌘E, or eject when the Mac goes to sleep.
 - **Tells you when it cannot eject**, and names the app holding the disk, so
