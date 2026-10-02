@@ -6,20 +6,21 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.4.1</title>
-      <pubDate>Wed, 30 Sep 2026 15:33:45 +0000</pubDate>
-      <sparkle:version>45</sparkle:version>
-      <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
+      <title>Version 1.4.2</title>
+      <pubDate>Fri, 02 Oct 2026 20:38:13 +0000</pubDate>
+      <sparkle:version>48</sparkle:version>
+      <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>Settings no longer scrolls. The lead time and what counts as a meeting moved to a new Meetings tab, General keeps how the app behaves, and the explanations sit under each section instead of between the controls.</p>
-<p>The welcome tour opens on the app's own icon, and the step about picking disks shows a guarded drive.</p>
+<p>Backup progress shows for every Time Machine backup, to a plugged-in disk or a network share, whether or not you ticked it and even with guarding off. Guarding still only decides what gets ejected or stopped before a meeting.</p>
+<p>The percentage now matches the Time Machine menu bar item: the same figure, to one decimal, and only while Time Machine is copying. Before, the app showed the copy alone, so 13.5% in the system menu read as 3% here.</p>
+<p>A backup already running when the app starts shows within seconds instead of after the first poll.</p>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.4.1/Eject-Guard-1.4.1.zip"
-                 sparkle:edSignature="05Q7Eh7u0b+8smriTCmOP5HOB0xAH0r5HMy3O6qN9VQX3ViazVN1zAx8iEdt2M2dm/C2ohbHxHMdF5ZjM76DCQ=="
-                 length="3033908"
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.4.2/Eject-Guard-1.4.2.zip"
+                 sparkle:edSignature="48HAlAdSSB+8vL/QJElA0JRFmdX77VHgsMmhSQf1UVLmFeQ0sOZGpOMNdkrLoJpnGTF3r2S4Eb7t0dJypCCkDw=="
+                 length="3035940"
                  type="application/octet-stream" />
     </item>
   </channel>
