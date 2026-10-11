@@ -67,14 +67,18 @@ rather than at the next hourly run.
   System keychain, so the guard asks Time Machine to start a backup to it
   (`tmutil startbackup --destination`) and waits up to 90 s for the volume to
   appear. Failing that, the user is told to replug it.
-- **⌘E and eject on sleep clear what is pending when they eject a mounted
-  guarded disk.** They say the user is leaving, and on a fixed USB disk the
-  device can outlive an eject, so it would otherwise be found "still plugged
-  in" and mounted again. With no guarded disk mounted there is nothing to
-  eject and they do nothing, so a disk that is only waiting keeps its entry:
-  it was never ejected, so the device cannot have outlived one, and if it is
-  still attached after a wake the user is at the desk and reconnecting it is
-  right.
+- **⌘E and eject on sleep clear everything pending whenever they run.** They
+  say the user is leaving, and on a fixed USB disk the device can outlive an
+  eject, so it would otherwise be found "still plugged in" and mounted again.
+  `ejectGuarded` drops every entry before it ejects anything, even when it
+  then finds nothing to eject. They only run with a guarded target to act on:
+  eject on sleep needs a mounted guarded disk or any guarded network
+  destination, ⌘E a mounted guarded disk or a backup running to a guarded
+  share; `eject-guard --eject-now` always runs. So with only a waiting disk
+  and no guarded network destination nothing runs and the entry stays, and a
+  disk still attached after the meeting is mounted again. That is intended:
+  a waiting disk was never ejected, so its device cannot have outlived one,
+  and if it is still attached after a wake the user is at the desk.
 - An entry more than 12 hours past its time is dropped without acting on it.
 
 A guarded **network** Time Machine destination counts as attached for the first
@@ -311,9 +315,11 @@ is banned.
   which is what Finder's eject does. Other volumes on the same disk are
   unmounted too; if one of them is busy the eject fails and names the process.
 - A disk unmounted for a meeting is mounted again only if it is still attached
-  when the meeting ends, found by its volume UUID. Like the unmount, the mount
-  covers the whole external disk, so its other volumes come back too. After ⌘E or eject on sleep, unplug and replug it: an encrypted Time
-  Machine volume unlocks from the keychain when the disk is reattached.
+  when the meeting ends, found by its volume UUID. When diskutil confirms an
+  external whole disk, `diskutil mountDisk` brings back every volume on it;
+  otherwise only that volume is mounted. After ⌘E or eject on sleep, unplug
+  and replug it: an encrypted Time Machine volume unlocks from the keychain
+  when the disk is reattached.
 - The log names your meetings, so it is created `0600`, as is the config file.
   At 512 KB it rolls over to `.log.1` rather than being deleted, because the
   entry you want is usually the one just before the rollover.
