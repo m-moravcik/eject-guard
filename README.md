@@ -3,8 +3,8 @@
 <h1 align="center">Eject Guard</h1>
 
 **Never unplug a mounted disk again.** Eject Guard is a small macOS menu bar
-app that ejects your external disks a few minutes before a meeting starts, so
-you can grab the laptop and go. A Time Machine drive, an archive, a portable
+app that unmounts your external disks a few minutes before a meeting starts,
+so you can grab the laptop and go. A Time Machine drive, an archive, a portable
 SSD: whichever you tick.
 
 <p align="center">
@@ -20,8 +20,9 @@ mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
 
 ## What it does
 
-- **Ejects on time.** Five minutes before a real meeting (you choose the lead
-  time), your guarded disks are ejected and you get a notification.
+- **Unmounts on time.** Five minutes before a real meeting (you choose the
+  lead time), your guarded disks are unmounted, safe to unplug, and you get a
+  notification.
 - **Puts them back if you stayed.** Joined the call from your desk and never
   touched the cable? The disk is reconnected when the meeting ends and Time
   Machine carries on, so a meeting never costs you a backup.
@@ -96,7 +97,7 @@ It is handy for setup and debugging:
 ```sh
 eject-guard                # disks, selection, next meeting
 eject-guard --watch "WD"   # guard a disk
-eject-guard --dry-run      # run a pass without ejecting
+eject-guard --dry-run      # run a pass without unmounting or mounting
 eject-guard --eject-now    # eject guarded disks now
 eject-guard --help         # everything else
 ```
