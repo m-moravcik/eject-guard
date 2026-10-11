@@ -120,6 +120,19 @@ final class ReconnectTests: XCTestCase {
         XCTAssertFalse(Reconnector.isVolumeUUID("/Volumes/Time Machine WD"))
     }
 
+    func testTheNotificationPromisesAReconnectOnlyWhenEveryDiskGetsOne() {
+        var outcome = GuardRunner.Outcome()
+        outcome.unmounted = ["Time Machine WD"]
+        XCTAssertTrue(outcome.allReconnect)
+
+        // A volume without a UUID was ejected for good and will not come back.
+        outcome.ejected = ["Old FAT stick"]
+        XCTAssertFalse(outcome.allReconnect)
+        XCTAssertEqual(outcome.takenOff, ["Time Machine WD", "Old FAT stick"])
+
+        XCTAssertFalse(GuardRunner.Outcome().allReconnect)
+    }
+
     // MARK: - Persistence
 
     func testAPendingReconnectSurvivesARestart() throws {

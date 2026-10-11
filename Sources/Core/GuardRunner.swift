@@ -39,6 +39,8 @@ enum GuardRunner {
     struct Outcome {
         var meeting: EKEvent?
         var ejected: [String] = []
+        /// Left attached, with a reconnect waiting for them after the meeting.
+        var unmounted: [String] = []
         var failed: [(name: String, detail: String)] = []
         /// Network destinations whose running backup was stopped, or could not be.
         var stoppedBackups: [String] = []
@@ -46,8 +48,14 @@ enum GuardRunner {
         var reconnect = ReconnectOutcome()
 
         var didNothing: Bool {
-            ejected.isEmpty && failed.isEmpty && stoppedBackups.isEmpty && unstoppedBackups.isEmpty
+            takenOff.isEmpty && failed.isEmpty && stoppedBackups.isEmpty && unstoppedBackups.isEmpty
         }
+
+        var takenOff: [String] { unmounted + ejected }
+
+        /// Only when no disk of this pass was ejected for good may the user be
+        /// told the disks come back on their own.
+        var allReconnect: Bool { !unmounted.isEmpty && ejected.isEmpty }
 
         mutating func record(_ stop: Ejector.BackupStop?) {
             guard let stop else { return }
@@ -83,14 +91,8 @@ enum GuardRunner {
         let title = meeting.title ?? "Meeting"
 
         for target in targets {
-            Log.write("trigger: \"\(title)\" in \(minutesAhead) min -> unmounting \(target.name) (\(target.path))")
-            let result = Ejector.eject(target, config: config, mode: .unmount, dryRun: dryRun)
-            if result.succeeded {
-                outcome.ejected.append(target.name)
-                if !dryRun { scheduleReconnect(result, after: meeting.endDate) }
-            } else {
-                outcome.failed.append((target.name, result.detail))
-            }
+            takeOff(target, because: "trigger: \"\(title)\" in \(minutesAhead) min", config: config,
+                    reconnectAfter: meeting.endDate, dryRun: dryRun, into: &outcome)
         }
         for destination in networkTargets {
             outcome.record(Ejector.stopBackup(to: destination, dryRun: dryRun))
@@ -100,10 +102,31 @@ enum GuardRunner {
         return outcome
     }
 
-    /// Remember to mount the disk again after the meeting. Needs the volume
-    /// UUID: that is what finds the disk again while it is not mounted.
-    static func scheduleReconnect(_ result: Ejector.Result, after date: Date) {
-        guard let uuid = result.volume.volumeUUID, Reconnector.isVolumeUUID(uuid) else { return }
+    /// Take one guarded volume off. With `reconnectAfter` it is unmounted and
+    /// mounted again after that moment, but only when its volume UUID can find
+    /// it again while it is not mounted. One without is ejected, as before
+    /// reconnecting existed: unmounted, it would never come back.
+    private static func takeOff(_ volume: AttachedVolume, because logLine: String, config: GuardConfig,
+                                reconnectAfter: Date?, dryRun: Bool = false, into outcome: inout Outcome) {
+        let uuid = volume.volumeUUID.flatMap { Reconnector.isVolumeUUID($0) ? $0 : nil }
+        let reconnect = reconnectAfter.flatMap { date in uuid.map { (uuid: $0, after: date) } }
+        let mode: Ejector.Mode = reconnect == nil ? .eject : .unmount
+        Log.write("\(logLine) -> \(mode == .eject ? "ejecting" : "unmounting") \(volume.name) (\(volume.path))")
+        let result = Ejector.eject(volume, config: config, mode: mode, dryRun: dryRun)
+        guard result.succeeded else {
+            outcome.failed.append((volume.name, result.detail))
+            return
+        }
+        guard let reconnect else {
+            outcome.ejected.append(volume.name)
+            return
+        }
+        outcome.unmounted.append(volume.name)
+        if !dryRun { scheduleReconnect(result, uuid: reconnect.uuid, after: reconnect.after) }
+    }
+
+    /// Remember to mount the disk again after the meeting.
+    private static func scheduleReconnect(_ result: Ejector.Result, uuid: String, after date: Date) {
         let entry = PendingReconnect(volumeUUID: uuid, name: result.volume.name, notBefore: date,
                                      tmDestinationID: result.volume.tmDestinationID,
                                      stoppedBackup: result.stoppedBackup)
@@ -124,8 +147,9 @@ enum GuardRunner {
     /// network destination, without consulting the calendar. Used by the
     /// "eject now" menu item and by the optional eject-on-sleep hook.
     ///
-    /// With `reconnectAfter`, disks are unmounted rather than ejected and
-    /// mounted again after that moment if they are still plugged in.
+    /// With `reconnectAfter`, disks with a volume UUID are unmounted rather
+    /// than ejected and mounted again after that moment if they are still
+    /// plugged in.
     @discardableResult
     static func ejectGuarded(reason: Reason, config: GuardConfig, notifyOnSuccess: Bool = true,
                              reconnectAfter: Date? = nil) -> Outcome {
@@ -138,22 +162,14 @@ enum GuardRunner {
             ConfigStore.mutate { $0.pendingReconnects.removeAll() }
         }
         for volume in guardedAttachedVolumes(config) {
-            let mode: Ejector.Mode = reconnectAfter == nil ? .eject : .unmount
-            Log.write("\(reason.logLine) -> \(mode == .eject ? "ejecting" : "unmounting") \(volume.name) (\(volume.path))")
-            let result = Ejector.eject(volume, config: config, mode: mode)
-            if result.succeeded {
-                outcome.ejected.append(volume.name)
-                if let reconnectAfter { scheduleReconnect(result, after: reconnectAfter) }
-            } else {
-                outcome.failed.append((volume.name, result.detail))
-            }
+            takeOff(volume, because: reason.logLine, config: config, reconnectAfter: reconnectAfter, into: &outcome)
         }
         for destination in Disks.guardedNetworkDestinations(config) {
             outcome.record(Ejector.stopBackup(to: destination))
         }
-        if notifyOnSuccess && !outcome.ejected.isEmpty {
-            Notify.post(title: ejectedTitle(outcome.ejected),
-                        body: safeToUnplug(reason, reconnects: reconnectAfter != nil))
+        if notifyOnSuccess && !outcome.takenOff.isEmpty {
+            Notify.post(title: ejectedTitle(outcome.takenOff),
+                        body: safeToUnplug(reason, reconnects: outcome.allReconnect))
         }
         for failure in outcome.failed {
             Notify.post(title: failedTitle(failure.name),
@@ -179,10 +195,10 @@ enum GuardRunner {
     }
 
     static func announce(_ outcome: Outcome, meetingTitle: String, minutesAhead: Int) {
-        if !outcome.ejected.isEmpty {
+        if !outcome.takenOff.isEmpty {
             let reason = Reason.meeting(title: meetingTitle, minutesAhead: minutesAhead)
-            Notify.post(title: ejectedTitle(outcome.ejected),
-                        body: safeToUnplug(reason, reconnects: true))
+            Notify.post(title: ejectedTitle(outcome.takenOff),
+                        body: safeToUnplug(reason, reconnects: outcome.allReconnect))
         }
         for failure in outcome.failed {
             Notify.post(title: failedTitle(failure.name),

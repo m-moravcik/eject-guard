@@ -24,6 +24,10 @@ final class GuardController {
     private(set) var ejectDate: Date?
     private(set) var calendarAccess: CalendarAccess = .pending
     private(set) var isBusy = false
+    /// Mounting a disk back, which can take a minute and a half for a locked
+    /// Time Machine volume. Kept apart from `isBusy`, which the menu bar and
+    /// the footer show as an eject; an eject waits for it all the same.
+    private var isReconnecting = false
     private(set) var lastFailure: String?
 
     private(set) var backup = BackupStatus()
@@ -270,7 +274,7 @@ final class GuardController {
     /// ⌘E has something to do: a guarded disk to eject, or a backup to a
     /// guarded share to stop.
     var canEjectNow: Bool {
-        !isBusy && (!guardedVolumes.isEmpty || !guardedNetworkBackups.isEmpty)
+        !isBusy && !isReconnecting && (!guardedVolumes.isEmpty || !guardedNetworkBackups.isEmpty)
     }
 
     // MARK: - Lifecycle
@@ -469,14 +473,14 @@ final class GuardController {
     /// Read the calendar here, where the store lives, and mount on the work
     /// queue. A meeting still running pushes the reconnect to its end.
     private func reconnect() {
-        guard !isBusy else { return }
+        guard !isBusy, !isReconnecting else { return }
         let busyUntil = calendarAccess == .granted ? Meetings.busyUntil(store, config: config) : nil
-        isBusy = true
+        isReconnecting = true
         work.async { [weak self] in
             GuardRunner.reconnectDue(busyUntil: busyUntil)
             Task { @MainActor in
                 guard let self else { return }
-                self.isBusy = false
+                self.isReconnecting = false
                 self.reloadDisks()
             }
         }
@@ -486,7 +490,7 @@ final class GuardController {
     /// only the ejecting to a background queue. Ejecting can block for well over
     /// a minute while a volume is busy, and it needs no EventKit at all.
     private func fire() {
-        guard !isBusy else { return }
+        guard !isBusy, !isReconnecting else { return }
         reloadConfig()
 
         // Re-validate rather than trusting the schedule: the meeting may have
@@ -625,7 +629,7 @@ final class GuardController {
     }
 
     func ejectNow() {
-        guard !isBusy else { return }
+        guard !isBusy, !isReconnecting else { return }
         reloadConfig()
         runEject(reason: .menu(), notifyOnSuccess: false)
     }
