@@ -17,8 +17,8 @@ func usage() -> Never {
       eject-guard --unhide         bring back every hidden disk
       eject-guard --unskip         undo the most recent skipped meeting
       eject-guard --unskip-all     undo every skipped meeting
-      eject-guard --run            run one pass now (ejects if a meeting is due)
-      eject-guard --dry-run        same, but never eject
+      eject-guard --run            run one pass now (unmounts before a meeting, reconnects after)
+      eject-guard --dry-run        same, but never unmount or mount
       eject-guard --eject-now      eject every guarded disk regardless of calendar
       eject-guard --calendars      list calendars and which ones are watched
       eject-guard --watch-cal NAME   watch this calendar (repeatable)
@@ -232,10 +232,16 @@ case "run", "dry-run":
     } else {
         print("no qualifying meeting within \(Int(config.leadMinutes)) min - nothing to do")
     }
-    if !outcome.ejected.isEmpty { print("ejected: \(outcome.ejected.joined(separator: ", "))") }
+    if !outcome.ejected.isEmpty {
+        print("unmounted until the meeting ends: \(outcome.ejected.joined(separator: ", "))")
+    }
     for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
+    for name in outcome.reconnect.reconnected { print("reconnected: \(name)") }
+    for name in outcome.reconnect.failed { print("FAILED to reconnect: \(name) - unplug it and plug it back in") }
     printBackupStops(outcome)
-    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
+    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty || !outcome.reconnect.failed.isEmpty {
+        exit(1)
+    }
 
 case "eject-now":
     let outcome = GuardRunner.ejectGuarded(reason: .manual(), config: config, notifyOnSuccess: false)
@@ -257,6 +263,10 @@ default:
     print("guard  : \(state), \(Int(config.leadMinutes)) min before a meeting")
     print("filter : events with at least \(config.minAttendees) attendees, not declined, not all day")
     print("cals   : \(config.watchAllCalendars ? "all" : "\(config.watchedCalendarIDs.count) selected")")
+    for entry in config.pendingReconnects {
+        let at = DateFormatter.localizedString(from: entry.notBefore, dateStyle: .none, timeStyle: .short)
+        print("later  : reconnect \(entry.name) after \(at) if it is still plugged in")
+    }
 
     let store = EKEventStore()
     if Meetings.requestAccess(store) {

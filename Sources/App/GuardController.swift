@@ -45,6 +45,8 @@ final class GuardController {
     private let work = DispatchQueue(label: "sk.moravcik.tmejectguard.work")
 
     private var ejectTimer: Timer?
+    /// Fires when the earliest disk unmounted for a meeting is due back.
+    private var reconnectTimer: Timer?
     private var heartbeat: Timer?
     /// Asks Time Machine what it is doing, but only while somewhere it could
     /// be writing to is reachable - see `updateBackupWatch`.
@@ -137,6 +139,12 @@ final class GuardController {
     }
 
     func isGuarded(_ disk: KnownDisk) -> Bool { config.watchedDiskIDs.contains(disk.id) }
+
+    /// The disk was unmounted for a meeting and is waiting to be mounted again.
+    func pendingReconnect(for disk: KnownDisk) -> PendingReconnect? {
+        guard let uuid = disk.volumeUUID else { return nil }
+        return config.pendingReconnects.first { $0.volumeUUID == uuid }
+    }
 
     func isBackingUp(_ disk: KnownDisk) -> Bool {
         if disk.isNetworkDestination { return backup.isBackingUp(toDestination: disk.tmDestinationID) }
@@ -237,10 +245,10 @@ final class GuardController {
         // UNUserNotificationCenter.current() traps when the executable has no
         // bundle identifier, which is exactly the preview harness.
         guard Bundle.main.bundleIdentifier != nil else { return }
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             let allowed = settings.authorizationStatus == .authorized
                 || settings.authorizationStatus == .provisional
-            Task { @MainActor [weak self] in self?.notificationsEnabled = allowed }
+            Task { @MainActor in self?.notificationsEnabled = allowed }
         }
     }
 
@@ -273,8 +281,8 @@ final class GuardController {
 
         // The permission callback arrives on an arbitrary queue; the store
         // itself is only ever touched back on the main actor.
-        Meetings.requestAccess(store) { granted in
-            Task { @MainActor [weak self] in
+        Meetings.requestAccess(store) { [weak self] granted in
+            Task { @MainActor in
                 guard let self else { return }
                 self.calendarAccess = granted ? .granted : .denied
                 if granted { self.calendars = self.store.calendars(for: .event) }
@@ -407,6 +415,9 @@ final class GuardController {
         reloadConfig()
         // After the reload, so it reads the settings that are now in force.
         updateBackupWatch()
+        // Independent of guarding and of calendar access: a disk the guard
+        // unmounted is put back even if either went away since.
+        scheduleReconnect()
         guard calendarAccess == .granted else { return }
 
         // Surface the next meeting even when the guard cannot act on it, so the
@@ -437,6 +448,40 @@ final class GuardController {
 
     @objc private func timerFired() { fire() }
 
+    private func scheduleReconnect() {
+        reconnectTimer?.invalidate()
+        reconnectTimer = nil
+        guard let earliest = config.pendingReconnects.map(\.notBefore).min() else { return }
+        if earliest <= Date() {
+            reconnect()
+            return
+        }
+        let timer = Timer(fireAt: earliest.addingTimeInterval(2), interval: 0,
+                          target: self, selector: #selector(reconnectTimerFired),
+                          userInfo: nil, repeats: false)
+        timer.tolerance = 10
+        RunLoop.main.add(timer, forMode: .common)
+        reconnectTimer = timer
+    }
+
+    @objc private func reconnectTimerFired() { reconnect() }
+
+    /// Read the calendar here, where the store lives, and mount on the work
+    /// queue. A meeting still running pushes the reconnect to its end.
+    private func reconnect() {
+        guard !isBusy else { return }
+        let busyUntil = calendarAccess == .granted ? Meetings.busyUntil(store, config: config) : nil
+        isBusy = true
+        work.async { [weak self] in
+            GuardRunner.reconnectDue(busyUntil: busyUntil)
+            Task { @MainActor in
+                guard let self else { return }
+                self.isBusy = false
+                self.reloadDisks()
+            }
+        }
+    }
+
     /// Decide here, on the main actor where the event store lives, then hand
     /// only the ejecting to a background queue. Ejecting can block for well over
     /// a minute while a volume is busy, and it needs no EventKit at all.
@@ -462,10 +507,10 @@ final class GuardController {
         let reason = GuardRunner.Reason.meeting(
             title: meeting.title ?? Loc.t("meeting.untitled", "Meeting"),
             minutesAhead: minutesAhead)
-        runEject(reason: reason, notifyOnSuccess: true)
+        runEject(reason: reason, notifyOnSuccess: true, reconnectAfter: meeting.endDate)
     }
 
-    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool) {
+    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool, reconnectAfter: Date? = nil) {
         let config = self.config
         // Check against the snapshot we already have; the eject itself rescans
         // on the work queue.
@@ -473,7 +518,8 @@ final class GuardController {
         isBusy = true
         work.async { [weak self] in
             let outcome = GuardRunner.ejectGuarded(
-                reason: reason, config: config, notifyOnSuccess: notifyOnSuccess)
+                reason: reason, config: config, notifyOnSuccess: notifyOnSuccess,
+                reconnectAfter: reconnectAfter)
             Task { @MainActor in
                 guard let self else { return }
                 self.isBusy = false

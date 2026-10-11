@@ -73,6 +73,9 @@ struct GuardConfig: Codable, Equatable {
     var launchAtLoginIntent: Bool?
     /// The welcome tour in the popover has been finished or skipped.
     var onboardingShown: Bool = false
+    /// Disks unmounted before a meeting, to mount again once it is over if
+    /// they are still plugged in.
+    var pendingReconnects: [PendingReconnect] = []
 
     static let maxSkippedEvents = 50
 
@@ -107,7 +110,7 @@ struct GuardConfig: Codable, Equatable {
         case watchAllCalendars, watchedCalendarIDs
         case leadMinutes, minAttendees, enabled, ignoreFreeEvents, ejectOnSleep
         case pausedUntil, pauseHours, skippedEventIDs, ejectAttempts, ejectRetryDelay
-        case launchAtLoginIntent, onboardingShown
+        case launchAtLoginIntent, onboardingShown, pendingReconnects
     }
 
     init(from decoder: Decoder) throws {
@@ -138,6 +141,7 @@ struct GuardConfig: Codable, Equatable {
         // so its owner is already using the app and should not be walked
         // through it after an update. Only a fresh install starts at false.
         onboardingShown = value(.onboardingShown, true)
+        pendingReconnects = value(.pendingReconnects, fallback.pendingReconnects)
     }
 }
 
