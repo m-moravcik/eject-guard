@@ -225,18 +225,20 @@ case "run", "dry-run":
             "calendar access denied - System Settings > Privacy & Security > Calendars\n".data(using: .utf8)!)
         exit(3)
     }
-    let outcome = GuardRunner.tick(store: store, dryRun: action == "dry-run")
+    let dryRun = action == "dry-run"
+    let outcome = GuardRunner.tick(store: store, dryRun: dryRun)
     if let meeting = outcome.meeting {
         let minutes = Int(meeting.startDate.timeIntervalSinceNow / 60)
         print("meeting: \"\(meeting.title ?? "?")\" in \(minutes) min")
     } else {
         print("no qualifying meeting within \(Int(config.leadMinutes)) min - nothing to do")
     }
-    if !outcome.ejected.isEmpty {
-        print("unmounted until the meeting ends: \(outcome.ejected.joined(separator: ", "))")
+    if !outcome.unmounted.isEmpty {
+        print("\(dryRun ? "would unmount" : "unmounted") until the meeting ends: \(outcome.unmounted.joined(separator: ", "))")
     }
+    for name in outcome.ejected { print("\(dryRun ? "would eject" : "ejected") (no volume UUID to find it again): \(name)") }
     for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
-    for name in outcome.reconnect.reconnected { print("reconnected: \(name)") }
+    for name in outcome.reconnect.reconnected { print("\(dryRun ? "would reconnect" : "reconnected"): \(name)") }
     for name in outcome.reconnect.failed { print("FAILED to reconnect: \(name) - unplug it and plug it back in") }
     printBackupStops(outcome)
     if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty || !outcome.reconnect.failed.isEmpty {
