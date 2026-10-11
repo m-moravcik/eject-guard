@@ -348,6 +348,12 @@ private struct DiskCard: View {
             return Loc.t("disk.backingUp", "Backing up…")
         }
         let watch = guarded ? Loc.t("disk.guarded", "Guarded") : Loc.t("disk.notGuarded", "Not guarded")
+        // Unmounted for a meeting: "Disconnected" would read as unplugged.
+        // Only a guarded disk is ever waiting, so "Guarded" goes unsaid and
+        // the time fits the row.
+        if !connected, let pending = controller.pendingReconnect(for: disk) {
+            return Loc.t("disk.reconnectsAt", "Reconnects at %@", Format.clock(pending.notBefore))
+        }
         return "\(watch) · \(connectionLabel)"
     }
 

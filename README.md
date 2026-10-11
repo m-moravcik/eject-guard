@@ -22,6 +22,9 @@ mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
 
 - **Ejects on time.** Five minutes before a real meeting (you choose the lead
   time), your guarded disks are ejected and you get a notification.
+- **Puts them back if you stayed.** Joined the call from your desk and never
+  touched the cable? The disk is reconnected when the meeting ends and Time
+  Machine carries on, so a meeting never costs you a backup.
 - **Knows a meeting from a calendar block.** Only timed events with other
   attendees count, so `Focus` or `Lunch` never trigger it. Declined and
   cancelled events are ignored.
@@ -77,9 +80,13 @@ on sleep.
   the network only to check for updates.
 - The log names your meetings, so it is readable by you alone.
 
-Good to know: like Finder, it ejects the whole physical disk, including its
-other volumes. An encrypted Time Machine disk has to be unplugged and plugged
-back in to use it again.
+Good to know: like Finder, it takes down the whole physical disk, including its
+other volumes. Before a meeting the disk is unmounted but stays attached, which
+is what lets it come back on its own; ⌘E and eject on sleep eject it fully. An
+encrypted Time Machine disk is locked again whenever it is unmounted, and only
+Time Machine holds its key, so the app asks Time Machine to start a backup to
+bring it back. If that does not work, you get a notification to plug it in
+again.
 
 ## Command line
 

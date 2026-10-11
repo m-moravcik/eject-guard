@@ -3,55 +3,78 @@
 import Foundation
 
 enum Ejector {
+    /// How far to take the disk.
+    enum Mode {
+        /// Unmount and power the device down, as Finder does. The user is
+        /// about to unplug it; getting it back means replugging.
+        case eject
+        /// Unmount every volume but leave the device attached, so a disk that
+        /// is still plugged in after the meeting can be mounted again. Just as
+        /// safe to unplug: nothing is mounted and every write is flushed.
+        case unmount
+    }
+
     struct Result {
         var volume: AttachedVolume
         var succeeded: Bool
         var detail: String
+        /// A Time Machine backup to this disk was stopped on the way.
+        var stoppedBackup = false
     }
 
-    static func eject(_ volume: AttachedVolume, config: GuardConfig, dryRun: Bool = false) -> Result {
+    static func eject(_ volume: AttachedVolume, config: GuardConfig,
+                      mode: Mode = .eject, dryRun: Bool = false) -> Result {
         guard Disks.isMountedVolume(volume.path) else {
             return Result(volume: volume, succeeded: false, detail: "not a mounted volume")
         }
+        let verb = mode == .eject ? "eject" : "unmount"
         if dryRun {
-            Log.write("dry-run: would stop backup and eject \(volume.path)")
+            Log.write("dry-run: would stop backup and \(verb) \(volume.path)")
             return Result(volume: volume, succeeded: true, detail: "dry run")
         }
 
-        stopBackupIfTargeting(volume)
+        let stoppedBackup = stopBackupIfTargeting(volume)
 
         // Resolve before unmounting: once the volume is gone there is nothing
         // left to ask about. Ejecting the whole disk also unmounts every volume
         // on it, which is what Finder's eject button does.
         let target = DeviceResolver.ejectTarget(forMountPoint: volume.path)
+        let arguments: [String]
+        switch mode {
+        case .eject: arguments = ["eject", target]
+        // `unmountDisk` wants a device; the mount point fallback gets the
+        // volume-level verb.
+        case .unmount: arguments = [target.hasPrefix("/") ? "unmount" : "unmountDisk", target]
+        }
 
         var lastOutput = ""
         for attempt in 1...max(1, config.ejectAttempts) {
-            let result = Shell.run("/usr/sbin/diskutil", ["eject", target], timeout: 60)
+            let result = Shell.run("/usr/sbin/diskutil", arguments, timeout: 60)
             if result.status == 0 {
-                Log.write("ejected \(volume.name) via \(target) on attempt \(attempt)")
-                return Result(volume: volume, succeeded: true, detail: "ok")
+                Log.write("\(verb)ed \(volume.name) via \(target) on attempt \(attempt)")
+                return Result(volume: volume, succeeded: true, detail: "ok", stoppedBackup: stoppedBackup)
             }
             lastOutput = result.output
-            Log.write("eject \(volume.name) attempt \(attempt)/\(config.ejectAttempts) failed: \(result.output)")
+            Log.write("\(verb) \(volume.name) attempt \(attempt)/\(config.ejectAttempts) failed: \(result.output)")
             if attempt < config.ejectAttempts {
                 Thread.sleep(forTimeInterval: config.ejectRetryDelay)
             }
         }
 
         let blockers = blockingProcesses(at: volume.path)
-        Log.write("EJECT FAILED \(volume.name): \(lastOutput) | holding: \(blockers.isEmpty ? "unknown" : blockers)")
-        return Result(volume: volume, succeeded: false, detail: blockers)
+        Log.write("\(verb.uppercased()) FAILED \(volume.name): \(lastOutput) | holding: \(blockers.isEmpty ? "unknown" : blockers)")
+        return Result(volume: volume, succeeded: false, detail: blockers, stoppedBackup: stoppedBackup)
     }
 
     /// Stop a backup that is writing to this disk. A backup to another
     /// destination is left running.
-    private static func stopBackupIfTargeting(_ volume: AttachedVolume) {
+    private static func stopBackupIfTargeting(_ volume: AttachedVolume) -> Bool {
         let status = BackupStatus.current()
-        guard status.isBackingUp(to: volume) else { return }
+        guard status.isBackingUp(to: volume) else { return false }
         // Measured at ~11 s on a real backup, so the default budget is too tight.
         let stop = Shell.run("/usr/bin/tmutil", ["stopbackup"], timeout: 120)
         Log.write("tmutil stopbackup -> status \(stop.status)\(stop.output.isEmpty ? "" : ": \(stop.output)")")
+        return true
     }
 
     /// How long to wait for a stopped network backup to actually end. About
