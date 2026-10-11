@@ -28,8 +28,8 @@ When the timer fires, three questions are re-asked, stopping at the first "no":
 3. **Is the guard active?** Not disabled, not paused.
 
 If all three hold, it stops a Time Machine backup that is writing to that disk,
-unmounts it with retries while Spotlight or `backupd` still holds it, and posts a
-notification.
+unmounts it with retries while Spotlight or `backupd` still holds it, and posts
+a notification.
 
 ## Reconnecting after a meeting
 
@@ -306,14 +306,14 @@ is banned.
 - Disks are identified by **volume UUID**, not by name, so another volume that
   happens to share a name is not touched.
 - A Time Machine backup is stopped only when it is writing to the disk being
-  ejected, or to a network destination the user ticked. A backup to a
-  different destination keeps running.
+  unmounted or ejected, or to a network destination the user ticked. A
+  backup to a different destination keeps running.
 - A network destination is never ejected, unmounted or linked to a volume.
-- A failed eject is reported with the processes holding the volume, so you know
-  not to pull the cable.
-- The eject targets the **whole physical disk**, not just the guarded volume,
-  which is what Finder's eject does. Other volumes on the same disk are
-  unmounted too; if one of them is busy the eject fails and names the process.
+- A failed unmount or eject is reported with the processes holding the
+  volume, so you know not to pull the cable.
+- Both target the **whole physical disk**, not just the guarded volume, which
+  is what Finder's eject does. Other volumes on the same disk are unmounted
+  too; if one of them is busy it fails and names the process.
 - A disk unmounted for a meeting is mounted again only if it is still attached
   when the meeting ends, found by its volume UUID. When diskutil confirms an
   external whole disk, `diskutil mountDisk` brings back every volume on it;
