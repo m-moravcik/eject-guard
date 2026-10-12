@@ -133,6 +133,51 @@ final class ReconnectTests: XCTestCase {
         XCTAssertFalse(GuardRunner.Outcome().allReconnect)
     }
 
+    func testTheKeychainPassphraseLosesItsTrailingNUL() {
+        // macOS stores "Encrypted Volume Password" with a NUL terminator;
+        // diskutil rejects the passphrase with it.
+        XCTAssertEqual(Reconnector.stripTrailingNULs(Data("secret\0".utf8)), Data("secret".utf8))
+        XCTAssertEqual(Reconnector.stripTrailingNULs(Data("secret".utf8)), Data("secret".utf8))
+        XCTAssertNil(Reconnector.stripTrailingNULs(Data([0, 0])))
+        XCTAssertNil(Reconnector.stripTrailingNULs(Data()))
+    }
+
+    // MARK: - Volumes sharing a drive
+
+    private func volume(_ name: String) -> AttachedVolume {
+        AttachedVolume(path: "/Volumes/\(name)", name: name, volumeUUID: UUID().uuidString)
+    }
+
+    func testTwoGuardedVolumesOnOneDriveAreTakenOffTogether() {
+        // Seen on 2026-10-12: "Sync" and "Time Machine WD" are two APFS
+        // volumes on one USB drive. Taken one at a time, unmounting Sync's
+        // disk pulled Time Machine WD from under a running backup, and the
+        // second pass then found nothing mounted and reported a failure.
+        let sync = volume("Sync"), wd = volume("Time Machine WD"), stick = volume("Stick")
+        let disks = [sync.path: "disk9", wd.path: "disk9", stick.path: "disk12"]
+        let groups = Ejector.group([sync, stick, wd]) { disks[$0.path]! }
+        XCTAssertEqual(groups, [
+            Ejector.Group(target: "disk9", volumes: [sync, wd]),
+            Ejector.Group(target: "disk12", volumes: [stick]),
+        ])
+    }
+
+    func testTheProcessHoldingTheDiskIsNamedFromDiskutil() {
+        // Verbatim from 2026-10-12, where lsof timed out and the notification
+        // said "an unknown process".
+        let output = "Unmount of disk8 failed: at least one volume could not be unmounted "
+            + "Unmount was dissented by PID 85940 (/usr/bin/tee) Dissenter parent PPID 85938 (/bin/bash)"
+        XCTAssertEqual(Ejector.dissenter(in: output), "tee")
+        XCTAssertNil(Ejector.dissenter(in: "Unmount of disk8 failed: busy"))
+    }
+
+    func testVolumesWithoutAProvenDiskStayApart() {
+        // The fallback target is the mount point, which never matches another.
+        let a = volume("A"), b = volume("B")
+        let groups = Ejector.group([a, b]) { $0.path }
+        XCTAssertEqual(groups.map(\.volumes), [[a], [b]])
+    }
+
     // MARK: - Persistence
 
     func testAPendingReconnectSurvivesARestart() throws {

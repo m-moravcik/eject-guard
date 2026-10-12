@@ -33,7 +33,8 @@ enum Shell {
         _ launchPath: String,
         _ arguments: [String],
         timeout: TimeInterval = 20,
-        killGrace: TimeInterval = 5
+        killGrace: TimeInterval = 5,
+        input: Data? = nil
     ) -> (status: Int32, output: String) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: launchPath)
@@ -41,11 +42,22 @@ enum Shell {
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = pipe
+        // Secrets go in here, never in the arguments, which any process can read.
+        let inputPipe = input.map { _ in Pipe() }
+        if let inputPipe { task.standardInput = inputPipe }
 
         let finished = DispatchSemaphore(value: 0)
         task.terminationHandler = { _ in finished.signal() }
 
         do { try task.run() } catch { return (-1, "\(error)") }
+
+        if let input, let writer = inputPipe?.fileHandleForWriting {
+            // A child that exits without reading must cost an error, not the
+            // SIGPIPE that would take the whole app down.
+            _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
+            try? writer.write(contentsOf: input)
+            try? writer.close()
+        }
 
         // Drain the pipe on another thread: a child that fills the buffer would
         // block forever if nobody is reading while we wait.

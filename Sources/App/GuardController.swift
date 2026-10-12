@@ -55,6 +55,10 @@ final class GuardController {
     /// Asks Time Machine what it is doing, but only while somewhere it could
     /// be writing to is reachable - see `updateBackupWatch`.
     private var backupTimer: Timer?
+    /// A status read is waiting on `work`. The queue is serial, so while a
+    /// pass spends minutes retrying an unmount every poll would otherwise
+    /// queue its own read, and they would all run back to back afterwards.
+    private var isBackupRefreshQueued = false
     /// Advances `backupPhase`. Pure bookkeeping, no process is spawned.
     private var breatheTimer: Timer?
     private var pendingReschedule: DispatchWorkItem?
@@ -171,10 +175,13 @@ final class GuardController {
     /// Time Machine destination is reachable, which is the only time the
     /// answer can be anything but "no".
     func refreshBackupStatus() {
+        guard !isBackupRefreshQueued else { return }
+        isBackupRefreshQueued = true
         work.async { [weak self] in
             let status = BackupStatus.current()
             Task { @MainActor in
                 guard let self else { return }
+                self.isBackupRefreshQueued = false
                 self.backup = status
                 // Both the poll interval and the breathing depend on the
                 // answer, so every answer re-evaluates them. The call is cheap:
