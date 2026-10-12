@@ -13,11 +13,16 @@
 //   mountDisk` then exits 0 and prints "mounted successfully" while the volume
 //   stays locked and unmounted. The exit status proves nothing; only reading
 //   the mount point back does.
-// - Unlocking needs the passphrase. For a Time Machine disk that lives in the
-//   System keychain, out of reach of a user process, so the only party that
-//   can bring it back is Time Machine itself, asked to start a backup.
+// - Unlocking needs the passphrase. Measured on a real encrypted Time Machine
+//   disk, 2026-10-12: Time Machine does not unlock it. `tmutil startbackup`
+//   to the locked destination fails with BACKUP_FAILED_TARGETVOL_NOT_FOUND.
+//   What unlocks it on plug-in is the login keychain item macOS saved when
+//   the user ticked "Remember this password": a generic password, service and
+//   account both the volume UUID, stored with a trailing NUL. Read through
+//   the Security framework, that unlocks it with one keychain approval.
 
 import Foundation
+import Security
 
 /// A disk the guard unmounted before a meeting and will try to mount again.
 /// Persisted, so a restart or a sleep through the meeting does not lose it.
@@ -114,13 +119,21 @@ enum Reconnector {
             mount(pending, wholeDisk: wholeDisk)
         }
 
+        // A locked encrypted volume stays down after a mount. The user's
+        // keychain holds its passphrase if macOS was told to remember it.
+        if case .unmounted(_, locked: true) = currentState(of: pending.volumeUUID) {
+            unlockFromKeychain(pending)
+        }
+
         if currentState(of: pending.volumeUUID) == .mounted {
             Log.write("reconnected \(pending.name)")
             let started = pending.stoppedBackup && startBackup(pending)
             return .remounted(backupStarted: started)
         }
 
-        // Most likely a locked encrypted volume. Time Machine holds the key.
+        // Last resort, for a passphrase only Time Machine has (the System
+        // keychain). Not seen to work for a disk unlocked from the login
+        // keychain, but costs nothing beyond the wait.
         if pending.tmDestinationID != nil, startBackup(pending) {
             let deadline = Date().addingTimeInterval(timeMachineMountBudget)
             while Date() < deadline {
@@ -155,6 +168,47 @@ enum Reconnector {
             result = Shell.run("/usr/sbin/diskutil", ["mount", pending.volumeUUID], timeout: 60)
         }
         Log.write("mount \(pending.name) -> status \(result.status)\(result.output.isEmpty ? "" : ": \(result.output)")")
+    }
+
+    /// Unlock and mount an encrypted APFS volume with the passphrase macOS
+    /// saved in the login keychain. The passphrase goes to diskutil on stdin
+    /// and is never logged. The first read asks the user to allow it.
+    private static func unlockFromKeychain(_ pending: PendingReconnect) {
+        guard var passphrase = keychainPassphrase(volumeUUID: pending.volumeUUID) else {
+            Log.write("unlock \(pending.name): no passphrase in the keychain")
+            return
+        }
+        defer { passphrase.resetBytes(in: 0..<passphrase.count) }
+        let result = Shell.run("/usr/sbin/diskutil",
+                               ["apfs", "unlockVolume", pending.volumeUUID, "-stdinpassphrase"],
+                               timeout: 60, input: passphrase)
+        Log.write("unlock \(pending.name) -> status \(result.status)\(result.output.isEmpty ? "" : ": \(result.output)")")
+    }
+
+    /// The "Encrypted Volume Password" item macOS keeps for a volume, without
+    /// the trailing NUL it is stored with.
+    static func keychainPassphrase(volumeUUID: String) -> Data? {
+        guard isVolumeUUID(volumeUUID) else { return nil }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: volumeUUID,
+            kSecAttrAccount as String: volumeUUID,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else {
+            if status != errSecItemNotFound { Log.write("keychain read for \(volumeUUID) -> status \(status)") }
+            return nil
+        }
+        return stripTrailingNULs(data)
+    }
+
+    static func stripTrailingNULs(_ data: Data) -> Data? {
+        var end = data.endIndex
+        while end > data.startIndex, data[data.index(before: end)] == 0 { end = data.index(before: end) }
+        return end > data.startIndex ? Data(data[data.startIndex..<end]) : nil
     }
 
     private static func startBackup(_ pending: PendingReconnect) -> Bool {

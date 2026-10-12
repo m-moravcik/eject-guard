@@ -90,8 +90,8 @@ enum GuardRunner {
         let minutesAhead = Int((meeting.startDate.timeIntervalSince(Date()) / 60).rounded())
         let title = meeting.title ?? "Meeting"
 
-        for target in targets {
-            takeOff(target, because: "trigger: \"\(title)\" in \(minutesAhead) min", config: config,
+        for group in Ejector.groups(targets) {
+            takeOff(group, because: "trigger: \"\(title)\" in \(minutesAhead) min", config: config,
                     reconnectAfter: meeting.endDate, dryRun: dryRun, into: &outcome)
         }
         for destination in networkTargets {
@@ -102,27 +102,30 @@ enum GuardRunner {
         return outcome
     }
 
-    /// Take one guarded volume off. With `reconnectAfter` it is unmounted and
-    /// mounted again after that moment, but only when its volume UUID can find
-    /// it again while it is not mounted. One without is ejected, as before
-    /// reconnecting existed: unmounted, it would never come back.
-    private static func takeOff(_ volume: AttachedVolume, because logLine: String, config: GuardConfig,
+    /// Take the guarded volumes of one disk off. With `reconnectAfter` they
+    /// are unmounted and mounted again after that moment, but only when every
+    /// one has a volume UUID to find it by while it is not mounted. Otherwise
+    /// the disk is ejected, as before reconnecting existed: unmounted, a
+    /// volume without one would never come back.
+    private static func takeOff(_ group: Ejector.Group, because logLine: String, config: GuardConfig,
                                 reconnectAfter: Date?, dryRun: Bool = false, into outcome: inout Outcome) {
-        let uuid = volume.volumeUUID.flatMap { Reconnector.isVolumeUUID($0) ? $0 : nil }
-        let reconnect = reconnectAfter.flatMap { date in uuid.map { (uuid: $0, after: date) } }
+        let findable = group.volumes.allSatisfy { $0.volumeUUID.map(Reconnector.isVolumeUUID) == true }
+        let reconnect = findable ? reconnectAfter : nil
         let mode: Ejector.Mode = reconnect == nil ? .eject : .unmount
-        Log.write("\(logLine) -> \(mode == .eject ? "ejecting" : "unmounting") \(volume.name) (\(volume.path))")
-        let result = Ejector.eject(volume, config: config, mode: mode, dryRun: dryRun)
-        guard result.succeeded else {
-            outcome.failed.append((volume.name, result.detail))
-            return
+        let volumes = group.volumes.map { "\($0.name) (\($0.path))" }.joined(separator: ", ")
+        Log.write("\(logLine) -> \(mode == .eject ? "ejecting" : "unmounting") \(volumes)")
+        for result in Ejector.eject(group, config: config, mode: mode, dryRun: dryRun) {
+            guard result.succeeded else {
+                outcome.failed.append((result.volume.name, result.detail))
+                continue
+            }
+            guard let reconnect, let uuid = result.volume.volumeUUID else {
+                outcome.ejected.append(result.volume.name)
+                continue
+            }
+            outcome.unmounted.append(result.volume.name)
+            if !dryRun { scheduleReconnect(result, uuid: uuid, after: reconnect) }
         }
-        guard let reconnect else {
-            outcome.ejected.append(volume.name)
-            return
-        }
-        outcome.unmounted.append(volume.name)
-        if !dryRun { scheduleReconnect(result, uuid: reconnect.uuid, after: reconnect.after) }
     }
 
     /// Remember to mount the disk again after the meeting.
@@ -161,8 +164,8 @@ enum GuardRunner {
             // "still plugged in" and mounted again.
             ConfigStore.mutate { $0.pendingReconnects.removeAll() }
         }
-        for volume in guardedAttachedVolumes(config) {
-            takeOff(volume, because: reason.logLine, config: config, reconnectAfter: reconnectAfter, into: &outcome)
+        for group in Ejector.groups(guardedAttachedVolumes(config)) {
+            takeOff(group, because: reason.logLine, config: config, reconnectAfter: reconnectAfter, into: &outcome)
         }
         for destination in Disks.guardedNetworkDestinations(config) {
             outcome.record(Ejector.stopBackup(to: destination))
