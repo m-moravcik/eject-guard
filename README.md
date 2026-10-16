@@ -109,6 +109,11 @@ settings: they move to the new folder on first launch.
 
 How it works inside, testing, and releasing: [DEVELOPMENT.md](DEVELOPMENT.md).
 
+## Support
+
+Eject Guard is free and open source. If it ever saved a backup for you,
+you can [buy me a coffee](https://buymeacoffee.com/pexelo).
+
 ## License
 
 [MIT](LICENSE)
