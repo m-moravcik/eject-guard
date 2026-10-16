@@ -76,4 +76,36 @@ enum Meetings {
             .filter { $0.startDate > now && isRealMeeting($0, config: config) }
             .min { $0.startDate < $1.startDate }
     }
+
+    /// When the meetings running now or starting within the lead time are
+    /// over, or nil when there are none. A disk is not mounted again in the
+    /// gap between back-to-back meetings, when the user may be walking off.
+    static func busyUntil(_ store: EKEventStore, at now: Date = Date(), config: GuardConfig) -> Date? {
+        let calendars = watchedCalendars(store, config: config)
+        if let calendars, calendars.isEmpty { return nil }
+        // Start a day back so a long meeting that began this morning is seen.
+        let predicate = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-24 * 3600),
+            end: now.addingTimeInterval(config.leadMinutes * 60), calendars: calendars)
+        return busyUntil(store.events(matching: predicate)
+            .filter { isRealMeeting($0, config: config) }
+            .map { (start: $0.startDate, end: $0.endDate) },
+            at: now, leadMinutes: config.leadMinutes)
+    }
+
+    /// The pure half of `busyUntil`, over plain intervals. Follows a chain of
+    /// meetings that start before the previous one ends, plus the lead time.
+    static func busyUntil(_ meetings: [(start: Date, end: Date)], at now: Date,
+                          leadMinutes: Double) -> Date? {
+        let lead = leadMinutes * 60
+        var until: Date?
+        var horizon = now
+        for meeting in meetings.sorted(by: { $0.start < $1.start }) {
+            guard meeting.end > now, meeting.start <= horizon.addingTimeInterval(lead) else { continue }
+            let end = max(until ?? meeting.end, meeting.end)
+            until = end
+            horizon = end
+        }
+        return until
+    }
 }

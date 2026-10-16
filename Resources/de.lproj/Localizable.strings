@@ -33,6 +33,7 @@
 "disk.hideHint" = "Später in den Einstellungen wiederherstellen";
 "disk.network" = "Netzwerk";
 "disk.notGuarded" = "Nicht überwacht";
+"disk.reconnectsAt" = "Ab %@ wieder verbunden";
 "disk.sdCard" = "SD-Karte";
 "disk.timeMachineBadge" = "Ein Time-Machine-Backupziel";
 "disks.empty" = "Noch keine externen Laufwerke gesehen.\nSchließe eines an, dann erscheint es hier.";
@@ -66,6 +67,7 @@
 "notify.backupStopped" = "Backup auf %@ gestoppt";
 "notify.backupStoppedDetail" = "%@. Time Machine macht beim nächsten Backup weiter.";
 "notify.couldNotEject" = "%@ konnte nicht ausgeworfen werden";
+"notify.couldNotReconnect" = "%@ konnte nicht wieder verbunden werden";
 "notify.couldNotStopBackup" = "Das Backup auf %@ konnte nicht gestoppt werden";
 "notify.doNotUnplug" = "%@ Nicht abziehen.";
 "notify.ejected" = "%@ ausgeworfen";
@@ -74,7 +76,12 @@
 "notify.reason.meeting" = "%1$@ in %2$d Min.";
 "notify.reason.menu" = "Über das Menü ausgeworfen";
 "notify.reason.sleep" = "Der Mac wechselt in den Ruhezustand";
+"notify.reconnected" = "%@ wieder verbunden";
+"notify.reconnectedBackup" = "Es blieb während der Besprechung angeschlossen. Time Machine sichert wieder.";
+"notify.reconnectedDetail" = "Es blieb während der Besprechung angeschlossen.";
+"notify.replug" = "Ziehe es ab und schließe es erneut an.";
 "notify.safeToUnplug" = "%@. Kann abgezogen werden.";
+"notify.safeToUnplugReconnects" = "%@. Kann abgezogen werden, oder lass es angeschlossen, dann wird es nach der Besprechung wieder verbunden.";
 "notify.stayOnNetwork" = "Bleib in diesem Netzwerk, bis es fertig ist.";
 "notify.unknownProcess" = "ein unbekannter Prozess";
 "onboarding.back" = "Zurück";

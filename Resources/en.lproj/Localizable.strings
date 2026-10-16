@@ -33,6 +33,7 @@
 "disk.hideHint" = "Restore it later in Settings";
 "disk.network" = "Network";
 "disk.notGuarded" = "Not guarded";
+"disk.reconnectsAt" = "Reconnects at %@";
 "disk.sdCard" = "SD card";
 "disk.timeMachineBadge" = "A Time Machine backup destination";
 "disks.empty" = "No external disks seen yet.\nPlug one in and it shows up here.";
@@ -66,6 +67,7 @@
 "notify.backupStopped" = "Backup to %@ stopped";
 "notify.backupStoppedDetail" = "%@. Time Machine carries on at its next backup.";
 "notify.couldNotEject" = "Could not eject %@";
+"notify.couldNotReconnect" = "Could not reconnect %@";
 "notify.couldNotStopBackup" = "Could not stop the backup to %@";
 "notify.doNotUnplug" = "%@ Do not unplug it.";
 "notify.ejected" = "%@ ejected";
@@ -74,7 +76,12 @@
 "notify.reason.meeting" = "%1$@ in %2$d min";
 "notify.reason.menu" = "Ejected from the menu";
 "notify.reason.sleep" = "The Mac is going to sleep";
+"notify.reconnected" = "%@ reconnected";
+"notify.reconnectedBackup" = "It stayed plugged in through the meeting. Time Machine is backing up again.";
+"notify.reconnectedDetail" = "It stayed plugged in through the meeting.";
+"notify.replug" = "Unplug it and plug it back in.";
 "notify.safeToUnplug" = "%@. Safe to unplug.";
+"notify.safeToUnplugReconnects" = "%@. Safe to unplug, or leave it in and it reconnects after the meeting.";
 "notify.stayOnNetwork" = "Stay on this network until it finishes.";
 "notify.unknownProcess" = "an unknown process";
 "onboarding.back" = "Back";
