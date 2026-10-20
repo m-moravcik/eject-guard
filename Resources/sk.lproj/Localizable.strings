@@ -135,3 +135,5 @@
 "status.guarding" = "Stráži %@";
 "status.idle" = "Nie je pripojený strážený disk";
 "status.off" = "Stráženie je vypnuté";
+"status.reconnecting" = "%@ sa znova pripája";
+"status.waitingToReconnect" = "%1$@ sa znova pripojí o %2$@";

@@ -15,6 +15,28 @@ import AppKit
 /// What the icon is saying right now.
 enum StatusIconState: CaseIterable, Sendable {
     case ejecting, backingUp, armed, idle, off
+    /// Mounting a disk back after the meeting it was unmounted for.
+    case reconnecting
+    /// A disk unmounted for a meeting, to be mounted again once it is over.
+    case waitingToReconnect
+
+    /// The state for what the app is doing. First match wins.
+    ///
+    /// A backup ranks above a reconnect: a locked Time Machine disk is
+    /// brought back by starting a backup to it, and the icon then says the
+    /// more specific thing. A reconnect ranks above off, since it runs
+    /// whether or not guarding is on. Something else still guarded and
+    /// plugged in ranks above a disk waiting to come back.
+    static func current(ejecting: Bool, backingUp: Bool, reconnecting: Bool, active: Bool,
+                        guardedTargets: Bool, waitingToReconnect: Bool) -> StatusIconState {
+        if ejecting { return .ejecting }
+        if backingUp { return .backingUp }
+        if reconnecting { return .reconnecting }
+        if !active { return .off }
+        if guardedTargets { return .armed }
+        if waitingToReconnect { return .waitingToReconnect }
+        return .idle
+    }
 }
 
 enum LiftIcon {
@@ -132,7 +154,13 @@ enum LiftIcon {
     static func pose(_ state: StatusIconState, percent: Double? = nil, phase: Int = 0,
                      guarding: Bool = false) -> Pose {
         switch state {
-        case .idle:
+        // The two reconnect states have no art of their own. The eject
+        // animation lands on the empty bar, and until the disk is mounted
+        // again nothing guarded is plugged in, so they keep that pose. What
+        // tells them apart is the label and the popover row ("Reconnects at
+        // 14:50"). Claiming armed before the mount succeeds would promise
+        // the disk is back, and the eject pose would read as one more eject.
+        case .idle, .waitingToReconnect, .reconnecting:
             return Pose()
         case .armed:
             return Pose(solid: 1, fillTo: 1)

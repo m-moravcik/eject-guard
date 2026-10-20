@@ -180,6 +180,8 @@ func renderIconSheet() {
         Sample(title: "armed", state: .armed),
         Sample(title: "off", state: .off, guarding: false),
         Sample(title: "ejecting", state: .ejecting),
+        Sample(title: "waiting", state: .waitingToReconnect, guarding: false),
+        Sample(title: "reconnect", state: .reconnecting, guarding: false),
         Sample(title: "0%", state: .backingUp, percent: 0, phase: full),
         Sample(title: "35%", state: .backingUp, percent: 0.35, phase: full),
         Sample(title: "78%", state: .backingUp, percent: 0.78, phase: full),
@@ -190,9 +192,10 @@ func renderIconSheet() {
     let sweep = (0..<GuardController.breatheSteps).map { phase in
         Sample(title: "…\(phase)", state: .backingUp, percent: nil, phase: phase)
     }
-    // The eject animation every tenth of a second, landing on idle.
+    // The eject animation every tenth of a second, landing where a disk
+    // unmounted for a meeting leaves it: waiting to reconnect.
     let eject = (0...Int(LiftIcon.duration * 10)).map { tenth in
-        Sample(title: String(format: "%.1fs", Double(tenth) / 10), state: .idle,
+        Sample(title: String(format: "%.1fs", Double(tenth) / 10), state: .waitingToReconnect,
                guarding: false, ejectPhase: Double(tenth) / 10)
     }
     let rows = [states, sweep, Array(eject.prefix(11)), Array(eject.dropFirst(11))]
@@ -229,22 +232,38 @@ func renderIconSheet() {
     .padding(12)
     .background(Color(white: 0.5))
 
-    let renderer = ImageRenderer(content: sheet)
-    // The icon is 16 points wide; 6x is what makes a 2 point bar reviewable.
-    renderer.scale = 6
     let path = CommandLine.arguments.count > 1
         ? CommandLine.arguments[1]
         : NSTemporaryDirectory() + "status-icons.png"
-    guard let image = renderer.nsImage,
-          let tiff = image.tiffRepresentation,
-          let bitmap = NSBitmapImageRep(data: tiff),
-          let png = bitmap.representation(using: .png, properties: [:]),
-          (try? png.write(to: URL(fileURLWithPath: path))) != nil
-    else {
-        FileHandle.standardError.write("icon render failed\n".data(using: .utf8)!)
-        exit(1)
+    // The icon is 16 points wide; 6x is what makes a 2 point bar reviewable.
+    // The 1x and 2x sheets are the pixels a menu bar really gets on each
+    // kind of screen, blown up without smoothing so each one can be counted.
+    for (scale, enlarge, suffix) in [(6.0, 1, ""), (1.0, 6, "-1x"), (2.0, 3, "-2x")] {
+        let renderer = ImageRenderer(content: sheet)
+        renderer.scale = scale
+        guard let cgImage = renderer.cgImage,
+              let png = enlarged(cgImage, by: enlarge),
+              (try? png.write(to: URL(fileURLWithPath: path.replacingOccurrences(
+                  of: ".png", with: "\(suffix).png")))) != nil
+        else {
+            FileHandle.standardError.write("icon render failed\n".data(using: .utf8)!)
+            exit(1)
+        }
+        print("wrote \(path.replacingOccurrences(of: ".png", with: "\(suffix).png"))")
     }
-    print("wrote \(path)")
+}
+
+/// A PNG of `image` scaled up by a whole factor with no interpolation.
+func enlarged(_ image: CGImage, by factor: Int) -> Data? {
+    let width = image.width * factor, height = image.height * factor
+    guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    context.interpolationQuality = .none
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    guard let scaled = context.makeImage() else { return nil }
+    return NSBitmapImageRep(cgImage: scaled).representation(using: .png, properties: [:])
 }
 
 

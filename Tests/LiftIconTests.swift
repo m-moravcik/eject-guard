@@ -89,6 +89,8 @@ final class LiftIconTests: XCTestCase {
         return render(image)
     }
 
+    /// One entry per distinct pose. The two reconnect states draw the idle
+    /// pose on purpose, see `testReconnectStatesKeepTheEmptyBar`.
     private static let resting: [(String, LiftIcon.Pose)] = [
         ("idle", LiftIcon.pose(.idle)),
         ("armed", LiftIcon.pose(.armed)),
@@ -313,5 +315,43 @@ final class LiftIconTests: XCTestCase {
         XCTAssertEqual(landing.solid, 0)
         XCTAssertEqual(landing.track, .line)
         XCTAssertEqual(landing.fillTo, 0)
+    }
+
+    // MARK: - The 1.5 reconnect states
+
+    /// No art of their own: after an unmount for a meeting the icon stays on
+    /// the empty bar the eject animation landed on, until the disk is back.
+    func testReconnectStatesKeepTheEmptyBar() {
+        XCTAssertEqual(LiftIcon.pose(.waitingToReconnect), LiftIcon.pose(.idle))
+        XCTAssertEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.idle))
+        XCTAssertNotEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.armed),
+                          "armed before the mount succeeds would promise the disk is back")
+        XCTAssertNotEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.ejecting),
+                          "and the eject pose would read as one more eject")
+    }
+
+    func testTheStateFollowsWhatTheAppIsDoing() {
+        func state(ejecting: Bool = false, backingUp: Bool = false, reconnecting: Bool = false,
+                   active: Bool = true, guarded: Bool = false, waiting: Bool = false) -> StatusIconState {
+            StatusIconState.current(ejecting: ejecting, backingUp: backingUp, reconnecting: reconnecting,
+                                    active: active, guardedTargets: guarded, waitingToReconnect: waiting)
+        }
+        XCTAssertEqual(state(), .idle)
+        XCTAssertEqual(state(guarded: true), .armed)
+        XCTAssertEqual(state(waiting: true), .waitingToReconnect)
+        XCTAssertEqual(state(guarded: true, waiting: true), .armed, "another guarded disk is still there")
+        XCTAssertEqual(state(active: false, waiting: true), .off)
+        XCTAssertEqual(state(reconnecting: true, active: false, waiting: true), .reconnecting,
+                       "a reconnect runs with guarding off too")
+        // A locked Time Machine disk comes back through a backup to it.
+        XCTAssertEqual(state(backingUp: true, reconnecting: true), .backingUp)
+        XCTAssertEqual(state(ejecting: true, backingUp: true, reconnecting: true), .ejecting)
+    }
+
+    /// An unmount for a meeting plays the eject animation and settles on the
+    /// state it leaves behind.
+    func testAnUnmountLandsOnWaitingToReconnect() {
+        let rest = LiftIcon.pose(.waitingToReconnect)
+        XCTAssertEqual(LiftIcon.pose(at: LiftIcon.duration, landingOn: rest), rest)
     }
 }

@@ -146,6 +146,12 @@ eject takes, and outline against fill alone does not read at 1x.
 | backing up | The bar fills with Time Machine's progress, with Time Machine's clock-and-arrow badge in the corner. Any destination, guarded or not, and even with guarding off. The triangle is solid only while a disk is guarded. |
 | ejecting | Triangle lifted, speed lines where the bar was. |
 | off | Idle with a slash through it: guarding is off or paused. |
+| waiting to reconnect | The idle pose. A disk unmounted for a meeting has left the bar, and nothing guarded is plugged in until it is back; the label says when it comes back. Something else guarded and plugged in shows armed instead. |
+| reconnecting | The idle pose too, until the mount succeeds and the icon turns armed. Armed earlier would promise the disk is back, and the eject pose would read as another eject. A locked Time Machine disk comes back through a backup to it, which shows as backing up. |
+
+The two reconnect states have no shape of their own yet, so in the icon they
+read as idle; the accessibility label and the popover row tell them apart.
+Giving them their own silhouette is new art, left for a later release.
 
 While a backup runs, the bar fills to the percentage Time Machine reports, or a
 short segment travels left to right while it is still sizing the job up - a bar
@@ -171,7 +177,7 @@ four times a second - and only while a backup is actually running.
 **When the guard ejects a disk, the icon plays a two second animation**: a beat,
 then the triangle crouches as the bar drains, launches out of the frame, and
 drops back onto the empty bar with a squash and a small hop. It plays only when
-a disk actually came off (`MenuBarIconAnimator.ejectFinished`): never for a
+a disk actually came off, unmounted for a meeting or ejected (`MenuBarIconAnimator.ejectFinished`): never for a
 failed eject, a backup to a share that was only stopped, or anything shown in
 the preview harness. A 30 Hz timer runs while it plays and not otherwise, a
 second eject restarts it rather than stacking a second timer, and with Reduce

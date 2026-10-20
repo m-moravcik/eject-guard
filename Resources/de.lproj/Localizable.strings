@@ -135,3 +135,5 @@
 "status.guarding" = "Überwacht %@";
 "status.idle" = "Kein überwachtes Laufwerk verbunden";
 "status.off" = "Überwachung ist aus";
+"status.reconnecting" = "%@ wird wieder verbunden";
+"status.waitingToReconnect" = "%1$@ wird um %2$@ wieder verbunden";

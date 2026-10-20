@@ -296,7 +296,7 @@ case "run", "dry-run":
         print("\(dryRun ? "would unmount" : "unmounted") until the meeting ends: \(outcome.unmounted.joined(separator: ", "))")
     }
     for name in outcome.ejected { print("\(dryRun ? "would eject" : "ejected") (no volume UUID to find it again): \(name)") }
-    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
+    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
     for name in outcome.reconnect.reconnected { print("\(dryRun ? "would reconnect" : "reconnected"): \(name)") }
     for name in outcome.reconnect.failed { print("FAILED to reconnect: \(name) - unplug it and plug it back in") }
     printBackupStops(outcome)
@@ -310,7 +310,7 @@ case "eject-now":
         print("no guarded disk is attached, and no backup to a guarded share is running")
     }
     for name in outcome.ejected { print("ejected: \(name)") }
-    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
+    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
     printBackupStops(outcome)
     if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
 

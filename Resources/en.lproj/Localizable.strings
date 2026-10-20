@@ -135,3 +135,5 @@
 "status.guarding" = "Guarding %@";
 "status.idle" = "No guarded disk connected";
 "status.off" = "Guarding is off";
+"status.reconnecting" = "Reconnecting %@";
+"status.waitingToReconnect" = "%1$@ reconnects at %2$@";

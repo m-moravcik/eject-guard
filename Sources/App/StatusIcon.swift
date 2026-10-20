@@ -15,12 +15,18 @@ struct StatusIcon: View {
     let controller: GuardController
 
     private var state: StatusIconState {
-        if controller.isBusy { return .ejecting }
-        // Ahead of off and idle: a backup is worth seeing whether or not
-        // anything is guarded.
-        if controller.isBackupRunning { return .backingUp }
-        if !controller.config.isActive { return .off }
-        return controller.hasGuardedTargets ? .armed : .idle
+        // A backup is worth seeing whether or not anything is guarded.
+        StatusIconState.current(
+            ejecting: controller.isBusy,
+            backingUp: controller.isBackupRunning,
+            reconnecting: controller.isReconnecting,
+            active: controller.config.isActive,
+            guardedTargets: controller.hasGuardedTargets,
+            waitingToReconnect: !controller.config.pendingReconnects.isEmpty)
+    }
+
+    private var waitingNames: String {
+        controller.config.pendingReconnects.map(\.name).joined(separator: ", ")
     }
 
     private var label: String {
@@ -38,6 +44,12 @@ struct StatusIcon: View {
             let names = controller.guardedTargetNames.joined(separator: ", ")
             return Loc.t("status.guarding", "Guarding %@", names)
         case .idle: return Loc.t("status.idle", "No guarded disk connected")
+        case .reconnecting: return Loc.t("status.reconnecting", "Reconnecting %@", waitingNames)
+        case .waitingToReconnect:
+            guard let at = controller.config.pendingReconnects.map(\.notBefore).min() else {
+                return Loc.t("status.idle", "No guarded disk connected")
+            }
+            return Loc.t("status.waitingToReconnect", "%1$@ reconnects at %2$@", waitingNames, Format.clock(at))
         }
     }
 

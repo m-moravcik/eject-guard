@@ -135,3 +135,5 @@
 "status.guarding" = "Hlídá %@";
 "status.idle" = "Není připojený hlídaný disk";
 "status.off" = "Hlídání je vypnuté";
+"status.reconnecting" = "%@ se znovu připojuje";
+"status.waitingToReconnect" = "%1$@ se znovu připojí v %2$@";

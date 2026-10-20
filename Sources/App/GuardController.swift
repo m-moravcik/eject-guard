@@ -29,7 +29,7 @@ final class GuardController {
     /// Mounting a disk back, which can take a minute and a half for a locked
     /// Time Machine volume. Kept apart from `isBusy`, which the menu bar and
     /// the footer show as an eject; an eject waits for it all the same.
-    private var isReconnecting = false
+    private(set) var isReconnecting = false
     private(set) var lastFailure: String?
 
     private(set) var backup = BackupStatus()
@@ -543,7 +543,9 @@ final class GuardController {
                 self.isBusy = false
                 // Only a disk that actually came off is celebrated: not a
                 // failure, and not a backup to a share that was only stopped.
-                self.iconAnimator.ejectFinished(ejectedDisks: outcome.ejected.count)
+                // Unmounted for a meeting counts: the disk came off all the
+                // same, and the icon lands on the empty bar until it is back.
+                self.iconAnimator.ejectFinished(ejectedDisks: outcome.takenOff.count)
                 self.lastFailure = outcome.failed.first.map {
                     Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, GuardRunner.holder($0.detail))
                 } ?? outcome.unstoppedBackups.first.map {
