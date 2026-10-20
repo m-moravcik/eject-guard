@@ -285,6 +285,8 @@ this project has been so far:
 | `Disks.mayChangeDiskList` | Time Machine's own mounts set off rescans whose `tmutil` hung past SIGKILL; a plugged-in disk must still rescan. |
 | `Sanitize.oneLine` | Untrusted titles must not forge log lines or break AppleScript. |
 | `BackupStatus` | `Percent: -1` means unknown, not zero. The figure is the one the Time Machine menu shows, `(1 - FractionOfProgressBar) + FractionOfProgressBar x Percent`, and only while copying. A backup to a share is matched by destination ID; its mount point is a disk image. |
+| Telling disks apart | Two disks with one name show their size, or the shortest UUID prefix that differs. A size is only stored once a disk is seen, so an entry from an older file decodes without one. |
+| Forgetting a disk | Takes its tick, hidden mark and waiting reconnect with it; offered only while unplugged and not for a destination Time Machine still reports, which the next scan would bring back. |
 | Network destinations | Never an eject target, never folded into a plugged-in disk by name, and an entry an older release stripped of its flag is still the same destination. |
 | `Disks.connection` | Only interfaces we recognise are named. |
 | Reconnecting | A volume diskutil no longer knows was unplugged; an empty mount point is attached but down. Nothing is mounted while a meeting runs or is about to start, back-to-back meetings chain, a day-old entry is dropped, and only a UUID reaches diskutil. |
@@ -300,9 +302,17 @@ is banned.
 
 - Only volumes that are **external, ejectable and directly under `/Volumes`** are
   ever considered. The boot disk cannot be reached by any code path.
-- Disk images (an installer `.dmg`, a sparse bundle) are never offered: there
-  is nothing to unplug. DiskArbitration reports their device model as
-  `Disk Image`; the volume keys alone cannot tell one from an external disk.
+- Disk images (an installer `.dmg`, a sparse bundle, a scratch image a test
+  tool mounts for a moment) are never offered or remembered: there is nothing
+  to unplug. DiskArbitration reports their device model as `Disk Image` and a
+  device path under `IOHDIXController` or `AppleDiskImagesController`
+  (measured on macOS 27 with `hdiutil attach` and `diskutil image attach`);
+  the volume keys alone cannot tell one from an external disk. A volume
+  DiskArbitration has lost by the time the scan asks, and that is no longer
+  mounted, is skipped rather than taken for a disk. The one image offered is a
+  local Time Machine destination. One remembered all the same is dropped the
+  next time it is mounted, guarded or not, but its tick stays: a block-level
+  copy of a real disk carries that disk's UUID.
 - Disks are identified by **volume UUID**, not by name, so another volume that
   happens to share a name is not touched.
 - A Time Machine backup is stopped only when it is writing to the disk being

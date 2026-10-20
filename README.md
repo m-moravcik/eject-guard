@@ -63,7 +63,11 @@ The menu bar popover shows your disks and today's next meeting:
   and Time Machine destinations appear straight away. Each row says how the
   disk is connected: USB, Thunderbolt, SD card, or network. ⌘1 to ⌘9 toggle them
   from the keyboard. A disk you do not guard is forgotten 30 days after you
-  unplug it, and listed again the next time you plug it in.
+  unplug it, and listed again the next time you plug it in. Disk images are
+  never listed. Two disks with the same name show their size, or the start
+  of their UUID, to tell them apart.
+- **Right-click a disk** to hide it for good, or, while it is unplugged, to
+  forget it until you plug it in again. A guarded disk asks first.
 - **Next meeting** shows what the guard will do and when it will eject.
   **Skip this meeting** leaves your disks alone for that one event.
 - **Eject now**, **Pause** and **Settings** sit at the bottom.
