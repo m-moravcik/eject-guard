@@ -18,7 +18,6 @@ func usage() -> Never {
       eject-guard --forget-disk NAME
                                    forget an unplugged disk until it is plugged in
                                    again; a guarded one asks first (--yes skips that)
-      eject-guard --forget NAME    old name of --hide, removed in the next release
       eject-guard --unskip         undo the most recent skipped meeting
       eject-guard --unskip-all     undo every skipped meeting
       eject-guard --run            run one pass now (unmounts before a meeting, reconnects after)
@@ -106,15 +105,8 @@ while !arguments.isEmpty {
     case "--watch": action = "watch"; pendingValue = value()
     case "--unwatch": action = "unwatch"; pendingValue = value()
     case "--hide": action = "hide"; pendingValue = value()
-    case "--forget":
-        // It always hid. One release of warning before the name is free.
-        FileHandle.standardError.write(
-            ("note: --forget is now --hide and will be removed in the next release. "
-                + "To drop an unplugged disk until it is plugged in again, use --forget-disk.\n")
-                .data(using: .utf8)!)
-        action = "hide"; pendingValue = value()
     case "--forget-disk": action = "forget-disk"; pendingValue = value()
-    case "--yes", "-y": confirmed = true
+    case "--yes": confirmed = true
     case "--unhide": action = "unhide"
     case "--unskip": action = "unskip"
     case "--unskip-all": action = "unskip-all"

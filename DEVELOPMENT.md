@@ -63,10 +63,14 @@ rather than at the next hourly run.
 - **Encrypted volumes lock on unmount.** Measured on APFS: after any unmount
   the volume reads `Locked`, and `diskutil mountDisk` exits 0 and prints
   "mounted successfully" while nothing is mounted. Only reading the mount
-  point back is trusted. The passphrase of a Time Machine disk is in the
-  System keychain, so the guard asks Time Machine to start a backup to it
+  point back is trusted. The guard reads the volume's "Encrypted Volume
+  Password" item from the login keychain (service and account both the volume
+  UUID; the first read needs the user's approval) and passes it to `diskutil
+  apfs unlockVolume -stdinpassphrase`. If the volume is still down and it is a
+  Time Machine disk, the guard asks Time Machine to start a backup to it
   (`tmutil startbackup --destination`) and waits up to 90 s for the volume to
-  appear. Failing that, the user is told to replug it.
+  appear; this was not seen to unlock a disk. Failing that, the user is told to
+  replug it.
 - **⌘E and eject on sleep clear everything pending whenever they run.** They
   say the user is leaving, and on a fixed USB disk the device can outlive an
   eject, so it would otherwise be found "still plugged in" and mounted again.

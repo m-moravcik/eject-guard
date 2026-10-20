@@ -88,10 +88,11 @@ on sleep.
 Good to know: like Finder, it takes down the whole physical disk, including its
 other volumes. Before a meeting the disk is unmounted but stays attached, which
 is what lets it come back on its own; ⌘E and eject on sleep eject it fully. An
-encrypted Time Machine disk is locked again whenever it is unmounted, and only
-Time Machine holds its key, so the app asks Time Machine to start a backup to
-bring it back. If that does not work, you get a notification to plug it in
-again.
+encrypted disk is locked again whenever it is unmounted. If macOS remembers its
+password in your login keychain, the app unlocks it with that password, after
+you allow it once when macOS asks. Otherwise, for a Time Machine disk, it asks
+Time Machine to start a backup to bring it back. If the disk stays locked, you
+get a notification to plug it in again.
 
 ## Command line
 

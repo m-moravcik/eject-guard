@@ -33,7 +33,7 @@ struct PendingReconnect: Codable, Equatable {
     /// about to start.
     var notBefore: Date
     /// Set for a Time Machine disk: the destination to start a backup to,
-    /// which is also how a locked encrypted volume gets unlocked.
+    /// also the last resort for a locked encrypted volume.
     var tmDestinationID: String?
     /// The guard stopped a backup to this disk, so starting one again is
     /// putting things back rather than doing something new.
