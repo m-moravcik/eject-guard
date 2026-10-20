@@ -277,9 +277,12 @@ enum GuardRunner {
 
     /// "Held by Finder." - or by something we could not name.
     private static func heldBy(_ detail: String) -> String {
-        let who = detail.isEmpty
-            ? Loc.t("notify.unknownProcess", "an unknown process")
-            : detail
-        return Loc.t("notify.heldBy", "Held by %@.", who)
+        Loc.t("notify.heldBy", "Held by %@.", holder(detail))
+    }
+
+    /// Who holds a disk that would not eject. A timed-out lsof names no one,
+    /// and the popover and the notification both say so rather than nothing.
+    static func holder(_ detail: String) -> String {
+        detail.isEmpty ? Loc.t("notify.unknownProcess", "an unknown process") : detail
     }
 }

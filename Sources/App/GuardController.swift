@@ -545,7 +545,7 @@ final class GuardController {
                 // failure, and not a backup to a share that was only stopped.
                 self.iconAnimator.ejectFinished(ejectedDisks: outcome.ejected.count)
                 self.lastFailure = outcome.failed.first.map {
-                    Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, $0.detail)
+                    Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, GuardRunner.holder($0.detail))
                 } ?? outcome.unstoppedBackups.first.map {
                     Loc.t("failure.backupNotStopped", "%@: the backup could not be stopped", $0)
                 }
