@@ -533,19 +533,32 @@ enum Disks {
         }
     }
 
-    /// Whether "Forget this disk" is offered for a remembered disk. Only
-    /// while it is not plugged in: one that is would be listed again by the
-    /// very next scan. Nor for a Time Machine destination Time Machine still
-    /// reports, which would come straight back the same way; hiding is what
-    /// keeps one of those out of the list. A share is never plugged in, so
-    /// it is the same question for it.
+    /// Why a remembered disk cannot be forgotten right now.
+    enum ForgetBlocker: Equatable {
+        /// Plugged in: the very next scan would list it again.
+        case attached
+        /// A Time Machine destination Time Machine still reports, which would
+        /// come straight back the same way. Hiding is what keeps one of those
+        /// out of the list.
+        case reportedByTimeMachine
+    }
+
+    /// What stands in the way of forgetting a disk, nil when nothing does.
+    /// The menu item and `eject-guard --forget-disk` both ask this. A share
+    /// is never plugged in, so only the second question applies to it.
+    static func forgetBlocker(_ disk: KnownDisk, attached: [AttachedVolume],
+                              reportedDestinationIDs: Set<String>) -> ForgetBlocker? {
+        if attachedVolume(for: disk, among: attached) != nil { return .attached }
+        if let destination = disk.tmDestinationID, reportedDestinationIDs.contains(destination) {
+            return .reportedByTimeMachine
+        }
+        return nil
+    }
+
+    /// Whether "Forget this disk" is offered for a remembered disk.
     static func canForget(_ disk: KnownDisk, attached: [AttachedVolume],
                           reportedDestinationIDs: Set<String>) -> Bool {
-        guard attachedVolume(for: disk, among: attached) == nil else { return false }
-        if let destination = disk.tmDestinationID, reportedDestinationIDs.contains(destination) {
-            return false
-        }
-        return true
+        forgetBlocker(disk, attached: attached, reportedDestinationIDs: reportedDestinationIDs) == nil
     }
 
     /// Remembered disks the user guards, that are present in this snapshot.

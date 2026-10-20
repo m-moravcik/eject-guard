@@ -99,11 +99,13 @@ An optional CLI, `eject-guard`, is installed by `./install.sh` from source.
 It is handy for setup and debugging:
 
 ```sh
-eject-guard                # disks, selection, next meeting
-eject-guard --watch "WD"   # guard a disk
-eject-guard --dry-run      # run a pass without unmounting or mounting
-eject-guard --eject-now    # eject guarded disks now
-eject-guard --help         # everything else
+eject-guard                     # disks, selection, next meeting
+eject-guard --watch "WD"        # guard a disk
+eject-guard --dry-run           # run a pass without unmounting or mounting
+eject-guard --eject-now         # eject guarded disks now
+eject-guard --hide "WD"         # hide a disk for good (--unhide brings it back)
+eject-guard --forget-disk "WD"  # forget an unplugged disk until it is plugged in again
+eject-guard --help              # everything else
 ```
 
 Settings live in `~/Library/Application Support/EjectGuard/config.json` and

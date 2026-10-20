@@ -71,6 +71,17 @@ final class ForgetDiskTests: XCTestCase {
         XCTAssertTrue(Disks.canForget(share, attached: [], reportedDestinationIDs: []))
     }
 
+    func testTheMenuAndTheCommandLineAreToldWhyNot() {
+        XCTAssertEqual(Disks.forgetBlocker(stick, attached: [volume(stick)], reportedDestinationIDs: []),
+                       .attached)
+        XCTAssertEqual(Disks.forgetBlocker(wd, attached: [], reportedDestinationIDs: ["TM-1"]),
+                       .reportedByTimeMachine)
+        // Plugged in counts first: that is the one the user can do something about.
+        XCTAssertEqual(Disks.forgetBlocker(wd, attached: [volume(wd)], reportedDestinationIDs: ["TM-1"]),
+                       .attached)
+        XCTAssertNil(Disks.forgetBlocker(stick, attached: [], reportedDestinationIDs: ["TM-1"]))
+    }
+
     func testAForgottenTimeMachineDestinationIsNotRelistedOnceTimeMachineDropsIt() {
         var config = GuardConfig()
         config.knownDisks = [wd]
