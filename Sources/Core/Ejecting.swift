@@ -192,9 +192,18 @@ enum Ejector {
     static func blockingProcesses(at path: String) -> String {
         // lsof walks the whole volume, which is slow on a big disk and is only
         // ever used to make an error message useful.
-        let lsof = Shell.run("/usr/sbin/lsof", ["+D", path], timeout: 30)
-        let names = Set(lsof.output.split(separator: "\n").dropFirst().compactMap {
-            $0.split(separator: " ").first.map(String.init)
+        // -w drops warnings, which Shell.run would merge into the output;
+        // -F c asks for one `c<command>` line per process instead of a table.
+        let lsof = Shell.run("/usr/sbin/lsof", ["-w", "-F", "c", "+D", path], timeout: 30)
+        return holderNames(fromLsof: lsof.output)
+    }
+
+    /// Process names from `lsof -F c` output. Only `c` lines name a process,
+    /// so a stray warning, or one left behind by a timed-out lsof that never
+    /// flushed its listing, is not mistaken for one.
+    static func holderNames(fromLsof output: String) -> String {
+        let names = Set(output.split(separator: "\n").compactMap { line in
+            line.first == "c" ? String(line.dropFirst()) : nil
         })
         return names.sorted().prefix(4).joined(separator: ", ")
     }
