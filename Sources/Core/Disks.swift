@@ -25,8 +25,8 @@ struct DiskSnapshot: Equatable {
     var destinations: [TimeMachineDestination] = []
     var attached: [AttachedVolume] = []
     /// Mounted disk images, keyed the way `merge` keys a disk. They are never
-    /// offered, and are listed only so that `merge` can forget one an earlier
-    /// release remembered.
+    /// offered, and are listed only so that `merge` can forget one that was
+    /// remembered before.
     var diskImageIDs: [String] = []
 }
 
@@ -107,17 +107,23 @@ enum Disks {
                               isRootFileSystem: values.volumeIsRootFileSystem)
             else { continue }
 
+            let tmDestinationID = destinations.first { !$0.isNetwork && $0.mountPoint == path }?.id
             let device = deviceDescription(of: url, session: session)
-            if isDiskImage(deviceModel: device.model) {
-                diskImageIDs.append(values.volumeUUIDString ?? path)
+            switch kind(ofDevice: device.map { (model: $0.model, path: $0.path) },
+                        isTimeMachineDestination: tmDestinationID != nil,
+                        stillMounted: { isMountedVolume(path) }) {
+            case .gone:
                 continue
+            case .diskImage:
+                diskImageIDs.append(values.volumeUUIDString ?? path)
+            case .disk:
+                attached.append(AttachedVolume(
+                    path: path,
+                    name: values.volumeLocalizedName ?? url.lastPathComponent,
+                    volumeUUID: values.volumeUUIDString,
+                    tmDestinationID: tmDestinationID,
+                    connection: connection(fromProtocol: device?.protocol)))
             }
-            attached.append(AttachedVolume(
-                path: path,
-                name: values.volumeLocalizedName ?? url.lastPathComponent,
-                volumeUUID: values.volumeUUIDString,
-                tmDestinationID: destinations.first { !$0.isNetwork && $0.mountPoint == path }?.id,
-                connection: connection(fromProtocol: device.protocol)))
         }
         return (attached, diskImageIDs)
     }
@@ -125,14 +131,17 @@ enum Disks {
     /// The device model and interface DiskArbitration reports for the disk
     /// behind a volume. This asks `diskarbitrationd` over IPC; no process is
     /// launched.
+    ///
+    /// Nil when DiskArbitration does not know the volume at all.
     private static func deviceDescription(of url: URL, session: DASession?)
-        -> (model: String?, protocol: String?) {
+        -> (model: String?, protocol: String?, path: String?)? {
         guard let session,
               let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
               let description = DADiskCopyDescription(disk) as? [String: Any]
-        else { return (nil, nil) }
+        else { return nil }
         return (description[kDADiskDescriptionDeviceModelKey as String] as? String,
-                description[kDADiskDescriptionDeviceProtocolKey as String] as? String)
+                description[kDADiskDescriptionDeviceProtocolKey as String] as? String,
+                description[kDADiskDescriptionDevicePathKey as String] as? String)
     }
 
     // MARK: Pure logic (no processes, no I/O - this is the part under test)
@@ -184,17 +193,53 @@ enum Disks {
         return true
     }
 
-    /// Whether DiskArbitration's device model is that of a mounted disk image:
-    /// a `.dmg` installer, a sparse bundle. There is nothing to unplug, so it
-    /// is never offered.
+    enum VolumeKind: Equatable {
+        /// Offered: a disk, or a volume we cannot tell from one.
+        case disk
+        /// A mounted disk image, never offered.
+        case diskImage
+        /// Unmounted while the scan ran.
+        case gone
+    }
+
+    /// What a mounted volume is, from what DiskArbitration says about the
+    /// device behind it (nil when it does not know the volume at all).
     ///
-    /// Observed on an installer image: model `Disk Image`, protocol `Virtual
-    /// Interface`, while an external disk reports its vendor's model.
+    /// A volume DiskArbitration has lost went away between the listing and
+    /// now, as a disk image a tool mounts for a moment does. Gone is not
+    /// attached, and remembering it would list a disk that never was. One it
+    /// has lost that is still mounted counts as a disk, as an unknown model
+    /// always has.
+    ///
+    /// A Time Machine destination is a disk even on an image: Time Machine
+    /// lists it anyway, and it should not read as unplugged while it is
+    /// mounted.
+    static func kind(ofDevice device: (model: String?, path: String?)?,
+                     isTimeMachineDestination: Bool,
+                     stillMounted: () -> Bool) -> VolumeKind {
+        guard let device else { return stillMounted() ? .disk : .gone }
+        if isTimeMachineDestination { return .disk }
+        return isDiskImage(deviceModel: device.model, devicePath: device.path) ? .diskImage : .disk
+    }
+
+    /// Whether DiskArbitration describes a mounted disk image: a `.dmg`
+    /// installer, a sparse bundle, a scratch image a test tool mounts for a
+    /// moment. There is nothing to unplug, so it is never offered.
+    ///
+    /// Observed on macOS 27 for HFS+ and APFS images attached with both
+    /// `hdiutil attach` and `diskutil image attach`, and on a Time Machine
+    /// share's sparse bundle: model `Disk Image`, protocol `Virtual
+    /// Interface`, and a device path under the disk image driver,
+    /// `IOHDIXController` or `AppleDiskImagesController`. An external disk
+    /// reports its vendor's model and a path under its bus. The path is the
+    /// second signal, should the model ever be missing.
     ///
     /// An unknown model counts as a real disk. Listing an image by mistake is
     /// one extra row; hiding a real disk by mistake means it is never guarded.
-    static func isDiskImage(deviceModel: String?) -> Bool {
-        deviceModel?.trimmingCharacters(in: .whitespaces) == "Disk Image"
+    static func isDiskImage(deviceModel: String?, devicePath: String? = nil) -> Bool {
+        if deviceModel?.trimmingCharacters(in: .whitespaces) == "Disk Image" { return true }
+        guard let devicePath else { return false }
+        return devicePath.contains("/IOHDIXController/") || devicePath.contains("/AppleDiskImagesController/")
     }
 
     /// The interface DiskArbitration reports, as the popover names it.
@@ -366,15 +411,23 @@ enum Disks {
                 lastSeen: now))
         }
 
-        // Earlier releases offered disk images, and remembered every one that
-        // was ever mounted. Forget one the next time it shows up - unless it is
-        // guarded or a Time Machine destination: a block-level copy of a real
-        // disk carries that disk's volume UUID, and quietly unguarding the
-        // real one is the failure this app exists to prevent.
+        // A disk image is never listed, and one remembered all the same - by
+        // an earlier release, or mounted for a moment while a scan ran - is
+        // forgotten the next time it shows up. Not a Time Machine
+        // destination, which Time Machine lists anyway. Not one a real volume
+        // in this snapshot also answers to: a block-level copy of a disk
+        // carries that disk's volume UUID. And the tick stays where it is, so
+        // a real guarded disk sharing the UUID comes back guarded: quietly
+        // unguarding it is the failure this app exists to prevent.
         let watched = Set(config.watchedDiskIDs)
         let images = Set(snapshot.diskImageIDs)
         known.removeAll { disk in
-            images.contains(disk.id) && !watched.contains(disk.id) && !disk.isTimeMachineDestination
+            let isImage = images.contains(disk.id) || disk.volumeUUID.map(images.contains) == true
+            guard isImage, !disk.isTimeMachineDestination,
+                  attachedVolume(for: disk, among: snapshot.attached) == nil
+            else { return false }
+            Log.write("forgot \"\(disk.name)\" - a disk image")
+            return true
         }
 
         // Counted from the first pass that finds the disk gone, not from

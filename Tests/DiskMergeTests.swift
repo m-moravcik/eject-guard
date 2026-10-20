@@ -258,20 +258,96 @@ final class DiskMergeTests: XCTestCase {
         XCTAssertTrue(config.knownDisks.isEmpty)
     }
 
-    func testAGuardedDiskIsNeverForgottenForSharingAnImagesUUID() {
-        // A block-level image of a real disk carries the same volume UUID.
+    func testAGuardedDiskImageIsForgottenButItsTickStays() {
+        // Images are never listed, guarded or not. A block-level image of a
+        // real disk carries the same volume UUID, so the tick is left alone:
+        // the real disk comes back guarded the next time it is plugged in.
         var config = GuardConfig()
-        config.knownDisks = [
-            KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1"),
-            KnownDisk(id: "VOL-2", name: "TM", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
-        ]
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
         config.watchedDiskIDs = ["VOL-1"]
 
-        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-1", "VOL-2"]),
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-1"]),
+                    into: &config)
+        XCTAssertTrue(config.knownDisks.isEmpty)
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"], "an image must never unguard a disk")
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [volume("WD", uuid: "VOL-1")]),
+                    into: &config)
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(Disks.guardedVolumes(config, among: [volume("WD", uuid: "VOL-1")]).map(\.volumeUUID),
+                       ["VOL-1"])
+    }
+
+    func testARealDiskPluggedInBesideItsImageStaysListedAndGuarded() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+        config.watchedDiskIDs = ["VOL-1"]
+        let real = volume("WD", uuid: "VOL-1")
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [real], diskImageIDs: ["VOL-1"]),
                     into: &config)
 
-        XCTAssertEqual(Set(config.knownDisks.map(\.id)), ["VOL-1", "VOL-2"])
-        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"], "an image must never unguard a disk")
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(Disks.guardedVolumes(config, among: [real]).map(\.volumeUUID), ["VOL-1"])
+    }
+
+    func testATimeMachineDestinationIsNeverForgottenForBeingAnImage() {
+        var config = GuardConfig()
+        config.knownDisks = [
+            KnownDisk(id: "VOL-2", name: "TM", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
+        ]
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-2"]),
+                    into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2"])
+    }
+
+    func testADiskImageIsNeverRemembered() {
+        // What a test tool's scratch image looks like to a scan: listed as an
+        // image, never attached. Two of them, sharing a name.
+        var config = GuardConfig()
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["IMG-1", "IMG-2"]),
+                    into: &config)
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    // MARK: What a mounted volume is
+
+    func testDiskImagesAreToldApartByModelOrDriver() {
+        // Observed on macOS 27: HFS+ and APFS images through `hdiutil attach`
+        // and `diskutil image attach`, and a Time Machine share's bundle.
+        XCTAssertTrue(Disks.isDiskImage(deviceModel: "Disk Image"))
+        XCTAssertTrue(Disks.isDiskImage(
+            deviceModel: nil,
+            devicePath: "IOService:/IOResources/IOHDIXController/IOHDIXHDDriveOutKernel@f0/IODiskImageBlockStorageDeviceOutKernel"))
+        XCTAssertTrue(Disks.isDiskImage(
+            deviceModel: nil,
+            devicePath: "IOService:/IOResources/AppleDiskImagesController/AppleDiskImageDevice@2d"))
+        // A USB disk, by the shape a USB storage path takes, and the internal SSD.
+        XCTAssertFalse(Disks.isDiskImage(
+            deviceModel: "Elements 25A3",
+            devicePath: "IOService:/AppleARMPE/arm-io@10F00000/AppleT811xIO/usb-drd0@2280000/AppleUSBHostPort@01100000/Elements 25A3@01100000/IOUSBHostInterface@0/IOUSBMassStorageInterfaceNub/IOUSBMassStorageDriverNub/IOUSBMassStorageDriver/IOSCSILogicalUnitNub@0/IOSCSIPeripheralDeviceType00"))
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: "APPLE SSD AP1024Z"))
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: nil, devicePath: nil))
+    }
+
+    func testAVolumeThatVanishedMidScanIsNotAttached() {
+        XCTAssertEqual(Disks.kind(ofDevice: nil, isTimeMachineDestination: false, stillMounted: { false }), .gone)
+        // Still there but unknown to DiskArbitration: offered, as an unknown
+        // model always was, rather than hiding a real disk.
+        XCTAssertEqual(Disks.kind(ofDevice: nil, isTimeMachineDestination: false, stillMounted: { true }), .disk)
+    }
+
+    func testAnImageIsOfferedOnlyAsATimeMachineDestination() {
+        let image = (model: Optional("Disk Image"), path: Optional<String>.none)
+        XCTAssertEqual(Disks.kind(ofDevice: image, isTimeMachineDestination: false, stillMounted: { true }),
+                       .diskImage)
+        XCTAssertEqual(Disks.kind(ofDevice: image, isTimeMachineDestination: true, stillMounted: { true }),
+                       .disk)
+        let disk = (model: Optional("Elements 25A3"), path: Optional<String>.none)
+        XCTAssertEqual(Disks.kind(ofDevice: disk, isTimeMachineDestination: false, stillMounted: { true }),
+                       .disk)
     }
 
     func testOnlyTickedDisksThatArePresentAreGuarded() {
