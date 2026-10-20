@@ -84,31 +84,49 @@ build if either rule comes back.
 
 ## The menu bar icon
 
-Each state has its own shape rather than a different badge, because a badge
-swap is too quiet to notice during the few seconds an eject takes.
+The icon is Eject Guard's own symbol, the app icon in miniature: an eject
+triangle over a bar. Each state has its own shape rather than a different
+fill, because a fill swap is too quiet to notice during the few seconds an
+eject takes, and outline against fill alone does not read at 1x.
 
 | | |
 |---|---|
-| `externaldrive` | No guarded disk connected. |
-| `externaldrive.fill.badge.checkmark` | A guarded disk is connected and armed. |
-| `externaldrive.fill.badge.timemachine` | Time Machine is backing up, with a progress bar under it. Any destination, guarded or not, and even with guarding off. |
-| `eject.fill` | Ejecting right now. |
-| `externaldrive.badge.xmark` | Guarding is off or paused. |
+| idle | Outline triangle over a thin line: no guarded disk connected. |
+| armed | Solid triangle over a solid slab: a guarded disk is connected. |
+| backing up | The bar fills with Time Machine's progress, with Time Machine's clock-and-arrow badge in the corner. Any destination, guarded or not, and even with guarding off. The triangle is solid only while a disk is guarded. |
+| ejecting | Triangle lifted, speed lines where the bar was. |
+| off | Idle with a slash through it: guarding is off or paused. |
 
-While a backup runs, a 15x2 pt bar sits under the drive: filled to the
-percentage Time Machine reports, or a short segment travelling left to right
-while it is still sizing the job up - a bar frozen at zero reads as a stalled
-backup. Both forms breathe between 55% and 100% opacity, because progress can
-sit on one number for minutes and a still icon in a menu bar reads as a dead
-one.
+While a backup runs, the bar fills to the percentage Time Machine reports, or a
+short segment travels left to right while it is still sizing the job up - a bar
+frozen at zero reads as a stalled backup. Both forms breathe between 55% and
+100% opacity, because progress can sit on one number for minutes and a still
+icon in a menu bar reads as a dead one. If the badge and the bar ever compete
+at 1x, the badge wins: it is what says "Time Machine".
 
 **A `MenuBarExtra` label is rendered to a static image, so SwiftUI's own symbol
 effects never run there.** That was measured rather than assumed: a throwaway
 menu bar app with `.symbolEffect(.pulse, options: .repeating)` was screenshotted
 twenty times over two seconds and its icon brightness did not move by a
-hundredth. The animation is therefore driven by `GuardController.backupPhase`,
-an integer advanced four times a second - and only while a backup is actually
-running.
+hundredth. So every state and every animation frame is drawn in code
+(`LiftIcon`) as a template `NSImage` on a fixed 22 x 16 pt canvas: crisp at
+every scale, tinted by the menu bar on light, dark, highlighted and
+tinted-wallpaper bars, and never wider or taller from one state to the next.
+The label stays a plain `Image`, which the menu bar never scales. VibeRes and
+ClipShot draw theirs the same way.
+
+The breathing is driven by `GuardController.backupPhase`, an integer advanced
+four times a second - and only while a backup is actually running.
+
+**When the guard ejects a disk, the icon plays a two second animation**: a beat,
+then the triangle crouches as the bar drains, launches out of the frame, and
+drops back onto the empty bar with a squash and a small hop. It plays only when
+a disk actually came off (`MenuBarIconAnimator.ejectFinished`): never for a
+failed eject, a backup to a share that was only stopped, or anything shown in
+the preview harness. A 30 Hz timer runs while it plays and not otherwise, a
+second eject restarts it rather than stacking a second timer, and with Reduce
+Motion on the icon goes straight to its state. The sleep eject does not play
+it: the Mac is going to sleep.
 
 Knowing a backup is running costs one `tmutil status` every 5 s while one is,
 20 s while a guarded disk is merely attached, and nothing at all when none is.
@@ -117,15 +135,19 @@ and it is bounded by the thing that matters: the disk being plugged in. A
 guarded network destination is always "plugged in", so ticking one keeps the
 20 s poll running for as long as guarding is on.
 
-The states are hard to review in place - the icon is 16 pt wide and some of them
-only appear mid-backup - so the preview harness renders them all side by side:
+The states are hard to review in place - the icon is 22 pt wide and some of them
+only appear mid-backup or mid-eject - so the preview harness renders them all
+side by side, with every tenth of a second of the eject animation:
 
 ```sh
 ./preview.sh icons
 ```
 
-That is how the backing-up glyph was caught shrinking: stacking a bar under the
-symbol stole its height until the size was pinned.
+Its size is pinned by tests against `externaldrive` at 15 pt, the symbol it
+replaced and the size its neighbours draw at: ink 25 to 29 px tall at 2x, the
+body (triangle and bar) at least as tall as the drive, the triangle as wide,
+and the line as heavy as the drive's outline. A menu bar icon that comes out
+smaller than its neighbours is the regression these exist for.
 
 ## Languages
 
@@ -200,11 +222,12 @@ fetched as "latest".
 
 ```
 Sources/Core/     the engine: no UI, compiled into both binaries and the tests
+Sources/Icon/     the menu bar icon and its animator, compiled into the app and the tests
 Sources/App/      the SwiftUI menu bar app
 Sources/CLI/      the command line tool
 Sources/Preview/  renders the popover to PNG so the layout can be reviewed
 Resources/        en, sk, cs and de translations, copied into the bundle
-Tests/            unit tests over Sources/Core
+Tests/            unit tests over Sources/Core and Sources/Icon
 ```
 
 Everything is built in **Swift 6 language mode** with warnings as errors. That
@@ -219,7 +242,7 @@ swift test
 ```
 
 `Package.swift` exists for the tests, not for shipping: it exposes `Sources/Core`
-as a library so `swift test` can reach it with `@testable`. The app and CLI are
+and `Sources/Icon` as libraries so `swift test` can reach them with `@testable`. The app and CLI are
 still assembled by `build.sh` from the same sources, so the shipping binaries are
 unaffected by the test setup.
 
@@ -237,9 +260,14 @@ this project has been so far:
 | `BackupStatus` | `Percent: -1` means unknown, not zero. The figure is the one the Time Machine menu shows, `(1 - FractionOfProgressBar) + FractionOfProgressBar x Percent`, and only while copying. A backup to a share is matched by destination ID; its mount point is a disk image. |
 | Network destinations | Never an eject target, never folded into a plugged-in disk by name, and an entry an older release stripped of its flag is still the same destination. |
 | `Disks.connection` | Only interfaces we recognise are named. |
+| `LiftIcon` | Every state and animation frame is a template image on the fixed canvas, or the menu bar cannot tint it. Its size is anchored on `externaldrive`: an icon smaller than its neighbours was the complaint before it. Idle and armed have to differ at 1x, not only at 2x. |
+| `MenuBarIconAnimator` | Plays only on a disk actually ejected, runs no timer at rest, restarts on a burst instead of stacking timers, and respects Reduce Motion. |
 
 The tests were checked by putting two real bugs back in: removing the hand
 written config decoder, and dropping the ticked-disk filter. Both were caught.
+The icon tests were checked the same way: a non-template image, a narrower
+triangle, a thin bar for armed, playing on an eject that ejected nothing, and
+ignoring Reduce Motion were each caught.
 
 CI runs the tests, builds the app and CLI, and enforces two rules that are
 easier to state than to remember: no shell is ever invoked, and `waitUntilExit`

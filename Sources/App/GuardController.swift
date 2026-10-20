@@ -33,6 +33,10 @@ final class GuardController {
     /// The only animation available is one we redraw ourselves.
     private(set) var backupPhase = 0
 
+    /// Plays the menu bar icon's eject animation once a guarded disk has
+    /// actually come off. Runs a timer only while it plays.
+    let iconAnimator = MenuBarIconAnimator()
+
     /// nil until we have asked. False means an eject will happen silently,
     /// which is worth saying out loud since the notification is the only
     /// feedback at the moment it matters.
@@ -78,7 +82,7 @@ final class GuardController {
     private let backupPollWhileIdle: TimeInterval = 20
     /// Eight steps of a two second cycle: slow enough to read as breathing
     /// rather than blinking, cheap enough to run for the length of a backup.
-    static let breatheSteps = 8
+    static let breatheSteps = LiftIcon.breatheSteps
     private let breatheInterval: TimeInterval = 0.25
 
     var knownDisks: [KnownDisk] { config.knownDisks }
@@ -237,10 +241,10 @@ final class GuardController {
         // UNUserNotificationCenter.current() traps when the executable has no
         // bundle identifier, which is exactly the preview harness.
         guard Bundle.main.bundleIdentifier != nil else { return }
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             let allowed = settings.authorizationStatus == .authorized
                 || settings.authorizationStatus == .provisional
-            Task { @MainActor [weak self] in self?.notificationsEnabled = allowed }
+            Task { @MainActor in self?.notificationsEnabled = allowed }
         }
     }
 
@@ -273,8 +277,8 @@ final class GuardController {
 
         // The permission callback arrives on an arbitrary queue; the store
         // itself is only ever touched back on the main actor.
-        Meetings.requestAccess(store) { granted in
-            Task { @MainActor [weak self] in
+        Meetings.requestAccess(store) { [weak self] granted in
+            Task { @MainActor in
                 guard let self else { return }
                 self.calendarAccess = granted ? .granted : .denied
                 if granted { self.calendars = self.store.calendars(for: .event) }
@@ -477,6 +481,9 @@ final class GuardController {
             Task { @MainActor in
                 guard let self else { return }
                 self.isBusy = false
+                // Only a disk that actually came off is celebrated: not a
+                // failure, and not a backup to a share that was only stopped.
+                self.iconAnimator.ejectFinished(ejectedDisks: outcome.ejected.count)
                 self.lastFailure = outcome.failed.first.map {
                     Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, $0.detail)
                 } ?? outcome.unstoppedBackups.first.map {

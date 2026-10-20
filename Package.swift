@@ -17,9 +17,16 @@ let package = Package(
             // Swift 6 checking found the one real concurrency bug in this
             // project before it shipped; keep it on.
             swiftSettings: [.swiftLanguageMode(.v6)]),
+        // The menu bar icon and its animator. AppKit only, with no controller
+        // to observe, so the drawing and the animation timing can be tested
+        // without the app. build.sh compiles it into the app.
+        .target(
+            name: "TMEjectGuardIcon",
+            path: "Sources/Icon",
+            swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(
             name: "TMEjectGuardCoreTests",
-            dependencies: ["TMEjectGuardCore"],
+            dependencies: ["TMEjectGuardCore", "TMEjectGuardIcon"],
             path: "Tests",
             swiftSettings: [.swiftLanguageMode(.v6)]),
     ]

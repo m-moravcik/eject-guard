@@ -24,7 +24,7 @@ mkdir -p "$OUT"
 cp -R Resources/*.lproj "$OUT/"
 
 swiftc -O -swift-version 6 -D PREVIEW -target arm64-apple-macos14.0 \
-    Sources/Core/*.swift Sources/App/DesignTokens.swift \
+    Sources/Core/*.swift Sources/Icon/*.swift Sources/App/DesignTokens.swift \
     Sources/App/GuardController.swift Sources/App/MenuContent.swift \
     Sources/App/SettingsView.swift Sources/App/UpdaterProtocol.swift \
     Sources/App/LoginItem.swift Sources/App/OnboardingView.swift \

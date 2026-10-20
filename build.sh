@@ -34,7 +34,7 @@ echo "building app..."
 swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
     -F "$SPARKLE_ROOT" -framework Sparkle \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
-    Sources/Core/*.swift Sources/App/*.swift \
+    Sources/Core/*.swift Sources/Icon/*.swift Sources/App/*.swift \
     -o "$APP/Contents/MacOS/EjectGuard"
 
 cp App/Info.plist "$APP/Contents/Info.plist"

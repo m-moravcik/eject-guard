@@ -86,7 +86,7 @@ MainActor.assumeIsolated {
 
             guard let image = renderer.nsImage,
                   let tiff = image.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let bitmap = NSBitmapImageRep(data: tiff).map(eightBit),
                   let png = bitmap.representation(using: .png, properties: [:])
             else {
                 FileHandle.standardError.write("render failed\n".data(using: .utf8)!)
@@ -112,6 +112,24 @@ MainActor.assumeIsolated {
 }
 
 
+/// The bitmap at 8 bits per channel in sRGB. ImageRenderer hands back 16 bits
+/// once anything in the view is in extended range, which the menu bar icon's
+/// template image is in the light popover shot. A screenshot gains nothing
+/// from it and the file triples.
+func eightBit(_ bitmap: NSBitmapImageRep) -> NSBitmapImageRep {
+    guard bitmap.bitsPerSample > 8, let image = bitmap.cgImage,
+          let space = CGColorSpace(name: CGColorSpace.sRGB),
+          let context = CGContext(data: nil, width: image.width, height: image.height,
+                                  bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return bitmap }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    guard let flattened = context.makeImage() else { return bitmap }
+    let result = NSBitmapImageRep(cgImage: flattened)
+    result.size = bitmap.size
+    return result
+}
+
 /// A contact sheet of every menu bar state, at the size the menu bar draws them
 /// and again enlarged.
 ///
@@ -127,32 +145,47 @@ func renderIconSheet() {
         let state: StatusIconState
         var percent: Double?
         var phase: Int = 0
+        var guarding = true
+        var ejectPhase: Double?
     }
 
-    var samples: [Sample] = [
-        Sample(title: "idle", state: .idle),
+    // The breathing is at its fullest halfway through its cycle.
+    let full = GuardController.breatheSteps / 2
+    let states: [Sample] = [
+        Sample(title: "idle", state: .idle, guarding: false),
         Sample(title: "armed", state: .armed),
-        Sample(title: "off", state: .off),
+        Sample(title: "off", state: .off, guarding: false),
         Sample(title: "ejecting", state: .ejecting),
-        Sample(title: "0%", state: .backingUp, percent: 0),
-        Sample(title: "35%", state: .backingUp, percent: 0.35),
-        Sample(title: "78%", state: .backingUp, percent: 0.78),
-        Sample(title: "100%", state: .backingUp, percent: 1),
+        Sample(title: "0%", state: .backingUp, percent: 0, phase: full),
+        Sample(title: "35%", state: .backingUp, percent: 0.35, phase: full),
+        Sample(title: "78%", state: .backingUp, percent: 0.78, phase: full),
+        Sample(title: "100%", state: .backingUp, percent: 1, phase: full),
+        Sample(title: "unguarded", state: .backingUp, percent: 0.42, phase: full, guarding: false),
     ]
     // The indeterminate sweep, one column per step of its cycle.
-    for phase in 0..<GuardController.breatheSteps {
-        samples.append(Sample(title: "…\(phase)", state: .backingUp, percent: nil, phase: phase))
+    let sweep = (0..<GuardController.breatheSteps).map { phase in
+        Sample(title: "…\(phase)", state: .backingUp, percent: nil, phase: phase)
     }
+    // The eject animation every tenth of a second, landing on idle.
+    let eject = (0...Int(LiftIcon.duration * 10)).map { tenth in
+        Sample(title: String(format: "%.1fs", Double(tenth) / 10), state: .idle,
+               guarding: false, ejectPhase: Double(tenth) / 10)
+    }
+    let rows = [states, sweep, Array(eject.prefix(11)), Array(eject.dropFirst(11))]
 
     let sheet = VStack(alignment: .leading, spacing: 14) {
         ForEach([ColorScheme.light, .dark], id: \.self) { scheme in
+            VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, samples in
             HStack(alignment: .bottom, spacing: 10) {
                 ForEach(Array(samples.enumerated()), id: \.offset) { _, sample in
                     VStack(spacing: 6) {
                         // Actual size, on the menu bar's own tinted background.
                         StatusIconArt(state: sample.state,
                                       percent: sample.percent,
-                                      phase: sample.phase)
+                                      phase: sample.phase,
+                                      guarding: sample.guarding,
+                                      ejectPhase: sample.ejectPhase)
                             .frame(width: 26, height: 22)
                             .background(scheme == .dark
                                         ? Color(white: 0.18) : Color(white: 0.82))
@@ -161,6 +194,8 @@ func renderIconSheet() {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            }
             }
             .padding(10)
             .environment(\.colorScheme, scheme)
@@ -206,11 +241,15 @@ struct HeroScene<Popover: View>: View {
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 Spacer()
-                // Only the symbol: a MenuBarExtra label keeps the image and
-                // drops the track StatusIconArt stacks under it, so that is
-                // all the real menu bar shows.
-                Image(systemName: StatusIconState.backingUp.symbol)
-                    .font(.system(size: 15))
+                // The demo's guarded Time Machine disk at 42%, drawn by the
+                // same code as the real menu bar icon. The menu bar tints it
+                // through AppKit; an offscreen render tints a template image
+                // with a dimmer primary than a symbol gets (0.72 against 0.85
+                // white in dark) and in extended range, which turns the whole
+                // PNG 16-bit. So it gets its neighbours' ink as a plain colour.
+                StatusIconArt(state: .backingUp, percent: 0.42,
+                              phase: GuardController.breatheSteps / 2, guarding: true)
+                    .foregroundStyle(Color(white: dark ? 0.86 : 0.12))
                     .frame(width: 30, height: 22)
                     .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(Color.primary.opacity(0.14)))
