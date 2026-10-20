@@ -234,6 +234,22 @@ final class LiftIconTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(d * 3, armedInk, "\(d) of \(armedInk) px change at 1x")
     }
 
+    /// The armed slab and the backup's slab sit on `LiftIcon.bar`'s whole
+    /// pixel rows at 1x: crisp edges, and no jump when a backup starts.
+    func testFullBarSitsOnItsPixelRowsAt1x() {
+        func rows(_ pose: LiftIcon.Pose) -> [Bool] {
+            let rep = Self.render(pose, scale: 1)
+            let x = Int(LiftIcon.bar.minX + 4)
+            return (Int(LiftIcon.bar.minY) - 1...Int(LiftIcon.bar.maxY)).map { y in
+                (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.9
+            }
+        }
+        let expected = [false] + Array(repeating: true, count: Int(LiftIcon.bar.height)) + [false]
+        XCTAssertEqual(rows(LiftIcon.pose(.armed)), expected, "armed")
+        XCTAssertEqual(rows(LiftIcon.pose(.backingUp, percent: 1, phase: 4, guarding: true)), expected,
+                       "backing up")
+    }
+
     /// The bar follows Time Machine's figure, and the badge is there at every
     /// figure, including while it is still sizing the job up.
     func testBackupProgressFillsTheBar() {
