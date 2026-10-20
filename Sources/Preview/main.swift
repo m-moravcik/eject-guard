@@ -34,9 +34,17 @@ MainActor.assumeIsolated {
     let update = CommandLine.arguments.contains("update")
     // Onboarding shows the welcome tour a fresh install opens on.
     let tour = CommandLine.arguments.contains("onboarding")
-    let demo = hero || update || tour || CommandLine.arguments.contains("demo")
+    // Disks shows disks that share a name, and a row's context menu.
+    let disks = CommandLine.arguments.contains("disks")
+    let demo = hero || update || tour || disks || CommandLine.arguments.contains("demo")
     let controller = GuardController()
-    if demo { controller.loadDemo(showingTour: tour) } else { controller.start() }
+    if disks {
+        controller.loadDisksDemo()
+    } else if demo {
+        controller.loadDemo(showingTour: tour)
+    } else {
+        controller.start()
+    }
 
     let output = CommandLine.arguments.count > 1
         ? CommandLine.arguments[1]
@@ -77,6 +85,8 @@ MainActor.assumeIsolated {
             let view = Group {
                 if hero {
                     HeroScene(popover: popover, scheme: scheme, banner: banner)
+                } else if disks {
+                    ContextMenuScene(popover: popover, scheme: scheme, controller: controller)
                 } else {
                     popover
                 }
@@ -104,6 +114,9 @@ MainActor.assumeIsolated {
                 exit(1)
             }
         }
+        }
+        if disks {
+            renderForgetConfirmation(controller: controller, output: output)
         }
         app.terminate(nil)
     }
@@ -292,5 +305,119 @@ func renderSettings(controller: GuardController, output: String) {
         try? png.write(to: URL(fileURLWithPath: path))
         print("wrote \(path)  \(Int(size.width))x\(Int(size.height)) pt")
     }
+    }
+}
+
+
+/// The popover with a disk row's context menu open beside the row it belongs
+/// to. A context menu is a native NSMenu, which nothing can draw offscreen,
+/// so the menu is drawn here to native metrics with the very strings and
+/// conditions the row uses. The popover is the real view.
+struct ContextMenuScene<Popover: View>: View {
+    let popover: Popover
+    let scheme: ColorScheme
+    let controller: GuardController
+
+    private var dark: Bool { scheme == .dark }
+
+    /// The second "Samsung T7": unplugged and guarded, so it offers Forget.
+    private var disk: KnownDisk? {
+        controller.knownDisks.first { $0.id == "demo-t7b" }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            popover
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            if let disk {
+                menu(for: disk)
+                    // Level with the row it was opened on, as a context menu
+                    // opens at the pointer.
+                    .padding(.top, 168)
+                    .padding(.leading, -64)
+            }
+        }
+        .padding(24)
+        .background(dark ? Color(white: 0.08) : Color(white: 0.86))
+        .environment(\.colorScheme, scheme)
+    }
+
+    private func menu(for disk: KnownDisk) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            item(Loc.t("disk.hide", "Hide this disk"), enabled: true)
+            item(Loc.t("disk.hideHint", "Restore it later in Settings"), enabled: false)
+            if controller.canForget(disk) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.12))
+                    .frame(height: 1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                item(Loc.t("disk.forget", "Forget this disk"), enabled: true, highlighted: true)
+                item(Loc.t("disk.forgetHint", "Listed again when you plug it in"), enabled: false)
+            }
+        }
+        .padding(.vertical, 5)
+        .frame(minWidth: 200, alignment: .leading)
+        .fixedSize()
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(dark ? Color(white: 0.20) : Color(white: 0.97)))
+        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .strokeBorder(dark ? Color.white.opacity(0.16) : Color.black.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(dark ? 0.5 : 0.2), radius: 12, y: 6)
+    }
+
+    private func item(_ title: String, enabled: Bool, highlighted: Bool = false) -> some View {
+        Text(title)
+            .font(.system(size: 13))
+            .foregroundStyle(highlighted ? AnyShapeStyle(Color.white)
+                             : enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(highlighted ? Color.accentColor : Color.clear))
+            .padding(.horizontal, 5)
+    }
+}
+
+/// The question a guarded disk asks before it is forgotten: the real
+/// NSAlert, laid out in a window that is never shown.
+@MainActor
+func renderForgetConfirmation(controller: GuardController, output: String) {
+    guard let disk = controller.knownDisks.first(where: { $0.id == "demo-t7b" }) else { return }
+    for scheme in [ColorScheme.light, .dark] {
+        // The alert's own views resolve their colours from the app, not from
+        // the window, when nothing is on screen.
+        NSApp.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        let alert = ForgetConfirmation.alert(for: disk, reconnectPending: false)
+        // The app's bundle supplies its icon; a bare executable has none.
+        alert.icon = NSApp.applicationIconImage
+        let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)!
+        alert.window.appearance = appearance
+        alert.layout()
+        guard let view = alert.window.contentView,
+              let content = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
+        view.cacheDisplay(in: view.bounds, to: content)
+        // The content view draws no background of its own: the window's
+        // material does, which an offscreen render does not have. A solid
+        // window colour stands in for it, as the popover shots do.
+        guard let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: content.pixelsWide, pixelsHigh: content.pixelsHigh,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: bitmap) else { exit(1) }
+        let pixels = NSRect(x: 0, y: 0, width: content.pixelsWide, height: content.pixelsHigh)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        (scheme == .dark ? NSColor(white: 0.17, alpha: 1) : NSColor(white: 0.93, alpha: 1)).setFill()
+        pixels.fill()
+        // Over, not the copy a bare draw(in:) does, which keeps the alpha.
+        content.draw(in: pixels, from: .zero, operation: .sourceOver, fraction: 1,
+                     respectFlipped: false, hints: nil)
+        NSGraphicsContext.restoreGraphicsState()
+        guard let png = bitmap.representation(using: .png, properties: [:]) else { exit(1) }
+        let suffix = scheme == .dark ? "-dark" : "-light"
+        let path = output.replacingOccurrences(of: ".png", with: "-confirm\(suffix).png")
+        try? png.write(to: URL(fileURLWithPath: path))
+        print("wrote \(path)")
     }
 }

@@ -745,6 +745,36 @@ extension GuardController {
         calendarAccess = .granted
         notificationsEnabled = true
     }
+
+    /// The demo with disks that share a name, for reviewing how a row tells
+    /// them apart and what its context menu offers. One pair differs in size,
+    /// the other only in its UUID.
+    func loadDisksDemo() {
+        loadDemo()
+        let small = KnownDisk(id: "demo-t7a", name: "Samsung T7", volumeUUID: "1C2F6A0B-demo",
+                              capacity: 1_000_000_000_000)
+        let large = KnownDisk(id: "demo-t7b", name: "Samsung T7", volumeUUID: "9E41D7C3-demo",
+                              absentSince: Date().addingTimeInterval(-3 * 86_400),
+                              capacity: 2_000_000_000_000)
+        let first = KnownDisk(id: "demo-u1", name: "Untitled", volumeUUID: "4BEED8FB-demo",
+                              capacity: 64_000_000_000)
+        let second = KnownDisk(id: "demo-u2", name: "Untitled", volumeUUID: "7496A0AE-demo",
+                               capacity: 64_000_000_000)
+        var demo = config
+        // The share and the single T7 make way, to keep the popover under its
+        // maximum height.
+        demo.knownDisks = [demo.knownDisks[0], small, large, demo.knownDisks[3], first, second]
+        demo.watchedDiskIDs = [demo.knownDisks[0].id, demo.knownDisks[3].id, large.id]
+        config = demo
+        attached = attached.filter { $0.volumeUUID != "demo-t7-uuid" } + [
+            AttachedVolume(path: "/Volumes/Samsung T7", name: small.name,
+                           volumeUUID: small.volumeUUID, connection: .usb, capacity: small.capacity),
+        ]
+        reportedDestinationIDs = ["demo-tm-dest", "demo-nas"]
+        var status = backup
+        status.running = false
+        backup = status
+    }
 }
 #endif
 
