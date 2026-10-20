@@ -3,29 +3,12 @@
 // Split in two on purpose. `StatusIcon` reads the controller; `StatusIconArt`
 // takes plain values and draws. Only the second one can be rendered offscreen
 // and looked at, and an icon nobody can look at is an icon nobody reviews.
+// The drawing itself, and the eject animation's timing, live in
+// Sources/Icon (`LiftIcon`, `MenuBarIconAnimator`), where the tests reach them.
 
 import SwiftUI
 
-/// What the icon is saying right now.
-enum StatusIconState: CaseIterable {
-    case ejecting, backingUp, armed, idle, off
-
-    /// Each state gets its own shape, not just a different badge. A badge swap
-    /// is too quiet to notice during the few seconds an eject takes.
-    var symbol: String {
-        switch self {
-        case .ejecting: return "eject.fill"
-        case .off: return "externaldrive.badge.xmark"
-        // The badge Time Machine itself uses, so the icon says what is
-        // happening rather than only that something is.
-        case .backingUp: return "externaldrive.fill.badge.timemachine"
-        case .armed: return "externaldrive.fill.badge.checkmark"
-        case .idle: return "externaldrive"
-        }
-    }
-}
-
-/// A View rather than a computed symbol name in the Scene body: observation is
+/// A View rather than a computed image in the Scene body: observation is
 /// registered when a view body is evaluated, so this is what reliably redraws
 /// when a disk is plugged in or an eject starts.
 struct StatusIcon: View {
@@ -61,7 +44,9 @@ struct StatusIcon: View {
     var body: some View {
         StatusIconArt(state: state,
                       percent: controller.backupPercent,
-                      phase: controller.backupPhase)
+                      phase: controller.backupPhase,
+                      guarding: controller.config.isActive && controller.hasGuardedTargets,
+                      ejectPhase: controller.iconAnimator.phase)
             // `label` is already translated; the name in front of it never is.
             .accessibilityLabel(Text(verbatim: "Eject Guard: \(label)"))
     }
@@ -69,73 +54,34 @@ struct StatusIcon: View {
 
 /// The drawing, with nothing to observe. Everything it needs is an argument, so
 /// it renders the same way in the menu bar and in the preview harness.
+///
+/// One template image per pose, on the fixed 22 x 16 pt canvas: a MenuBarExtra
+/// label is rendered to a static image, so SwiftUI's own effects never run
+/// there, and the label stays a plain `Image`, which the menu bar tints like a
+/// system symbol and never scales.
 struct StatusIconArt: View {
     let state: StatusIconState
     /// 0...1, or nil while Time Machine is still sizing the job up.
     var percent: Double?
+    /// The backup breathing step, see `GuardController.backupPhase`.
     var phase: Int = 0
+    /// A disk is guarded, so the triangle is solid during a backup too.
+    var guarding = false
+    /// Seconds into the eject animation, nil at rest. See `MenuBarIconAnimator`.
+    var ejectPhase: Double?
 
-    /// Fixed rather than inherited. The backing-up state stacks a progress bar
-    /// under the glyph, and without a fixed size that extra height shrinks the
-    /// glyph - so the icon would visibly shrink the moment a backup started and
-    /// grow back when it finished. Caught by rendering the states side by side.
-    private static let glyphSize: CGFloat = 15
-
-    var body: some View {
-        if state == .backingUp {
-            VStack(spacing: 1) {
-                Image(systemName: state.symbol)
-                    .font(.system(size: Self.glyphSize))
-                BackupTrack(percent: percent, phase: phase)
-            }
-        } else {
-            Image(systemName: state.symbol)
-                .font(.system(size: Self.glyphSize))
-        }
+    var pose: LiftIcon.Pose {
+        let rest = LiftIcon.pose(state, percent: percent, phase: phase, guarding: guarding)
+        // A new eject under way says so, rather than finishing the last one's
+        // celebration.
+        guard let ejectPhase, state != .ejecting else { return rest }
+        return LiftIcon.pose(at: ejectPhase, landingOn: rest)
     }
-}
-
-/// The thin bar under the drive while Time Machine is writing to it.
-///
-/// Determinate once Time Machine has a percentage. Until then it reports -1,
-/// and a bar sitting at zero reads as a stalled backup, so a short segment
-/// travels instead: honest about working without claiming to know how far.
-///
-/// Both forms breathe, because progress can sit on one number for minutes and a
-/// still icon in a menu bar reads as a dead one. The breathing is driven by
-/// `GuardController.backupPhase` rather than by SwiftUI: a MenuBarExtra label
-/// is rendered to a static image, so `.symbolEffect` and friends never run
-/// there. That was measured on this machine, not assumed.
-struct BackupTrack: View {
-    let percent: Double?
-    let phase: Int
-
-    private static let width: CGFloat = 15
-    private static let height: CGFloat = 2
-
-    /// 0..<1 through one cycle.
-    private var t: Double { Double(phase) / Double(GuardController.breatheSteps) }
-
-    /// 0.55 at the ends of the cycle, 1 in the middle.
-    private var breath: Double { 0.55 + 0.45 * (0.5 - 0.5 * cos(2 * .pi * t)) }
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule().opacity(0.25)
-            if let percent {
-                // A hairline even at 0%, so the track never looks empty.
-                Capsule()
-                    .frame(width: max(Self.height, Self.width * percent))
-                    .opacity(breath)
-            } else {
-                Capsule()
-                    .frame(width: Self.width * 0.35)
-                    .offset(x: Self.width * 1.35 * t - Self.width * 0.35)
-                    .opacity(breath)
-            }
-        }
-        .frame(width: Self.width, height: Self.height)
-        // The travelling segment starts and ends outside the track.
-        .clipShape(Capsule())
+        // Still an Image after this, so the menu bar treats it as one; in an
+        // offscreen render it takes the foreground colour like a symbol.
+        Image(nsImage: LiftIcon.image(pose))
+            .renderingMode(.template)
     }
 }
