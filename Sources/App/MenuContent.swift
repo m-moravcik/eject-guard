@@ -298,9 +298,12 @@ private struct DisksSection: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Design.Spacing.l)
                 } else {
+                    // Two disks of one name read the same, so each gets what
+                    // tells it apart: its size, or the start of its UUID.
+                    let details = Disks.distinguishingDetails(for: controller.knownDisks)
                     VStack(spacing: Design.Spacing.xs) {
                         ForEach(Array(controller.knownDisks.enumerated()), id: \.element.id) { index, disk in
-                            DiskCard(disk: disk, shortcutIndex: index)
+                            DiskCard(disk: disk, shortcutIndex: index, detail: details[disk.id])
                         }
                         // The one thing a new user has to do, said where they
                         // are looking rather than only in the README.
@@ -325,6 +328,8 @@ private struct DiskCard: View {
     let disk: KnownDisk
     /// Position in the list, which is also its keyboard shortcut.
     let shortcutIndex: Int
+    /// Set only when another listed disk has the same name.
+    var detail: String?
 
     @State private var isHovering = false
 
@@ -341,6 +346,11 @@ private struct DiskCard: View {
     private var backingUp: Bool { controller.isBackingUp(disk) }
 
     private var subtitle: String {
+        guard let detail else { return status }
+        return "\(status) · \(detail)"
+    }
+
+    private var status: String {
         if backingUp {
             if let percent = controller.backup.percent {
                 return Loc.t("disk.backingUpPercent", "Backing up… %@", Format.percent(percent))

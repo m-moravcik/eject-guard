@@ -486,6 +486,88 @@ final class DiskMergeTests: XCTestCase {
         XCTAssertFalse(disk.isNetworkDestination)
     }
 
+    // MARK: Telling apart disks that share a name
+
+    private let english = Locale(identifier: "en_US")
+
+    func testASizeIsStoredWhenTheDiskIsSeenAndKeptWhileItIsAway() {
+        var config = GuardConfig()
+        var plugged = volume("WD", uuid: "VOL-1")
+        plugged.capacity = 999_995_129_856
+        Disks.merge(DiskSnapshot(destinations: [], attached: [plugged]), into: &config)
+        XCTAssertEqual(config.knownDisks.first?.capacity, 999_995_129_856)
+
+        Disks.merge(unplugged, into: &config)
+        XCTAssertEqual(config.knownDisks.first?.capacity, 999_995_129_856)
+    }
+
+    func testAnEntryFromAnOlderFileGetsItsSizeOnceSeen() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+        var plugged = volume("WD", uuid: "VOL-1")
+        plugged.capacity = 2_000_000_000_000
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [plugged]), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(config.knownDisks.first?.capacity, 2_000_000_000_000)
+    }
+
+    func testOnlyDisksSharingANameGetADetail() {
+        let disks = [
+            KnownDisk(id: "VOL-1", name: "Macintosh HD", volumeUUID: "VOL-1", capacity: 999_995_129_856),
+            KnownDisk(id: "VOL-2", name: "macintosh hd", volumeUUID: "VOL-2", capacity: 499_963_174_912),
+            KnownDisk(id: "VOL-3", name: "Archive", volumeUUID: "VOL-3", capacity: 999_995_129_856),
+        ]
+
+        XCTAssertEqual(Disks.distinguishingDetails(for: disks, locale: english),
+                       ["VOL-1": "1 TB", "VOL-2": "500 GB"])
+    }
+
+    func testTheUUIDTellsThemApartWhenTheSizeCannot() {
+        let sameSize = [
+            KnownDisk(id: "4BEED8FB-FE3C-4976-926E-C0E17CD588AD", name: "Macintosh HD",
+                      volumeUUID: "4BEED8FB-FE3C-4976-926E-C0E17CD588AD", capacity: 41_902_080),
+            KnownDisk(id: "749640AE-ADFC-3275-B8A0-CA490DE810FB", name: "Macintosh HD",
+                      volumeUUID: "749640AE-ADFC-3275-B8A0-CA490DE810FB", capacity: 41_902_080),
+        ]
+        XCTAssertEqual(Disks.distinguishingDetails(for: sameSize, locale: english),
+                       ["4BEED8FB-FE3C-4976-926E-C0E17CD588AD": "ID 4BEE",
+                        "749640AE-ADFC-3275-B8A0-CA490DE810FB": "ID 7496"])
+
+        // One of them never seen with a size, as an entry from an older file.
+        var unsized = sameSize
+        unsized[1].capacity = nil
+        XCTAssertEqual(Disks.distinguishingDetails(for: unsized, locale: english).values.sorted(),
+                       ["ID 4BEE", "ID 7496"])
+    }
+
+    func testTheUUIDPrefixGrowsUntilItTellsThemApart() {
+        let disks = [
+            KnownDisk(id: "A", name: "WD", volumeUUID: "ABCDEF01-0000-0000-0000-000000000000"),
+            KnownDisk(id: "B", name: "WD", volumeUUID: "ABCDEF02-0000-0000-0000-000000000000"),
+        ]
+        XCTAssertEqual(Disks.distinguishingDetails(for: disks, locale: english),
+                       ["A": "ID ABCDEF01", "B": "ID ABCDEF02"])
+    }
+
+    func testADiskWithNeitherSizeNorUUIDGetsNoGuess() {
+        // A path-keyed volume that reported no UUID, beside a share.
+        let disks = [
+            KnownDisk(id: "/Volumes/Backup", name: "Backup"),
+            KnownDisk(id: "NET-1", name: "Backup", tmDestinationID: "NET-1", network: true),
+        ]
+        XCTAssertEqual(Disks.distinguishingDetails(for: disks, locale: english), ["NET-1": "ID NET1"])
+    }
+
+    func testSizesReadTheWayDisksAreSold() {
+        XCTAssertEqual(Disks.capacityLabel(999_995_129_856, locale: english), "1 TB")
+        XCTAssertEqual(Disks.capacityLabel(499_963_174_912, locale: english), "500 GB")
+        XCTAssertEqual(Disks.capacityLabel(255_850_000_000, locale: english), "256 GB")
+        XCTAssertEqual(Disks.capacityLabel(1_499_000_000_000, locale: english), "1.5 TB")
+        XCTAssertEqual(Disks.capacityLabel(1_499_000_000_000, locale: Locale(identifier: "sk_SK")), "1,5 TB")
+    }
+
     // MARK: How a disk is connected
 
     func testTheInterfaceIsNamedOnlyWhenWeRecogniseIt() {

@@ -35,6 +35,7 @@
 "disk.notGuarded" = "Nehlídaný";
 "disk.reconnectsAt" = "Připojí se v %@";
 "disk.sdCard" = "SD karta";
+"disk.shortID" = "ID %@";
 "disk.timeMachineBadge" = "Cíl zálohování Time Machine";
 "disks.empty" = "Zatím žádný externí disk.\nPřipoj ho a objeví se tady.";
 "disks.hint" = "Klikni na disk a bude hlídaný.";

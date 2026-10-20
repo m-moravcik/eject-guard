@@ -75,6 +75,44 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(try decoder.decode(GuardConfig.self, from: data), original)
     }
 
+    /// A 1.4.2 file: disks without the size this release stores. Every
+    /// disk, tick and absence must come through, with no size until the disk
+    /// is seen again.
+    func testDisksFromAnOlderFileDecodeWithoutASize() throws {
+        let config = try decode("""
+        {
+          "watchedDiskIDs": ["VOL-1"],
+          "dismissedDiskIDs": ["TM-9"],
+          "knownDisks": [
+            { "id": "VOL-1", "name": "Time Machine WD", "volumeUUID": "VOL-1",
+              "tmDestinationID": "TM-1", "lastSeen": "2026-10-07T08:00:00Z" },
+            { "id": "VOL-2", "name": "Macintosh HD", "volumeUUID": "VOL-2",
+              "lastSeen": "2026-10-20T09:00:00Z", "absentSince": "2026-10-20T09:05:00Z" },
+            { "id": "NET-1", "name": "NAS", "tmDestinationID": "NET-1", "network": true }
+          ]
+        }
+        """)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1", "VOL-2", "NET-1"])
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"])
+        XCTAssertEqual(config.dismissedDiskIDs, ["TM-9"])
+        XCTAssertTrue(config.knownDisks.allSatisfy { $0.capacity == nil })
+        XCTAssertNotNil(config.knownDisks[1].absentSince)
+        XCTAssertTrue(config.knownDisks[2].isNetworkDestination)
+    }
+
+    func testADisksSizeSurvivesARoundTrip() throws {
+        var original = GuardConfig()
+        original.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1",
+                                         capacity: 999_995_129_856)]
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(original)
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains(#""capacity":999995129856"#))
+
+        XCTAssertEqual(try decode(String(decoding: data, as: UTF8.self)), original)
+    }
+
     func testIsActive() {
         var config = GuardConfig()
         XCTAssertTrue(config.isActive)

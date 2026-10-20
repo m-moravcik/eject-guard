@@ -89,7 +89,7 @@ enum Disks {
         // back nil and the volume is silently rejected.
         let keys: [URLResourceKey] = [
             .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRootFileSystemKey,
-            .volumeUUIDStringKey, .volumeLocalizedNameKey,
+            .volumeUUIDStringKey, .volumeLocalizedNameKey, .volumeTotalCapacityKey,
         ]
         guard let urls = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes])
@@ -122,7 +122,8 @@ enum Disks {
                     name: values.volumeLocalizedName ?? url.lastPathComponent,
                     volumeUUID: values.volumeUUIDString,
                     tmDestinationID: tmDestinationID,
-                    connection: connection(fromProtocol: device?.protocol)))
+                    connection: connection(fromProtocol: device?.protocol),
+                    capacity: values.volumeTotalCapacity.map(Int64.init)))
             }
         }
         return (attached, diskImageIDs)
@@ -350,6 +351,7 @@ enum Disks {
                 merged.tmDestinationID = disk.tmDestinationID ?? merged.tmDestinationID
                 merged.lastSeen = disk.lastSeen ?? merged.lastSeen
                 merged.network = disk.network ?? merged.network
+                merged.capacity = disk.capacity ?? merged.capacity
 
                 // Another entry sharing an identity is this same disk, written
                 // down before the link between its volume and its destination
@@ -376,6 +378,7 @@ enum Disks {
                     let duplicate = known[other]
                     merged.volumeUUID = merged.volumeUUID ?? duplicate.volumeUUID
                     merged.tmDestinationID = merged.tmDestinationID ?? duplicate.tmDestinationID
+                    merged.capacity = merged.capacity ?? duplicate.capacity
                     if let seen = duplicate.lastSeen, seen > merged.lastSeen ?? .distantPast {
                         merged.lastSeen = seen
                     }
@@ -410,7 +413,8 @@ enum Disks {
                 name: volume.name,
                 volumeUUID: volume.volumeUUID,
                 tmDestinationID: volume.tmDestinationID,
-                lastSeen: now))
+                lastSeen: now,
+                capacity: volume.capacity))
         }
 
         // A disk image is never listed, and one remembered all the same - by
@@ -463,6 +467,52 @@ enum Disks {
         config.knownDisks = known
             .filter { !dismissed.contains($0.id) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// What tells apart remembered disks that share a name, keyed by disk
+    /// ID. A disk whose name no other one has gets nothing.
+    ///
+    /// The size first, as people know their disks by it ("the 1 TB one"),
+    /// when every disk of the name has one and no two read the same. Failing
+    /// that, the start of each one's volume UUID, as short as still tells
+    /// them apart and never under four characters. A disk with neither, a
+    /// share for instance, gets nothing rather than a guess.
+    static func distinguishingDetails(for disks: [KnownDisk], locale: Locale = .current) -> [String: String] {
+        var details: [String: String] = [:]
+        let groups = Dictionary(grouping: disks) { $0.name.lowercased() }
+        for group in groups.values where group.count > 1 {
+            let sizes = group.map { $0.capacity.map { capacityLabel($0, locale: locale) } }
+            if sizes.allSatisfy({ $0 != nil }), Set(sizes).count == group.count {
+                for (disk, size) in zip(group, sizes) { details[disk.id] = size }
+                continue
+            }
+            let identities = group.map { disk in
+                (disk.volumeUUID ?? disk.tmDestinationID).map { $0.replacingOccurrences(of: "-", with: "").uppercased() }
+            }
+            let known = identities.compactMap { $0 }
+            var length = 4
+            while length < (known.map(\.count).max() ?? 0),
+                  Set(known.map { $0.prefix(length) }).count < Set(known).count {
+                length += 1
+            }
+            for (disk, identity) in zip(group, identities) {
+                if let identity {
+                    details[disk.id] = Loc.t("disk.shortID", "ID %@", String(identity.prefix(length)))
+                }
+            }
+        }
+        return details
+    }
+
+    /// A size the way a disk is sold: "1 TB", "500 GB". Rounded to three
+    /// significant figures first, because a volume is a little smaller than
+    /// its disk and "499.96 GB" is not what anyone calls it.
+    static func capacityLabel(_ bytes: Int64, locale: Locale = .current) -> String {
+        guard bytes > 0 else { return 0.formatted(.byteCount(style: .file).locale(locale)) }
+        let digits = Int(log10(Double(bytes))) + 1
+        let scale = pow(10, Double(max(digits - 3, 0)))
+        let rounded = Int64((Double(bytes) / scale).rounded() * scale)
+        return rounded.formatted(.byteCount(style: .file).locale(locale))
     }
 
     /// Scan and merge in one step. Fine for the command line tool, which is

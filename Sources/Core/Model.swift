@@ -20,6 +20,9 @@ struct KnownDisk: Codable, Equatable {
     /// disk behind it to eject: guarding one means stopping a backup to it
     /// before a meeting, so the laptop never leaves the network mid-write.
     var network: Bool?
+    /// The volume's size in bytes, as of the last time it was plugged in.
+    /// Only ever shown to tell apart two disks that share a name.
+    var capacity: Int64?
 
     var isTimeMachineDestination: Bool { tmDestinationID != nil }
     var isNetworkDestination: Bool { network == true }
@@ -38,6 +41,8 @@ struct AttachedVolume: Equatable {
     var tmDestinationID: String?
     /// Nil when DiskArbitration reports an interface we do not name.
     var connection: Connection?
+    /// Total size in bytes, when the volume reports one.
+    var capacity: Int64?
 }
 
 
