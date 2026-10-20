@@ -170,24 +170,43 @@ final class DiskMergeTests: XCTestCase {
                        "you pick from this list while the disk is in a drawer")
     }
 
-    // A disk nobody guards is forgotten a week after it was unplugged: a
+    // A disk nobody guards is forgotten 30 days after it was unplugged: a
     // volume made while formatting a disk otherwise stayed listed for good,
     // and hiding it by hand was the only way out.
 
+    private let day: TimeInterval = 24 * 60 * 60
     private let week: TimeInterval = 7 * 24 * 60 * 60
+    private let month: TimeInterval = 30 * 24 * 60 * 60
     private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     private let unplugged = DiskSnapshot(destinations: [], attached: [])
 
-    func testAnUnguardedDiskUnpluggedForAWeekIsForgotten() {
+    func testAnUnguardedDiskUnpluggedFor30DaysIsForgotten() {
         var config = GuardConfig()
         Disks.merge(DiskSnapshot(destinations: [], attached: [volume("TmpInit", uuid: "VOL-1")]),
                     into: &config, now: start)
         Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60))
-
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + week - 1))
-        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "not a week yet")
+        XCTAssertEqual(config.knownDisks.first?.absentSince, start.addingTimeInterval(60))
 
         Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + week))
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "a week is no longer enough")
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + month - 1))
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "not 30 days yet")
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + month))
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    func testAnEntryFromAnEarlierReleaseCountsFromItsStoredAbsence() {
+        // Written by 1.4.2 with the absence it found 20 days ago.
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "Speaker's SSD", volumeUUID: "VOL-1",
+                                       absentSince: start.addingTimeInterval(-20 * day))]
+
+        Disks.merge(unplugged, into: &config, now: start)
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(10 * day))
         XCTAssertTrue(config.knownDisks.isEmpty)
     }
 
@@ -202,48 +221,51 @@ final class DiskMergeTests: XCTestCase {
         XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"],
                        "you pick from this list while the disk is in a drawer")
         XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"])
+        XCTAssertNotNil(config.knownDisks.first?.absentSince, "absent all the same")
     }
 
     func testATimeMachineDiskIsNeverForgotten() {
         // Time Machine reports it again on every pass, so forgetting it would
-        // only make the row flicker. One it no longer backs up to is hidden.
+        // only make the row flicker. One it no longer backs up to is hidden
+        // or forgotten by hand.
         var config = GuardConfig()
         config.knownDisks = [
             KnownDisk(id: "VOL-2", name: "TM MBP", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
+            // Never seen mounted: only a destination ID.
+            KnownDisk(id: "TM-3", name: "TM Old", tmDestinationID: "TM-3"),
         ]
 
         Disks.merge(unplugged, into: &config, now: start)
         Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(52 * week))
 
-        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2"])
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2", "TM-3"])
     }
 
-    func testTheWeekCountsFromWhenTheDiskWasFoundMissing() {
+    func testTheMonthCountsFromWhenTheDiskWasFoundMissing() {
         // The app rescans only when something mounts, unmounts or wakes, so a
         // disk left plugged into a Mac that never sleeps, or one an earlier
         // release remembered, can carry a `lastSeen` weeks old the moment it
         // is found missing.
         var config = GuardConfig()
         config.knownDisks = [KnownDisk(id: "VOL-1", name: "Archive", volumeUUID: "VOL-1",
-                                       lastSeen: start.addingTimeInterval(-4 * week))]
+                                       lastSeen: start.addingTimeInterval(-8 * week))]
 
         Disks.merge(unplugged, into: &config, now: start)
         XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "found missing just now")
 
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(week))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(month))
         XCTAssertTrue(config.knownDisks.isEmpty)
     }
 
-    func testPluggingTheDiskBackInStartsTheWeekAgain() {
-        let day: TimeInterval = 24 * 60 * 60
+    func testPluggingTheDiskBackInStartsTheMonthAgain() {
         var config = GuardConfig()
         config.knownDisks = [KnownDisk(id: "VOL-1", name: "Archive", volumeUUID: "VOL-1")]
         let pluggedIn = DiskSnapshot(destinations: [], attached: [volume("Archive", uuid: "VOL-1")])
 
         Disks.merge(unplugged, into: &config, now: start)
-        Disks.merge(pluggedIn, into: &config, now: start.addingTimeInterval(6 * day))
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(6 * day + 60))
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(week + 1))
+        Disks.merge(pluggedIn, into: &config, now: start.addingTimeInterval(29 * day))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(29 * day + 60))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(month + 1))
 
         XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
     }

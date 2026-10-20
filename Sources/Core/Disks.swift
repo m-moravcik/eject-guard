@@ -289,12 +289,14 @@ enum Disks {
         return URL(fileURLWithPath: path).deletingLastPathComponent().path == "/Volumes"
     }
 
-    static let forgetUnguardedAfter: TimeInterval = 7 * 24 * 60 * 60
+    /// Long enough for a disk that only comes out for a monthly backup, short
+    /// enough that a stick handed on does not sit in the list for good.
+    static let forgetUnguardedAfter: TimeInterval = 30 * 24 * 60 * 60
 
     /// Fold a snapshot into the remembered list. A guarded disk is never
-    /// dropped unless the user hid it: the list is what you pick from while the
-    /// disk sits in a drawer. One nobody guards is forgotten a week after it
-    /// was unplugged.
+    /// dropped unless the user hid or forgot it: the list is what you pick
+    /// from while the disk sits in a drawer. One nobody guards is forgotten
+    /// 30 days after it was unplugged.
     static func merge(_ snapshot: DiskSnapshot, into config: inout GuardConfig, now: Date = Date()) {
         var known = config.knownDisks
 
@@ -443,8 +445,8 @@ enum Disks {
             }
         }
 
-        // A disk nobody guards, unplugged for a week, is most likely gone for
-        // good: a volume made while formatting, a stick handed on. Forgetting
+        // A disk nobody guards, unplugged for 30 days, is most likely gone
+        // for good: a volume made while formatting, a stick handed on. Forgetting
         // it costs nothing, it is listed again the moment it is plugged in.
         // Never a guarded disk, and never a Time Machine destination, which
         // Time Machine reports again on every pass.
@@ -453,7 +455,7 @@ enum Disks {
                   now.timeIntervalSince(since) >= forgetUnguardedAfter,
                   !watched.contains(disk.id), !disk.isTimeMachineDestination
             else { return false }
-            Log.write("forgot \"\(disk.name)\" - not guarded and unplugged for a week")
+            Log.write("forgot \"\(disk.name)\" - not guarded and unplugged for 30 days")
             return true
         }
 

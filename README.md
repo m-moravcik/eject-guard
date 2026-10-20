@@ -62,7 +62,7 @@ The menu bar popover shows your disks and today's next meeting:
 - **Click a disk** to guard it. Disks are remembered once you plug them in,
   and Time Machine destinations appear straight away. Each row says how the
   disk is connected: USB, Thunderbolt, SD card, or network. ⌘1 to ⌘9 toggle them
-  from the keyboard. A disk you do not guard is forgotten a week after you
+  from the keyboard. A disk you do not guard is forgotten 30 days after you
   unplug it, and listed again the next time you plug it in.
 - **Next meeting** shows what the guard will do and when it will eject.
   **Skip this meeting** leaves your disks alone for that one event.
