@@ -188,8 +188,9 @@ four times a second - and only while a backup is actually running.
 
 **When the guard ejects a disk, the icon plays a two second animation**: a beat,
 then the triangle crouches as the bar drains, launches out of the frame, and
-drops back onto the empty bar with a squash and a small hop. It plays only when
-a disk actually came off, unmounted for a meeting or ejected (`MenuBarIconAnimator.ejectFinished`): never for a
+drops back with a squash and a small hop onto the state it rests in: the dashed
+slot after an unmount for a meeting, the empty bar after an eject. It plays only
+when a disk actually came off, unmounted for a meeting or ejected (`MenuBarIconAnimator.ejectFinished`): never for a
 failed eject, a backup to a share that was only stopped, or anything shown in
 the preview harness. A 30 Hz timer runs while it plays and not otherwise, a
 second eject restarts it rather than stacking a second timer, and with Reduce
@@ -332,7 +333,7 @@ this project has been so far:
 | `Disks.connection` | Only interfaces we recognise are named. |
 | Reconnecting | A volume diskutil no longer knows was unplugged; an empty mount point is attached but down. Nothing is mounted while a meeting runs or is about to start, back-to-back meetings chain, a day-old entry is dropped, and only a UUID reaches diskutil. |
 | `LiftIcon` | Every state and animation frame is a template image on the fixed canvas, or the menu bar cannot tint it. Its size is anchored on `externaldrive`: an icon smaller than its neighbours was the complaint before it. Idle and armed have to differ at 1x, not only at 2x. |
-| `MenuBarIconAnimator` | Plays only on a disk actually ejected, runs no timer at rest, restarts on a burst instead of stacking timers, and respects Reduce Motion. |
+| `MenuBarIconAnimator` | Plays only on a disk actually ejected or mounted again, runs no timer at rest, restarts on a burst instead of stacking timers, and respects Reduce Motion. |
 
 The tests were checked by putting two real bugs back in: removing the hand
 written config decoder, and dropping the ticked-disk filter. Both were caught.

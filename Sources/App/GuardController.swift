@@ -557,7 +557,7 @@ final class GuardController {
                 // Only a disk that actually came off is celebrated: not a
                 // failure, and not a backup to a share that was only stopped.
                 // Unmounted for a meeting counts: the disk came off all the
-                // same, and the icon lands on the empty bar until it is back.
+                // same, and the icon lands on the dashed slot until it is back.
                 self.iconAnimator.ejectFinished(ejectedDisks: outcome.takenOff.count)
                 self.lastFailure = outcome.failed.first.map {
                     Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, GuardRunner.holder($0.detail))

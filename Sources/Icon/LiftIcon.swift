@@ -4,9 +4,9 @@
 // nothing is guarded, a solid slab while a disk is guarded, filling up while
 // Time Machine writes, and a dashed slot while a disk unmounted for a meeting
 // waits to come back. When the guard takes a disk off, the triangle crouches
-// as the bar drains, launches out of the frame, and drops back onto an empty
-// bar; when the disk comes back, the slot closes and fills, and the triangle
-// settles onto it.
+// as the bar drains, launches out of the frame, and drops back onto the bar
+// it rests on, the slot or the empty line; when the disk comes back, the
+// slot closes and fills, and the triangle settles onto it.
 //
 // Drawn with Core Graphics as one template image per pose, so it is sharp at
 // every backing scale, every animation frame comes from the same paths, and
@@ -232,7 +232,7 @@ enum LiftIcon {
 
     /// The beats, in seconds. It waits a beat so the eye finds it, crouches
     /// slowly enough to notice while the bar drains, launches out of the
-    /// frame trailing speed lines, and drops back onto the empty bar with a
+    /// frame trailing speed lines, and drops back onto its resting bar with a
     /// squash and a little hop.
     enum Beat {
         static let crouch = 0.45...1.0
@@ -255,7 +255,8 @@ enum LiftIcon {
     static let hopHeight: CGFloat = 1.0
 
     /// A frame of the eject animation, landing on `rest`: whatever the icon
-    /// shows once it ends, usually the idle pose.
+    /// shows once it ends, the slot after an unmount for a meeting and the
+    /// idle pose after an eject.
     static func pose(at t: Double, landingOn rest: Pose = Pose()) -> Pose {
         guard t < duration else { return rest }
         // Starts as the guarded disk it is ejecting: solid, full bar.

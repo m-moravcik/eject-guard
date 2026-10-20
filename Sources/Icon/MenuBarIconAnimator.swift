@@ -21,7 +21,7 @@ final class MenuBarIconAnimator {
 
     /// Which animation is playing.
     enum Clip: Sendable, Equatable {
-        /// A disk came off: crouch, launch, land on the empty bar.
+        /// A disk came off: crouch, launch, land on the state it rests in.
         case eject
         /// A disk came back after a meeting: the slot closes and fills.
         case reconnect
