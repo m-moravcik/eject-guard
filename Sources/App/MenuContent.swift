@@ -513,8 +513,12 @@ private struct DiskCard: View {
 
     /// A guarded disk is asked about first: forgetting one also stops
     /// guarding it, and a click in a context menu is easy to get wrong.
-    /// An NSAlert rather than a SwiftUI alert, which a menu bar popover
-    /// closes along with itself.
+    /// An app-modal NSAlert rather than a SwiftUI alert, which a menu bar
+    /// popover closes along with itself. The popover may well close when the
+    /// alert takes focus; `runModal` still hands back the answer, and only
+    /// values captured here are used after it. Checked offscreen by closing
+    /// a stand-in popover window while the alert was up: Forget came back as
+    /// the first button, Return as Cancel.
     private func forget() {
         guard guarded else {
             controller.forget(disk)
