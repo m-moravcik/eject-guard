@@ -31,4 +31,11 @@ final class EjectorTests: XCTestCase {
             """
         XCTAssertEqual(Ejector.holderNames(fromLsof: output), "")
     }
+
+    /// Every place a failed eject is shown names a holder, even when lsof
+    /// could not: the popover once read "NMGuardB: held by " and nothing more.
+    func testAnUnnamedHolderIsSaidToBeUnknown() {
+        XCTAssertEqual(GuardRunner.holder(""), "an unknown process")
+        XCTAssertEqual(GuardRunner.holder("bash, zsh"), "bash, zsh")
+    }
 }
