@@ -506,18 +506,33 @@ private struct DiskCard: View {
             controller.forget(disk)
             return
         }
+        let alert = ForgetConfirmation.alert(
+            for: disk, reconnectPending: controller.pendingReconnect(for: disk) != nil)
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        controller.forget(disk)
+    }
+}
+
+/// The question asked before a guarded disk is forgotten. Apart from the
+/// row so the preview harness renders the very same alert.
+@MainActor
+enum ForgetConfirmation {
+    static func alert(for disk: KnownDisk, reconnectPending: Bool) -> NSAlert {
         var message = Loc.t("disk.forgetConfirmDetail", "It is guarded. Forgetting it stops guarding it, and the next time you plug it in it is listed as not guarded.")
-        if controller.pendingReconnect(for: disk) != nil {
+        if reconnectPending {
             message += " " + Loc.t("disk.forgetConfirmReconnect", "It will not be reconnected after the meeting either.")
         }
         let alert = NSAlert()
         alert.messageText = Loc.t("disk.forgetConfirm", "Forget “%@”?", disk.name)
         alert.informativeText = message
-        alert.addButton(withTitle: Loc.t("disk.forgetConfirmButton", "Forget"))
-        alert.addButton(withTitle: Loc.t("disk.forgetCancel", "Cancel"))
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        controller.forget(disk)
+        let forget = alert.addButton(withTitle: Loc.t("disk.forgetConfirmButton", "Forget"))
+        let cancel = alert.addButton(withTitle: Loc.t("disk.forgetCancel", "Cancel"))
+        // Destructive, so Return cancels, as macOS asks of such an alert.
+        forget.hasDestructiveAction = true
+        forget.keyEquivalent = ""
+        cancel.keyEquivalent = "\r"
+        return alert
     }
 }
 
