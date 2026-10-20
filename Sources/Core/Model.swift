@@ -84,6 +84,19 @@ struct GuardConfig: Codable, Equatable {
 
     static let maxSkippedEvents = 50
 
+    /// Drop a remembered disk as if it had never been seen: its tick, a
+    /// hidden mark and a reconnect still waiting for it go with it. Unlike
+    /// hiding, nothing is kept, so the disk is listed again, unguarded, the
+    /// next time it is plugged in.
+    mutating func forget(_ disk: KnownDisk) {
+        knownDisks.removeAll { $0.id == disk.id }
+        watchedDiskIDs.removeAll { $0 == disk.id }
+        dismissedDiskIDs.removeAll { $0 == disk.id }
+        if let uuid = disk.volumeUUID {
+            pendingReconnects.removeAll { $0.volumeUUID == uuid }
+        }
+    }
+
     /// Record a skip, keeping the list bounded. Stale identifiers cost nothing
     /// but the file should not grow forever.
     mutating func skip(_ eventID: String) {

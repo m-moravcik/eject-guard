@@ -474,7 +474,37 @@ private struct DiskCard: View {
             // Settings has the way back.
             Button(Loc.t("disk.hide", "Hide this disk")) { controller.hide(disk) }
             Text(Loc.t("disk.hideHint", "Restore it later in Settings"))
+            // Only while it is unplugged: one that is plugged in would be
+            // listed again by the very next scan.
+            if controller.canForget(disk) {
+                Divider()
+                Button(Loc.t("disk.forget", "Forget this disk")) { forget() }
+                Text(Loc.t("disk.forgetHint", "Listed again when you plug it in"))
+            }
         }
+    }
+
+    /// A guarded disk is asked about first: forgetting one also stops
+    /// guarding it, and a click in a context menu is easy to get wrong.
+    /// An NSAlert rather than a SwiftUI alert, which a menu bar popover
+    /// closes along with itself.
+    private func forget() {
+        guard guarded else {
+            controller.forget(disk)
+            return
+        }
+        var message = Loc.t("disk.forgetConfirmDetail", "It is guarded. Forgetting it stops guarding it, and the next time you plug it in it is listed as not guarded.")
+        if controller.pendingReconnect(for: disk) != nil {
+            message += " " + Loc.t("disk.forgetConfirmReconnect", "It will not be reconnected after the meeting either.")
+        }
+        let alert = NSAlert()
+        alert.messageText = Loc.t("disk.forgetConfirm", "Forget “%@”?", disk.name)
+        alert.informativeText = message
+        alert.addButton(withTitle: Loc.t("disk.forgetConfirmButton", "Forget"))
+        alert.addButton(withTitle: Loc.t("disk.forgetCancel", "Cancel"))
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        controller.forget(disk)
     }
 }
 

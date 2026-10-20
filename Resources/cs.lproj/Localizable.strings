@@ -28,6 +28,13 @@
 "disk.backingUpPercent" = "Zálohuje se… %@";
 "disk.connected" = "Připojený";
 "disk.disconnected" = "Odpojený";
+"disk.forget" = "Zapomenout tento disk";
+"disk.forgetCancel" = "Zrušit";
+"disk.forgetConfirm" = "Zapomenout „%@“?";
+"disk.forgetConfirmButton" = "Zapomenout";
+"disk.forgetConfirmDetail" = "Disk je hlídaný. Zapomenutím ho přestaneš hlídat a až ho příště připojíš, zobrazí se jako nehlídaný.";
+"disk.forgetConfirmReconnect" = "Po schůzce se už ani znovu nepřipojí.";
+"disk.forgetHint" = "Znovu se zobrazí, až ho připojíš";
 "disk.guarded" = "Hlídaný";
 "disk.hide" = "Skrýt tento disk";
 "disk.hideHint" = "Později ho vrátíš v Nastavení";

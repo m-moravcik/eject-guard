@@ -533,6 +533,21 @@ enum Disks {
         }
     }
 
+    /// Whether "Forget this disk" is offered for a remembered disk. Only
+    /// while it is not plugged in: one that is would be listed again by the
+    /// very next scan. Nor for a Time Machine destination Time Machine still
+    /// reports, which would come straight back the same way; hiding is what
+    /// keeps one of those out of the list. A share is never plugged in, so
+    /// it is the same question for it.
+    static func canForget(_ disk: KnownDisk, attached: [AttachedVolume],
+                          reportedDestinationIDs: Set<String>) -> Bool {
+        guard attachedVolume(for: disk, among: attached) == nil else { return false }
+        if let destination = disk.tmDestinationID, reportedDestinationIDs.contains(destination) {
+            return false
+        }
+        return true
+    }
+
     /// Remembered disks the user guards, that are present in this snapshot.
     static func guardedVolumes(_ config: GuardConfig, among volumes: [AttachedVolume]) -> [AttachedVolume] {
         config.knownDisks

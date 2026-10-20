@@ -28,6 +28,13 @@
 "disk.backingUpPercent" = "Backing up… %@";
 "disk.connected" = "Connected";
 "disk.disconnected" = "Disconnected";
+"disk.forget" = "Forget this disk";
+"disk.forgetCancel" = "Cancel";
+"disk.forgetConfirm" = "Forget “%@”?";
+"disk.forgetConfirmButton" = "Forget";
+"disk.forgetConfirmDetail" = "It is guarded. Forgetting it stops guarding it, and the next time you plug it in it is listed as not guarded.";
+"disk.forgetConfirmReconnect" = "It will not be reconnected after the meeting either.";
+"disk.forgetHint" = "Listed again when you plug it in";
 "disk.guarded" = "Guarded";
 "disk.hide" = "Hide this disk";
 "disk.hideHint" = "Restore it later in Settings";

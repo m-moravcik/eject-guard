@@ -20,6 +20,8 @@ final class GuardController {
 
     private(set) var config = GuardConfig()
     private(set) var attached: [AttachedVolume] = []
+    /// The Time Machine destinations the last scan reported.
+    private(set) var reportedDestinationIDs: Set<String> = []
     private(set) var nextMeeting: EKEvent?
     private(set) var ejectDate: Date?
     private(set) var calendarAccess: CalendarAccess = .pending
@@ -375,6 +377,7 @@ final class GuardController {
                     return config
                 }
                 self.attached = snapshot.attached
+                self.reportedDestinationIDs = Set(snapshot.destinations.map(\.id))
                 // Once the disk that failed to eject is gone, or the backup
                 // that would not stop has ended, the warning is stale - it
                 // must not sit in the popover for days.
@@ -568,6 +571,21 @@ final class GuardController {
                 config.dismissedDiskIDs.append(disk.id)
             }
         }
+    }
+
+    func canForget(_ disk: KnownDisk) -> Bool {
+        Disks.canForget(disk, attached: attached, reportedDestinationIDs: reportedDestinationIDs)
+    }
+
+    /// Forgets a disk that is not plugged in. Unlike hiding, nothing is kept:
+    /// it is listed again the next time it is plugged in. The popover asks
+    /// first when the disk is guarded.
+    func forget(_ disk: KnownDisk) {
+        guard canForget(disk) else { return }
+        Log.write("forgot \"\(disk.name)\" - by hand")
+        // The update reschedules, which re-arms the reconnect timer without
+        // an entry this disk had.
+        update { $0.forget(disk) }
     }
 
     func restoreHiddenDisks() {

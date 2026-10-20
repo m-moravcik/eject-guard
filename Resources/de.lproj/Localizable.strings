@@ -28,6 +28,13 @@
 "disk.backingUpPercent" = "Sicherung läuft… %@";
 "disk.connected" = "Verbunden";
 "disk.disconnected" = "Getrennt";
+"disk.forget" = "Dieses Laufwerk vergessen";
+"disk.forgetCancel" = "Abbrechen";
+"disk.forgetConfirm" = "„%@“ vergessen?";
+"disk.forgetConfirmButton" = "Vergessen";
+"disk.forgetConfirmDetail" = "Das Laufwerk wird überwacht. Wenn du es vergisst, wird es nicht mehr überwacht und beim nächsten Anschließen als nicht überwacht angezeigt.";
+"disk.forgetConfirmReconnect" = "Nach dem Meeting wird es auch nicht wieder verbunden.";
+"disk.forgetHint" = "Erscheint wieder, sobald du es anschließt";
 "disk.guarded" = "Überwacht";
 "disk.hide" = "Dieses Laufwerk ausblenden";
 "disk.hideHint" = "Später in den Einstellungen wiederherstellen";
