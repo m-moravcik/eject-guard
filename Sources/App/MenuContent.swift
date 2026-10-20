@@ -438,10 +438,23 @@ private struct DiskCard: View {
                                 .frame(width: 10, height: 10)
                             #endif
                         }
-                        Text(subtitle)
-                            .font(Design.Typography.cardSubtitle)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        // The detail after the status where the line has
+                        // room, on a line of its own where it does not: cut
+                        // off, it would be the very part that tells the two
+                        // disks apart.
+                        ViewThatFits(in: .horizontal) {
+                            Text(subtitle)
+                                .lineLimit(1)
+                            if let detail {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(status)
+                                    Text(detail)
+                                }
+                                .lineLimit(1)
+                            }
+                        }
+                        .font(Design.Typography.cardSubtitle)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
