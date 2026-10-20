@@ -130,4 +130,57 @@ final class MenuBarIconAnimatorTests: XCTestCase {
         XCTAssertGreaterThan(after, 0)
         XCTAssertEqual(count.ticks, after, "no tick after cancel")
     }
+
+    // MARK: - The reconnect animation
+
+    func testAReconnectThatMountedNothingDoesNotPlay() {
+        let rig = Rig()
+        let animator = rig.animator()
+        animator.reconnectFinished(reconnectedDisks: 0)
+        XCTAssertFalse(animator.isTicking)
+        XCTAssertNil(animator.phase)
+        XCTAssertEqual(rig.started, 0)
+    }
+
+    func testAReconnectPlaysItsOwnClipAndEndsWithNoTickerLeft() {
+        let rig = Rig()
+        let animator = rig.animator()
+        animator.reconnectFinished(reconnectedDisks: 1)
+        XCTAssertEqual(animator.clip, .reconnect)
+        XCTAssertEqual(animator.phase, 0)
+        rig.fire(after: LiftIcon.reconnectDuration - 0.1)
+        XCTAssertNotNil(animator.phase, "still settling")
+        rig.fire(after: 0.11)
+
+        XCTAssertNil(animator.phase, "the reconnect is shorter than the eject and ends on its own length")
+        XCTAssertFalse(animator.isTicking)
+        XCTAssertEqual(rig.started, 1)
+        XCTAssertEqual(rig.cancelled, 1)
+        XCTAssertNil(rig.tick)
+    }
+
+    /// An eject during a reconnect takes over the one ticker.
+    func testAnEjectDuringAReconnectTakesOverTheTicker() {
+        let rig = Rig()
+        let animator = rig.animator()
+        animator.reconnectFinished(reconnectedDisks: 1)
+        rig.fire(after: 0.5)
+        animator.ejectFinished(ejectedDisks: 1)
+        XCTAssertEqual(animator.clip, .eject)
+        XCTAssertEqual(animator.phase, 0)
+        rig.fire(after: LiftIcon.reconnectDuration)
+        XCTAssertNotNil(animator.phase, "runs for the eject's length now")
+        XCTAssertEqual(rig.started, 1)
+    }
+
+    /// Reduce Motion: a static change from the slot to the state.
+    func testReduceMotionSkipsTheReconnect() {
+        let rig = Rig()
+        rig.reduceMotion = true
+        let animator = rig.animator()
+        animator.reconnectFinished(reconnectedDisks: 1)
+        XCTAssertNil(animator.phase)
+        XCTAssertFalse(animator.isTicking)
+        XCTAssertEqual(rig.started, 0)
+    }
 }

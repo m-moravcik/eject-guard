@@ -70,6 +70,10 @@ final class GuardController {
     private var pendingReschedule: DispatchWorkItem?
     private var isScanning = false
     private var rescanWhenIdle = false
+    /// Run once a scan started after they were asked for has landed, so
+    /// they see the disks as they are now, not as a scan already under way
+    /// found them.
+    private var afterNextScan: [@MainActor () -> Void] = []
 
     /// Meetings already acted on, successfully or not. Without this a failed
     /// eject would reschedule itself into the past, fire again immediately, and
@@ -363,7 +367,8 @@ final class GuardController {
     /// `Process.waitUntilExit` pumps the run loop, the run loop delivered the
     /// next volume notification, and the second pass blocked on the config lock
     /// the first pass was still holding.
-    private func reloadDisks() {
+    private func reloadDisks(then done: (@MainActor () -> Void)? = nil) {
+        if let done { afterNextScan.append(done) }
         guard !isScanning else {
             // A scan is already in flight and the world changed again; run one
             // more when it lands rather than queueing a pile of them.
@@ -371,6 +376,8 @@ final class GuardController {
             return
         }
         isScanning = true
+        let landed = afterNextScan
+        afterNextScan = []
         work.async { [weak self] in
             let snapshot = Disks.scan()
             Task { @MainActor in
@@ -388,6 +395,7 @@ final class GuardController {
                 if self.guardedVolumes.isEmpty && self.guardedNetworkBackups.isEmpty {
                     self.lastFailure = nil
                 }
+                for done in landed { done() }
                 if self.rescanWhenIdle {
                     self.rescanWhenIdle = false
                     self.reloadDisks()
@@ -491,11 +499,16 @@ final class GuardController {
         let busyUntil = calendarAccess == .granted ? Meetings.busyUntil(store, config: config) : nil
         isReconnecting = true
         work.async { [weak self] in
-            GuardRunner.reconnectDue(busyUntil: busyUntil)
+            let reconnected = GuardRunner.reconnectDue(busyUntil: busyUntil).reconnected.count
             Task { @MainActor in
                 guard let self else { return }
-                self.isReconnecting = false
-                self.reloadDisks()
+                // Still reconnecting until the disk list shows the disk back:
+                // otherwise the icon would drop to the empty line in between,
+                // and the animation would land on a state about to change.
+                self.reloadDisks {
+                    self.isReconnecting = false
+                    self.iconAnimator.reconnectFinished(reconnectedDisks: reconnected)
+                }
             }
         }
     }

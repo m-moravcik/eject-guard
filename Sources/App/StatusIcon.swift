@@ -58,7 +58,8 @@ struct StatusIcon: View {
                       percent: controller.backupPercent,
                       phase: controller.backupPhase,
                       guarding: controller.config.isActive && controller.hasGuardedTargets,
-                      ejectPhase: controller.iconAnimator.phase)
+                      animationPhase: controller.iconAnimator.phase,
+                      clip: controller.iconAnimator.clip)
             // `label` is already translated; the name in front of it never is.
             .accessibilityLabel(Text(verbatim: "Eject Guard: \(label)"))
     }
@@ -79,15 +80,19 @@ struct StatusIconArt: View {
     var phase: Int = 0
     /// A disk is guarded, so the triangle is solid during a backup too.
     var guarding = false
-    /// Seconds into the eject animation, nil at rest. See `MenuBarIconAnimator`.
-    var ejectPhase: Double?
+    /// Seconds into an animation, nil at rest. See `MenuBarIconAnimator`.
+    var animationPhase: Double?
+    var clip: MenuBarIconAnimator.Clip = .eject
 
     var pose: LiftIcon.Pose {
         let rest = LiftIcon.pose(state, percent: percent, phase: phase, guarding: guarding)
         // A new eject under way says so, rather than finishing the last one's
         // celebration.
-        guard let ejectPhase, state != .ejecting else { return rest }
-        return LiftIcon.pose(at: ejectPhase, landingOn: rest)
+        guard let animationPhase, state != .ejecting else { return rest }
+        switch clip {
+        case .eject: return LiftIcon.pose(at: animationPhase, landingOn: rest)
+        case .reconnect: return LiftIcon.pose(reconnectingAt: animationPhase, landingOn: rest)
+        }
     }
 
     var body: some View {

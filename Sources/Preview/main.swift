@@ -170,7 +170,8 @@ func renderIconSheet() {
         var percent: Double?
         var phase: Int = 0
         var guarding = true
-        var ejectPhase: Double?
+        var animationPhase: Double?
+        var clip: MenuBarIconAnimator.Clip = .eject
     }
 
     // The breathing is at its fullest halfway through its cycle.
@@ -196,9 +197,15 @@ func renderIconSheet() {
     // unmounted for a meeting leaves it: waiting to reconnect.
     let eject = (0...Int(LiftIcon.duration * 10)).map { tenth in
         Sample(title: String(format: "%.1fs", Double(tenth) / 10), state: .waitingToReconnect,
-               guarding: false, ejectPhase: Double(tenth) / 10)
+               guarding: false, animationPhase: Double(tenth) / 10)
     }
-    let rows = [states, sweep, Array(eject.prefix(11)), Array(eject.dropFirst(11))]
+    // The reconnect animation every tenth of a second, landing on armed.
+    let reconnect = (0...Int(LiftIcon.reconnectDuration * 10)).map { tenth in
+        Sample(title: String(format: "%.1fs", Double(tenth) / 10), state: .armed,
+               animationPhase: Double(tenth) / 10, clip: .reconnect)
+    }
+    let rows = [states, sweep, Array(eject.prefix(11)), Array(eject.dropFirst(11)),
+                Array(reconnect.prefix(10)), Array(reconnect.dropFirst(10))]
 
     let sheet = VStack(alignment: .leading, spacing: 14) {
         ForEach([ColorScheme.light, .dark], id: \.self) { scheme in
@@ -212,7 +219,8 @@ func renderIconSheet() {
                                       percent: sample.percent,
                                       phase: sample.phase,
                                       guarding: sample.guarding,
-                                      ejectPhase: sample.ejectPhase)
+                                      animationPhase: sample.animationPhase,
+                                      clip: sample.clip)
                             .frame(width: 26, height: 22)
                             .background(scheme == .dark
                                         ? Color(white: 0.18) : Color(white: 0.82))

@@ -89,13 +89,14 @@ final class LiftIconTests: XCTestCase {
         return render(image)
     }
 
-    /// One entry per distinct pose. The two reconnect states draw the idle
-    /// pose on purpose, see `testReconnectStatesKeepTheEmptyBar`.
+    /// One entry per distinct pose. Reconnecting draws the waiting pose on
+    /// purpose, see `testReconnectingKeepsTheSlot`.
     private static let resting: [(String, LiftIcon.Pose)] = [
         ("idle", LiftIcon.pose(.idle)),
         ("armed", LiftIcon.pose(.armed)),
         ("off", LiftIcon.pose(.off)),
         ("ejecting", LiftIcon.pose(.ejecting)),
+        ("waiting to reconnect", LiftIcon.pose(.waitingToReconnect)),
         ("backing up", LiftIcon.pose(.backingUp, percent: 0.42, phase: 4, guarding: true)),
         ("backing up, unguarded", LiftIcon.pose(.backingUp, percent: 0.42, phase: 4)),
         ("backing up, sizing", LiftIcon.pose(.backingUp, percent: nil, phase: 3, guarding: true)),
@@ -319,15 +320,11 @@ final class LiftIconTests: XCTestCase {
 
     // MARK: - The 1.5 reconnect states
 
-    /// No art of their own: after an unmount for a meeting the icon stays on
-    /// the empty bar the eject animation landed on, until the disk is back.
-    func testReconnectStatesKeepTheEmptyBar() {
-        XCTAssertEqual(LiftIcon.pose(.waitingToReconnect), LiftIcon.pose(.idle))
-        XCTAssertEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.idle))
-        XCTAssertNotEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.armed),
-                          "armed before the mount succeeds would promise the disk is back")
-        XCTAssertNotEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.ejecting),
-                          "and the eject pose would read as one more eject")
+    /// The disk is still away while it is mounted again, so reconnecting
+    /// keeps the slot until the mount has worked and the animation plays.
+    func testReconnectingKeepsTheSlot() {
+        XCTAssertEqual(LiftIcon.pose(.waitingToReconnect).track, .slot)
+        XCTAssertEqual(LiftIcon.pose(.reconnecting), LiftIcon.pose(.waitingToReconnect))
     }
 
     func testTheStateFollowsWhatTheAppIsDoing() {
@@ -353,5 +350,90 @@ final class LiftIconTests: XCTestCase {
     func testAnUnmountLandsOnWaitingToReconnect() {
         let rest = LiftIcon.pose(.waitingToReconnect)
         XCTAssertEqual(LiftIcon.pose(at: LiftIcon.duration, landingOn: rest), rest)
+    }
+
+    // MARK: - The reconnect animation
+
+    private static let reconnectFrames: [Double] = Array(
+        stride(from: 0.0, through: LiftIcon.reconnectDuration, by: MenuBarIconAnimator.frameInterval))
+
+    /// Every frame is a template image on the fixed canvas, with no ink
+    /// outside it: the settle never leaves the frame.
+    func testEveryReconnectFrameFitsTheCanvas() {
+        for rest in [LiftIcon.pose(.armed), LiftIcon.pose(.idle)] {
+            for t in Self.reconnectFrames {
+                let pose = LiftIcon.pose(reconnectingAt: t, landingOn: rest)
+                let image = LiftIcon.image(pose)
+                XCTAssertTrue(image.isTemplate, "frame at \(t) s")
+                XCTAssertEqual(image.size, LiftIcon.canvas, "frame at \(t) s")
+                let (rep, canvas) = Self.unclipped(pose)
+                let ink = Self.ink(rep)
+                XCTAssertGreaterThanOrEqual(ink.minX, canvas.minX, "frame at \(t) s")
+                XCTAssertGreaterThanOrEqual(ink.minY, canvas.minY, "frame at \(t) s")
+                XCTAssertLessThanOrEqual(ink.maxX, canvas.maxX, "frame at \(t) s")
+                XCTAssertLessThanOrEqual(ink.maxY, canvas.maxY, "frame at \(t) s")
+            }
+        }
+    }
+
+    /// It starts as the slot the icon waited on, so starting is invisible,
+    /// and ends exactly on the state the disk came back to: armed, or the
+    /// empty line when nothing is guarded.
+    func testReconnectStartsOnTheSlotAndEndsOnItsState() {
+        let waiting = Self.render(LiftIcon.pose(.waitingToReconnect))
+        XCTAssertEqual(Self.difference(Self.render(LiftIcon.pose(reconnectingAt: 0)), waiting), 0)
+        XCTAssertEqual(Self.difference(Self.render(LiftIcon.pose(reconnectingAt: 0.25)), waiting), 0,
+                       "a beat before anything moves")
+
+        for (name, rest) in [("armed", LiftIcon.pose(.armed)), ("idle", LiftIcon.pose(.idle))] {
+            XCTAssertEqual(LiftIcon.pose(reconnectingAt: LiftIcon.reconnectDuration, landingOn: rest), rest, name)
+            let last = LiftIcon.pose(reconnectingAt: LiftIcon.reconnectDuration - MenuBarIconAnimator.frameInterval,
+                                     landingOn: rest)
+            XCTAssertLessThanOrEqual(Self.difference(Self.render(last), Self.render(rest)), 2, name)
+        }
+        XCTAssertGreaterThanOrEqual(LiftIcon.reconnectDuration, 1.5)
+        XCTAssertLessThanOrEqual(LiftIcon.reconnectDuration, 2.4)
+    }
+
+    /// The choreography: the gaps close, the slot fills, and the triangle
+    /// presses down, comes up solid and overshoots only a little.
+    func testReconnectClosesFillsAndSettles() {
+        let samples = stride(from: 0.0, through: LiftIcon.reconnectDuration, by: 0.01)
+            .map { LiftIcon.pose(reconnectingAt: $0) }
+        XCTAssertLessThan(samples.map(\.stretch).min() ?? 1, 0.9, "a visible press")
+        XCTAssertLessThanOrEqual(samples.map(\.stretch).max() ?? 1, 1 + LiftIcon.releaseOvershoot + 0.001)
+        XCTAssertEqual(samples.map(\.lift).max() ?? 1, 0, "it never leaves the bar")
+        let filling = samples.filter { $0.slotFill > 0 && $0.slotFill < 1 }
+        XCTAssertTrue(filling.allSatisfy { $0.slotClosed > 0.99 }, "the gaps close before it fills")
+    }
+
+    /// A backup that starts as the disk comes back has its own state.
+    func testReconnectGivesWayToABackup() {
+        let backup = LiftIcon.pose(.backingUp, percent: 0.1, phase: 4, guarding: true)
+        XCTAssertEqual(LiftIcon.pose(reconnectingAt: 0.5, landingOn: backup), backup)
+    }
+
+    // MARK: - Pixel snap
+
+    /// The base, a 1.4 pt line, sits on a device pixel row at 1x and 2x, in
+    /// every resting pose: one solid row at 1x rather than two half-grey
+    /// ones, and no half-covered row at 2x.
+    func testTheBaseSitsOnWholePixelRows() {
+        for scale in [1, 2] {
+            for (name, pose) in Self.resting where !pose.slashed {
+                let rep = Self.render(pose, scale: CGFloat(scale))
+                let x = Int(LiftIcon.apex.x) * scale
+                let ys = (5 * scale)...(9 * scale + scale - 1)
+                let alphas = ys.map { rep.colorAt(x: x, y: $0)?.alphaComponent ?? 0 }
+                let solid = alphas.filter { $0 > 0.75 }.count
+                let grey = alphas.filter { $0 > 0.3 && $0 <= 0.75 }.count
+                XCTAssertEqual(grey, 0, "\(name) at \(scale)x: \(alphas.map { Int($0 * 100) })")
+                if pose.solid == 0 {
+                    XCTAssertEqual(solid, scale == 1 ? 1 : 3, "\(name) at \(scale)x: \(alphas.map { Int($0 * 100) })")
+                }
+            }
+        }
+        XCTAssertEqual(LiftIcon.baseOffset(scale: 1), 0.5)
+        XCTAssertEqual(LiftIcon.baseOffset(scale: 2), 0.25)
     }
 }

@@ -146,12 +146,20 @@ eject takes, and outline against fill alone does not read at 1x.
 | backing up | The bar fills with Time Machine's progress, with Time Machine's clock-and-arrow badge in the corner. Any destination, guarded or not, and even with guarding off. The triangle is solid only while a disk is guarded. |
 | ejecting | Triangle lifted, speed lines where the bar was. |
 | off | Idle with a slash through it: guarding is off or paused. |
-| waiting to reconnect | The idle pose. A disk unmounted for a meeting has left the bar, and nothing guarded is plugged in until it is back; the label says when it comes back. Something else guarded and plugged in shows armed instead. |
-| reconnecting | The idle pose too, until the mount succeeds and the icon turns armed. Armed earlier would promise the disk is back, and the eject pose would read as another eject. A locked Time Machine disk comes back through a backup to it, which shows as backing up. |
+| waiting to reconnect | Outline triangle over a dashed slot, the slab's outline drawn the way a placeholder is: the disk's place, kept for it while it is away for a meeting. Something else guarded and plugged in shows armed instead. |
+| reconnecting | The slot stays while the disk is mounted again, then the settle animation plays. A locked Time Machine disk comes back through a backup to it, which shows as backing up. |
 
-The two reconnect states have no shape of their own yet, so in the icon they
-read as idle; the accessibility label and the popover row tell them apart.
-Giving them their own silhouette is new art, left for a later release.
+**When a disk comes back after a meeting, the icon settles**, 1.8 s: a beat,
+the slot's gaps close, the slot fills from its middle while the triangle
+presses down and comes up solid with the smallest overshoot. It lands on
+armed, or on the empty line if nothing is guarded. It plays once the disk
+list shows the disk back (`MenuBarIconAnimator.reconnectFinished`), on the same
+ticker as the eject; with Reduce Motion the slot simply turns into the state.
+
+The triangle's base, a 1.4 pt line, is centred on a device pixel row at
+whatever scale it is drawn (`LiftIcon.snappedBase`): at 8.0 pt it straddled two
+rows at 1x and drew as two half-grey ones. The whole triangle moves, by at most
+half a pixel, so its shape is unchanged.
 
 While a backup runs, the bar fills to the percentage Time Machine reports, or a
 short segment travels left to right while it is still sizing the job up - a bar

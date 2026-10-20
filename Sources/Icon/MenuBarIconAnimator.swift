@@ -1,7 +1,7 @@
 import AppKit
 import Observation
 
-/// Plays the menu bar icon's eject animation.
+/// Plays the menu bar icon's eject and reconnect animations.
 ///
 /// A MenuBarExtra label is rasterised into the status item, so SwiftUI's symbol
 /// effects never run there (measured, see DEVELOPMENT.md). Instead the label
@@ -19,8 +19,25 @@ final class MenuBarIconAnimator {
 
     static let frameInterval: TimeInterval = 1.0 / 30
 
+    /// Which animation is playing.
+    enum Clip: Sendable, Equatable {
+        /// A disk came off: crouch, launch, land on the empty bar.
+        case eject
+        /// A disk came back after a meeting: the slot closes and fills.
+        case reconnect
+
+        var duration: Double {
+            switch self {
+            case .eject: return LiftIcon.duration
+            case .reconnect: return LiftIcon.reconnectDuration
+            }
+        }
+    }
+
     /// Seconds into the animation; nil at rest.
     private(set) var phase: Double?
+    /// The animation `phase` belongs to.
+    private(set) var clip: Clip = .eject
 
     @ObservationIgnored private let now: () -> TimeInterval
     @ObservationIgnored private let reduceMotion: () -> Bool
@@ -47,16 +64,26 @@ final class MenuBarIconAnimator {
     /// nothing to do is not an eject, and the icon must not celebrate one.
     func ejectFinished(ejectedDisks: Int) {
         guard ejectedDisks > 0 else { return }
-        play()
+        play(.eject)
     }
 
-    /// Starts the animation, or restarts it if it is already playing. With
-    /// Reduce Motion on, the icon goes straight to its state.
-    func play() {
+    /// A reconnect pass has finished, and the disk list has caught up with
+    /// it. Plays only when a disk was actually mounted again: one unplugged
+    /// during the meeting, or one that failed, is not a return.
+    func reconnectFinished(reconnectedDisks: Int) {
+        guard reconnectedDisks > 0 else { return }
+        play(.reconnect)
+    }
+
+    /// Starts an animation, or starts over if one is already playing: the
+    /// latest event wins, on the one ticker. With Reduce Motion on, the icon
+    /// goes straight to its state.
+    func play(_ clip: Clip = .eject) {
         guard !reduceMotion() else {
             stop()
             return
         }
+        self.clip = clip
         startedAt = now()
         phase = 0
         if cancelTicker == nil {
@@ -66,7 +93,7 @@ final class MenuBarIconAnimator {
 
     func tick() {
         let elapsed = now() - startedAt
-        if elapsed >= LiftIcon.duration {
+        if elapsed >= clip.duration {
             stop()
         } else {
             phase = elapsed
