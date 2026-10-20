@@ -387,6 +387,8 @@ the popover straight to PNG in both appearances:
 ./preview.sh demo     # invented data, the bare popover
 ./preview.sh update   # the demo popover with an update ready to install
 ./preview.sh onboarding  # the welcome tour a fresh install opens on
+./preview.sh disks    # disks sharing a name, a row's context menu, the Forget alert
+./preview.sh many     # ten disks: the list scrolls, and the popover's height is printed
 ./preview.sh hero     # the same, open under the menu bar: docs/popover-*.png
 ./preview.sh icons    # every menu bar icon state
 ./preview.sh settings # every Settings tab at the window's real size

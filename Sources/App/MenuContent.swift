@@ -284,42 +284,56 @@ private struct UpdateReadyBanner: View {
 
 private struct DisksSection: View {
     @Environment(GuardController.self) private var controller
+    /// The rows' natural height, measured; past the cap they scroll.
+    @State private var rowsHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: Design.Spacing.xs) {
             SectionHeader(title: Loc.t("section.disks", "DISKS"))
 
-            Group {
-                if controller.knownDisks.isEmpty {
-                    Text(Loc.t("disks.empty", "No external disks seen yet.\nPlug one in and it shows up here."))
-                        .font(Design.Typography.note)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Design.Spacing.l)
-                } else {
-                    // Two disks of one name read the same, so each gets what
-                    // tells it apart: its size, or the start of its UUID.
-                    let details = Disks.distinguishingDetails(for: controller.knownDisks)
-                    VStack(spacing: Design.Spacing.xs) {
-                        ForEach(Array(controller.knownDisks.enumerated()), id: \.element.id) { index, disk in
-                            DiskCard(disk: disk, shortcutIndex: index, detail: details[disk.id])
-                        }
-                        // The one thing a new user has to do, said where they
-                        // are looking rather than only in the README.
-                        if controller.config.watchedDiskIDs.isEmpty {
-                            Text(Loc.t("disks.hint", "Click a disk to guard it."))
-                                .font(Design.Typography.note)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, Design.Spacing.s)
-                                .padding(.top, Design.Spacing.xs)
-                        }
-                    }
+            if controller.knownDisks.isEmpty {
+                Text(Loc.t("disks.empty", "No external disks seen yet.\nPlug one in and it shows up here."))
+                    .font(Design.Typography.note)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Design.Spacing.l)
+                    .padding(.horizontal, Design.Spacing.m)
+            } else if rowsHeight > Design.Layout.diskListMaxHeight {
+                // Only once the rows outgrow the cap, so a list that fits
+                // looks exactly as it did. The scroller sits at the popover's
+                // edge, outside the cards.
+                ScrollView {
+                    rows
                 }
+                .frame(height: Design.Layout.diskListMaxHeight)
+            } else {
+                rows
             }
-            .padding(.horizontal, Design.Spacing.m)
         }
+    }
+
+    private var rows: some View {
+        // Two disks of one name read the same, so each gets what tells it
+        // apart: its size, or the start of its UUID.
+        let details = Disks.distinguishingDetails(for: controller.knownDisks)
+        return VStack(spacing: Design.Spacing.xs) {
+            ForEach(Array(controller.knownDisks.enumerated()), id: \.element.id) { index, disk in
+                DiskCard(disk: disk, shortcutIndex: index, detail: details[disk.id])
+            }
+            // The one thing a new user has to do, said where they are looking
+            // rather than only in the README.
+            if controller.config.watchedDiskIDs.isEmpty {
+                Text(Loc.t("disks.hint", "Click a disk to guard it."))
+                    .font(Design.Typography.note)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Design.Spacing.s)
+                    .padding(.top, Design.Spacing.xs)
+            }
+        }
+        .padding(.horizontal, Design.Spacing.m)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
     }
 }
 

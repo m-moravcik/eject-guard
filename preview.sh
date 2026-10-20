@@ -6,6 +6,7 @@
 #   ./preview.sh update          # the demo popover with an update ready
 #   ./preview.sh onboarding      # the welcome tour of a fresh install
 #   ./preview.sh disks           # disks sharing a name, a row's context menu
+#   ./preview.sh many            # ten disks: the list scrolls
 #   ./preview.sh hero            # the same, open under the menu bar: README
 #   ./preview.sh banner          # 1920x1080, for the web.pexelo portfolio
 #   ./preview.sh icons           # every menu bar icon state
@@ -38,9 +39,10 @@ case "$MODE" in
     demo)  "$OUT/preview" "$OUT/popover.png" demo -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
     onboarding) "$OUT/preview" "$OUT/onboarding.png" onboarding -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
     disks) "$OUT/preview" "$OUT/disks.png" disks -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
+    many)  "$OUT/preview" "$OUT/many.png" many -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
     update) "$OUT/preview" "$OUT/update.png" update -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
     banner) "$OUT/preview" "$OUT/banner.png" banner -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
     hero)  "$OUT/preview" "$OUT/hero.png" hero -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
     "")    "$OUT/preview" "$OUT/popover.png" -AppleLanguages "(${PREVIEW_LANG:-en})" ;;
-    *)     echo "usage: $0 [demo|update|onboarding|disks|hero|banner|icons|settings]" >&2; exit 1 ;;
+    *)     echo "usage: $0 [demo|update|onboarding|disks|many|hero|banner|icons|settings]" >&2; exit 1 ;;
 esac

@@ -746,6 +746,31 @@ extension GuardController {
         notificationsEnabled = true
     }
 
+    /// The demo with `count` disks, more than the list shows without
+    /// scrolling once there are enough of them. `paused` adds the banner a
+    /// pause shows, for measuring the popover at its tallest.
+    func loadManyDisksDemo(_ count: Int, paused: Bool = false) {
+        loadDemo()
+        let names = ["Archive HDD", "Backup SSD", "Camera Cards", "Lacie Rugged", "Photos 2024",
+                     "Samsung T7", "SanDisk Extreme", "Scratch", "Time Machine", "Video Projects",
+                     "WD Elements", "Zeta"]
+        var demo = config
+        demo.knownDisks = (0..<count).map { index in
+            let name = names[index % names.count]
+            return KnownDisk(id: "demo-\(index)", name: index < names.count ? name : "\(name) \(index)",
+                             volumeUUID: "demo-\(index)-uuid",
+                             tmDestinationID: name == "Time Machine" ? "demo-tm-dest" : nil)
+        }
+        demo.watchedDiskIDs = demo.knownDisks.filter { $0.name == "Archive HDD" || $0.name == "Time Machine" }.map(\.id)
+        if paused { demo.pausedUntil = Date().addingTimeInterval(3600) }
+        config = demo
+        attached = demo.knownDisks.filter { $0.name == "Time Machine" || $0.name == "Samsung T7" }.map { disk in
+            AttachedVolume(path: "/Volumes/\(disk.name)", name: disk.name, volumeUUID: disk.volumeUUID,
+                           tmDestinationID: disk.tmDestinationID, connection: .usb)
+        }
+        backup = BackupStatus()
+    }
+
     /// The demo with disks that share a name, for reviewing how a row tells
     /// them apart and what its context menu offers. One pair differs in size,
     /// the other only in its UUID.
@@ -761,10 +786,10 @@ extension GuardController {
         let second = KnownDisk(id: "demo-u2", name: "Untitled", volumeUUID: "7496A0AE-demo",
                                capacity: 64_000_000_000)
         var demo = config
-        // The share and the single T7 make way, to keep the popover under its
-        // maximum height.
-        demo.knownDisks = [demo.knownDisks[0], small, large, demo.knownDisks[3], first, second]
-        demo.watchedDiskIDs = [demo.knownDisks[0].id, demo.knownDisks[3].id, large.id]
+        // Few enough that the list does not scroll, which ImageRenderer
+        // could not draw: `many` shows that.
+        demo.knownDisks = [small, large, demo.knownDisks[3], first, second]
+        demo.watchedDiskIDs = [demo.knownDisks[2].id, large.id]
         config = demo
         attached = attached.filter { $0.volumeUUID != "demo-t7-uuid" } + [
             AttachedVolume(path: "/Volumes/Samsung T7", name: small.name,

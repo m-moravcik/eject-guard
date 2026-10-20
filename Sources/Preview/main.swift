@@ -36,9 +36,13 @@ MainActor.assumeIsolated {
     let tour = CommandLine.arguments.contains("onboarding")
     // Disks shows disks that share a name, and a row's context menu.
     let disks = CommandLine.arguments.contains("disks")
-    let demo = hero || update || tour || disks || CommandLine.arguments.contains("demo")
+    // Many shows ten disks, more than fit without scrolling.
+    let many = CommandLine.arguments.contains("many")
+    let demo = hero || update || tour || disks || many || CommandLine.arguments.contains("demo")
     let controller = GuardController()
-    if disks {
+    if many {
+        controller.loadManyDisksDemo(10)
+    } else if disks {
         controller.loadDisksDemo()
     } else if demo {
         controller.loadDemo(showingTour: tour)
@@ -58,6 +62,13 @@ MainActor.assumeIsolated {
             renderSettings(controller: controller, output: output)
             app.terminate(nil)
         }
+        app.run()
+    }
+
+    // A scrolling list is an AppKit scroll view, which ImageRenderer cannot
+    // draw, so this one goes through a real hosting view like Settings.
+    if many {
+        renderHosted(controller: controller, output: output)
         app.run()
     }
 
@@ -333,7 +344,7 @@ struct ContextMenuScene<Popover: View>: View {
                 menu(for: disk)
                     // Level with the row it was opened on, as a context menu
                     // opens at the pointer.
-                    .padding(.top, 168)
+                    .padding(.top, 100)
                     .padding(.leading, -64)
             }
         }
@@ -419,5 +430,46 @@ func renderForgetConfirmation(controller: GuardController, output: String) {
         let path = output.replacingOccurrences(of: ".png", with: "-confirm\(suffix).png")
         try? png.write(to: URL(fileURLWithPath: path))
         print("wrote \(path)")
+    }
+}
+
+
+/// The popover in a window that is never shown, for views ImageRenderer
+/// cannot draw. The window gets a moment for the disk list to measure itself
+/// and switch to scrolling before it is captured. Prints the popover's height
+/// next to the disk list's cap, which is how `Design.Layout` was measured.
+@MainActor
+func renderHosted(controller: GuardController, output: String) {
+    var hosts: [(ColorScheme, NSHostingView<AnyView>, NSWindow)] = []
+    for scheme in [ColorScheme.light, .dark] {
+        let root = AnyView(MenuContent()
+            .environment(controller)
+            .environment(UpdateStatus(isUpdateReady: false))
+            .environment(\.colorScheme, scheme)
+            .background(scheme == .dark
+                        ? Color(red: 0.14, green: 0.14, blue: 0.15)
+                        : Color(red: 0.96, green: 0.96, blue: 0.97)))
+        let host = NSHostingView(rootView: root)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Design.Layout.popoverWidth, height: 800),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        window.contentView = host
+        hosts.append((scheme, host, window))
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        for (scheme, host, window) in hosts {
+            let size = host.fittingSize
+            window.setContentSize(size)
+            host.layoutSubtreeIfNeeded()
+            host.display()
+            guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { exit(1) }
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            guard let png = bitmap.representation(using: .png, properties: [:]) else { exit(1) }
+            let suffix = scheme == .dark ? "-dark" : "-light"
+            let path = output.replacingOccurrences(of: ".png", with: "\(suffix).png")
+            try? png.write(to: URL(fileURLWithPath: path))
+            print("wrote \(path)  popover \(Int(size.height)) pt, disk list cap \(Int(Design.Layout.diskListMaxHeight)) pt")
+        }
+        NSApp.terminate(nil)
     }
 }
