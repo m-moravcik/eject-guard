@@ -344,19 +344,22 @@ enum LiftIcon {
         }
         let fraction = to - from
         var height = bar.height
+        var midY = bar.midY
         if pose.track == .line {
             // Draining into the empty line: the last of it thins down to the
-            // line itself, so it runs out instead of ending in a stub.
+            // line itself, so it runs out instead of ending in a stub, while
+            // a full fill sits on the slab.
             let u = min(1, max(0, fraction / 0.3))
-            height = line + (bar.height - line) * CGFloat(u * u * (3 - 2 * u))
+            let s = CGFloat(u * u * (3 - 2 * u))
+            height = line + (bar.height - line) * s
+            midY = trackY + (bar.midY - trackY) * s
         }
         // Backup progress at 0 % still shows a sliver, so the bar never
         // looks like nothing is happening.
         let width = max(pose.track == .dim ? minimumFill : height, bar.width * fraction)
         guard fraction > 0 || pose.track == .dim else { return }
         let x = min(bar.minX + bar.width * from, bar.maxX - width)
-        let rect = CGRect(x: x, y: pose.track == .line ? trackY - height / 2 : bar.minY,
-                          width: width, height: height)
+        let rect = CGRect(x: x, y: midY - height / 2, width: width, height: height)
         let radius = min(barRadius, height / 2)
         context.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
         context.fillPath()
