@@ -6,21 +6,25 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.4.2</title>
-      <pubDate>Fri, 02 Oct 2026 20:38:13 +0000</pubDate>
-      <sparkle:version>48</sparkle:version>
-      <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
+      <title>Version 1.5</title>
+      <pubDate>Wed, 21 Oct 2026 07:36:28 +0000</pubDate>
+      <sparkle:version>81</sparkle:version>
+      <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>Backup progress shows for every Time Machine backup, to a plugged-in disk or a network share, whether or not you ticked it and even with guarding off. Guarding still only decides what gets ejected or stopped before a meeting.</p>
-<p>The percentage now matches the Time Machine menu bar item: the same figure, to one decimal, and only while Time Machine is copying. Before, the app showed the copy alone, so 13.5% in the system menu read as 3% here.</p>
-<p>A backup already running when the app starts shows within seconds instead of after the first poll.</p>
+<p>A meeting no longer costs you a backup. Before a meeting your disks are now unmounted rather than ejected: just as safe to unplug, but if you join from your desk and leave the cable in, the disk is reconnected when the meeting ends and a Time Machine backup it stopped starts again straight away. Back-to-back meetings keep it down until the last one is over.</p>
+<p>While it waits, the disk row says when it comes back. ⌘E and eject on sleep still eject fully, because they mean you are leaving.</p>
+<p>An encrypted disk locks whenever it is unmounted. If macOS remembers its password in your login keychain, Eject Guard unlocks it with that password; macOS asks you once to allow this. Otherwise, for a Time Machine disk, Eject Guard asks Time Machine to start a backup to bring it back. If the disk stays locked, a notification tells you to plug it in again.</p>
+<p>The disk list keeps to real disks. Disk images are no longer listed, unless Time Machine backs up to one, a disk you do not guard is forgotten 30 days after you unplug it, and right-clicking an unplugged disk now offers Forget this disk. Two disks with the same name show their size, or the start of their UUID, so you can tell which is which.</p>
+<p>Eject Guard has its own menu bar icon: an eject triangle over a bar, the app icon in miniature. The bar says what the guard is doing: a thin line when there is nothing to guard, a solid bar while a disk is guarded, and Time Machine's progress, with its clock badge, while a backup runs. When the guard takes a disk off before a meeting, the triangle crouches, jumps out of the menu bar and lands on a dashed outline that keeps the disk's place while it is away. When the disk comes back, the outline fills and the triangle settles onto it. With Reduce Motion on, the icon simply changes.</p>
+<p>When a disk will not come off, the warning names the app holding it, or says it could not tell, rather than a line of lsof output.</p>
+<p>The command line tool reports reconnects, and <code>eject-guard</code> lists the disks waiting for one. <code>--forget</code> is now called <code>--hide</code> and still hides a disk for good. The new <code>--forget-disk</code> forgets an unplugged disk until you plug it in again, like the menu item.</p>
 <p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.4.2/Eject-Guard-1.4.2.zip"
-                 sparkle:edSignature="48HAlAdSSB+8vL/QJElA0JRFmdX77VHgsMmhSQf1UVLmFeQ0sOZGpOMNdkrLoJpnGTF3r2S4Eb7t0dJypCCkDw=="
-                 length="3035940"
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.5/Eject-Guard-1.5.zip"
+                 sparkle:edSignature="2s/IXLDf1WiVpWV+b5RCs7gE65GpoamFrKVpwlet912gxuzd4bLnrlE6CIci2gzztpsbycH7DLRjb9OlfxnQDw=="
+                 length="3117615"
                  type="application/octet-stream" />
     </item>
   </channel>
