@@ -2,17 +2,19 @@
 
 <h1 align="center">Eject Guard</h1>
 
-**Never unplug a mounted disk again.** Eject Guard is a small macOS menu bar
-app that unmounts your external disks a few minutes before a meeting starts,
-so you can grab the laptop and go. A Time Machine drive, an archive, a portable
-SSD: whichever you tick.
+<p align="center"><strong>Never unplug a mounted disk again.</strong></p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/popover-dark.png">
-    <img src="docs/popover-light.png" width="480" alt="Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42% over USB, a network Time Machine share, two more disks, and the next meeting with the time the disks will be ejected">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/hero-dark.gif">
+    <img src="docs/hero.gif" alt="A demo desktop with Eject Guard open under its menu bar icon, also shown enlarged on the left. A guarded Time Machine disk is backing up at 42% and a meeting starts in 7 minutes. At 10:55 the guard stops the backup and unmounts the disk; the icon's triangle crouches, jumps out of the menu bar and lands on a dashed outline, and the disk row reads Reconnects at 11:45. After the meeting the disk is mounted again, the outline fills, the row reads Guarded, USB, and Time Machine starts backing up again.">
   </picture>
 </p>
+
+Eject Guard is a small macOS menu bar app that unmounts your external disks a
+few minutes before a meeting starts, so you can grab the laptop and go. Stay at
+your desk instead, and it puts them back when the meeting ends. A Time Machine
+drive, an archive, a portable SSD: whichever you tick.
 
 You head to a meeting, pull the laptop off the desk, and only remember the
 Time Machine drive once the cable is already out. On a spinning HDD, especially
@@ -35,8 +37,10 @@ mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
   a backup running to it is stopped before the meeting, so you never walk off
   the network mid-write. Nothing is ejected: there is no cable to pull. Plain
   network shares are not listed.
-- **Shows backup progress** in the menu bar icon whenever Time Machine is
-  backing up, to a plugged-in disk or a network share, guarded or not.
+- **Shows what it is doing** in the menu bar icon: a solid bar while a disk
+  is guarded, Time Machine's progress whenever it is backing up (to a
+  plugged-in disk or a network share, guarded or not), and a dashed outline
+  while a disk waits to come back after a meeting.
 - **Stays out of your way.** Skip a single meeting, pause for an hour, eject
   now with ⌘E, or eject when the Mac goes to sleep.
 - **Tells you when it cannot eject**, and names the app holding the disk, so
@@ -59,15 +63,24 @@ signed and notarized by Apple and requires macOS 14 or newer.
 
 The menu bar popover shows your disks and today's next meeting:
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/popover-dark.png">
+    <img src="docs/popover-light.png" width="480" alt="Eject Guard open under its menu bar icon: a Time Machine disk backing up at 42% over USB, a network Time Machine share, two more disks, and the next meeting with the time the disks will be ejected">
+  </picture>
+</p>
+
 - **Click a disk** to guard it. Disks are remembered once you plug them in,
   and Time Machine destinations appear straight away. Each row says how the
   disk is connected: USB, Thunderbolt, SD card, or network. ⌘1 to ⌘9 toggle them
   from the keyboard. A disk you do not guard is forgotten 30 days after you
   unplug it, and listed again the next time you plug it in. Disk images are
-  never listed. Two disks with the same name show their size, or the start
-  of their UUID, to tell them apart.
+  never listed, unless Time Machine backs up to one. Two disks with the same
+  name show their size, or the start of their UUID, to tell them apart.
 - **Right-click a disk** to hide it for good, or, while it is unplugged, to
   forget it until you plug it in again. A guarded disk asks first.
+- **While a disk waits** to be reconnected after a meeting, its row says when
+  it comes back.
 - **Next meeting** shows what the guard will do and when it will eject.
   **Skip this meeting** leaves your disks alone for that one event.
 - **Eject now**, **Pause** and **Settings** sit at the bottom.
