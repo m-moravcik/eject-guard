@@ -13,12 +13,15 @@ func usage() -> Never {
       eject-guard --list           list remembered disks
       eject-guard --watch NAME     guard this disk (name or id, case insensitive)
       eject-guard --unwatch NAME   stop guarding it
-      eject-guard --forget NAME    hide a disk from the remembered list
+      eject-guard --hide NAME      hide a disk for good (--unhide brings it back)
       eject-guard --unhide         bring back every hidden disk
+      eject-guard --forget-disk NAME
+                                   forget an unplugged disk until it is plugged in
+                                   again; a guarded one asks first (--yes skips that)
       eject-guard --unskip         undo the most recent skipped meeting
       eject-guard --unskip-all     undo every skipped meeting
-      eject-guard --run            run one pass now (ejects if a meeting is due)
-      eject-guard --dry-run        same, but never eject
+      eject-guard --run            run one pass now (unmounts before a meeting, reconnects after)
+      eject-guard --dry-run        same, but never unmount or mount
       eject-guard --eject-now      eject every guarded disk regardless of calendar
       eject-guard --calendars      list calendars and which ones are watched
       eject-guard --watch-cal NAME   watch this calendar (repeatable)
@@ -37,8 +40,11 @@ func usage() -> Never {
 // the first read of the config can move its folder (see ConfigStore.migrate).
 if CommandLine.arguments.contains(where: { $0 == "--help" || $0 == "-h" }) { usage() }
 
+// Kept, so --forget-disk asks the same question of it as the menu item asks
+// of the app's last scan.
+let snapshot = Disks.scan()
 var config = ConfigStore.mutate { config -> GuardConfig in
-    Disks.refreshKnownDisks(in: &config)
+    Disks.merge(snapshot, into: &config)
     return config
 }
 
@@ -78,6 +84,8 @@ func printBackupStops(_ outcome: GuardRunner.Outcome) {
 var arguments = Array(CommandLine.arguments.dropFirst())
 var action = "status"
 var pendingValue: String?
+/// --yes: forget a guarded disk without asking.
+var confirmed = false
 
 while !arguments.isEmpty {
     let argument = arguments.removeFirst()
@@ -96,7 +104,9 @@ while !arguments.isEmpty {
     case "--eject-now": action = "eject-now"
     case "--watch": action = "watch"; pendingValue = value()
     case "--unwatch": action = "unwatch"; pendingValue = value()
-    case "--forget": action = "forget"; pendingValue = value()
+    case "--hide": action = "hide"; pendingValue = value()
+    case "--forget-disk": action = "forget-disk"; pendingValue = value()
+    case "--yes": confirmed = true
     case "--unhide": action = "unhide"
     case "--unskip": action = "unskip"
     case "--unskip-all": action = "unskip-all"
@@ -125,7 +135,7 @@ switch action {
 case "list":
     printDisks()
 
-case "watch", "unwatch", "forget":
+case "watch", "unwatch", "hide":
     guard let needle = pendingValue, let disk = findDisk(needle) else {
         FileHandle.standardError.write("no remembered disk matches \"\(pendingValue ?? "")\"\n".data(using: .utf8)!)
         printDisks()
@@ -135,7 +145,7 @@ case "watch", "unwatch", "forget":
         switch action {
         case "watch":
             if !config.watchedDiskIDs.contains(disk.id) { config.watchedDiskIDs.append(disk.id) }
-        case "forget":
+        case "hide":
             config.watchedDiskIDs.removeAll { $0 == disk.id }
             config.knownDisks.removeAll { $0.id == disk.id }
             if !config.dismissedDiskIDs.contains(disk.id) {
@@ -147,9 +157,50 @@ case "watch", "unwatch", "forget":
     }
     switch action {
     case "watch": print("guarding: \(disk.name)")
-    case "forget": print("forgotten: \(disk.name)")
+    case "hide": print("hidden: \(disk.name)")
     default: print("no longer guarding: \(disk.name)")
     }
+
+case "forget-disk":
+    guard let needle = pendingValue, let disk = findDisk(needle) else {
+        FileHandle.standardError.write("no remembered disk matches \"\(pendingValue ?? "")\"\n".data(using: .utf8)!)
+        printDisks()
+        exit(1)
+    }
+    switch Disks.forgetBlocker(disk, attached: snapshot.attached,
+                               reportedDestinationIDs: Set(snapshot.destinations.map(\.id))) {
+    case .attached?:
+        FileHandle.standardError.write(
+            "\(disk.name) is plugged in, so the next scan would list it again. Unplug it first, or use --hide.\n"
+                .data(using: .utf8)!)
+        exit(1)
+    case .reportedByTimeMachine?:
+        FileHandle.standardError.write(
+            "Time Machine still backs up to \(disk.name), so it would be listed again. Use --hide.\n"
+                .data(using: .utf8)!)
+        exit(1)
+    case nil:
+        break
+    }
+    // As in the menu: forgetting a guarded disk stops guarding it, so it is
+    // asked about first. Without a terminal to ask on, only --yes will do.
+    if config.watchedDiskIDs.contains(disk.id), !confirmed {
+        guard isatty(STDIN_FILENO) != 0 else {
+            FileHandle.standardError.write(
+                "\(disk.name) is guarded. Forgetting it stops guarding it; add --yes to go ahead.\n"
+                    .data(using: .utf8)!)
+            exit(1)
+        }
+        print("\(disk.name) is guarded. Forgetting it stops guarding it, and the next time you plug it in "
+              + "it is listed as not guarded. Forget it? [y/N] ", terminator: "")
+        guard let answer = readLine(), answer.lowercased().hasPrefix("y") else {
+            print("left as it was")
+            exit(1)
+        }
+    }
+    ConfigStore.mutate { $0.forget(disk) }
+    Log.write("forgot \"\(disk.name)\" - by hand, from the command line")
+    print("forgotten: \(disk.name) - listed again when it is plugged in")
 
 case "unhide":
     let restored = ConfigStore.mutate { config -> Int in
@@ -225,17 +276,25 @@ case "run", "dry-run":
             "calendar access denied - System Settings > Privacy & Security > Calendars\n".data(using: .utf8)!)
         exit(3)
     }
-    let outcome = GuardRunner.tick(store: store, dryRun: action == "dry-run")
+    let dryRun = action == "dry-run"
+    let outcome = GuardRunner.tick(store: store, dryRun: dryRun)
     if let meeting = outcome.meeting {
         let minutes = Int(meeting.startDate.timeIntervalSinceNow / 60)
         print("meeting: \"\(meeting.title ?? "?")\" in \(minutes) min")
     } else {
         print("no qualifying meeting within \(Int(config.leadMinutes)) min - nothing to do")
     }
-    if !outcome.ejected.isEmpty { print("ejected: \(outcome.ejected.joined(separator: ", "))") }
-    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
+    if !outcome.unmounted.isEmpty {
+        print("\(dryRun ? "would unmount" : "unmounted") until the meeting ends: \(outcome.unmounted.joined(separator: ", "))")
+    }
+    for name in outcome.ejected { print("\(dryRun ? "would eject" : "ejected") (no volume UUID to find it again): \(name)") }
+    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
+    for name in outcome.reconnect.reconnected { print("\(dryRun ? "would reconnect" : "reconnected"): \(name)") }
+    for name in outcome.reconnect.failed { print("FAILED to reconnect: \(name) - unplug it and plug it back in") }
     printBackupStops(outcome)
-    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
+    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty || !outcome.reconnect.failed.isEmpty {
+        exit(1)
+    }
 
 case "eject-now":
     let outcome = GuardRunner.ejectGuarded(reason: .manual(), config: config, notifyOnSuccess: false)
@@ -243,7 +302,7 @@ case "eject-now":
         print("no guarded disk is attached, and no backup to a guarded share is running")
     }
     for name in outcome.ejected { print("ejected: \(name)") }
-    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(failure.detail)") }
+    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
     printBackupStops(outcome)
     if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
 
@@ -257,6 +316,10 @@ default:
     print("guard  : \(state), \(Int(config.leadMinutes)) min before a meeting")
     print("filter : events with at least \(config.minAttendees) attendees, not declined, not all day")
     print("cals   : \(config.watchAllCalendars ? "all" : "\(config.watchedCalendarIDs.count) selected")")
+    for entry in config.pendingReconnects {
+        let at = DateFormatter.localizedString(from: entry.notBefore, dateStyle: .none, timeStyle: .short)
+        print("later  : reconnect \(entry.name) after \(at) if it is still plugged in")
+    }
 
     let store = EKEventStore()
     if Meetings.requestAccess(store) {

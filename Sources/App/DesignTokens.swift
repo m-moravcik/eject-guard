@@ -17,7 +17,21 @@ enum Design {
 
     enum Layout {
         static let popoverWidth: CGFloat = 300
-        static let popoverMaxHeight: CGFloat = 620
+        /// Measured with the preview harness (`./preview.sh many`), the rest
+        /// of the popover is 293pt with today's meeting and its skip row, a
+        /// disk row 47pt and the gap between rows 2pt.
+        ///
+        /// The disk list scrolls past six rows and half of a seventh, the half
+        /// row saying there is more. The popover is then 609pt, inside the
+        /// 620pt it always kept to.
+        static let diskListMaxHeight: CGFloat = 316
+        /// A backstop, not the layout: the scrolling list keeps the popover
+        /// under it. Banners add 49pt each (update ready, paused: measured
+        /// together at 98pt), so the tallest state stays around 740pt. The
+        /// smallest screen a 13-inch MacBook that runs macOS 14 opens at is
+        /// 1440 x 900 points, 876pt under a 24pt menu bar; this leaves more
+        /// than 120pt for the Dock.
+        static let popoverMaxHeight: CGFloat = 750
         /// A 13pt line plus 4 + 4 is 24pt, the height of a native menu item
         /// on macOS 26 (measured with `NSMenu.size`).
         static let rowVerticalPadding: CGFloat = 4

@@ -284,39 +284,56 @@ private struct UpdateReadyBanner: View {
 
 private struct DisksSection: View {
     @Environment(GuardController.self) private var controller
+    /// The rows' natural height, measured; past the cap they scroll.
+    @State private var rowsHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: Design.Spacing.xs) {
             SectionHeader(title: Loc.t("section.disks", "DISKS"))
 
-            Group {
-                if controller.knownDisks.isEmpty {
-                    Text(Loc.t("disks.empty", "No external disks seen yet.\nPlug one in and it shows up here."))
-                        .font(Design.Typography.note)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Design.Spacing.l)
-                } else {
-                    VStack(spacing: Design.Spacing.xs) {
-                        ForEach(Array(controller.knownDisks.enumerated()), id: \.element.id) { index, disk in
-                            DiskCard(disk: disk, shortcutIndex: index)
-                        }
-                        // The one thing a new user has to do, said where they
-                        // are looking rather than only in the README.
-                        if controller.config.watchedDiskIDs.isEmpty {
-                            Text(Loc.t("disks.hint", "Click a disk to guard it."))
-                                .font(Design.Typography.note)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, Design.Spacing.s)
-                                .padding(.top, Design.Spacing.xs)
-                        }
-                    }
+            if controller.knownDisks.isEmpty {
+                Text(Loc.t("disks.empty", "No external disks seen yet.\nPlug one in and it shows up here."))
+                    .font(Design.Typography.note)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Design.Spacing.l)
+                    .padding(.horizontal, Design.Spacing.m)
+            } else if rowsHeight > Design.Layout.diskListMaxHeight {
+                // Only once the rows outgrow the cap, so a list that fits
+                // looks exactly as it did. The scroller sits at the popover's
+                // edge, outside the cards.
+                ScrollView {
+                    rows
                 }
+                .frame(height: Design.Layout.diskListMaxHeight)
+            } else {
+                rows
             }
-            .padding(.horizontal, Design.Spacing.m)
         }
+    }
+
+    private var rows: some View {
+        // Two disks of one name read the same, so each gets what tells it
+        // apart: its size, or the start of its UUID.
+        let details = Disks.distinguishingDetails(for: controller.knownDisks)
+        return VStack(spacing: Design.Spacing.xs) {
+            ForEach(Array(controller.knownDisks.enumerated()), id: \.element.id) { index, disk in
+                DiskCard(disk: disk, shortcutIndex: index, detail: details[disk.id])
+            }
+            // The one thing a new user has to do, said where they are looking
+            // rather than only in the README.
+            if controller.config.watchedDiskIDs.isEmpty {
+                Text(Loc.t("disks.hint", "Click a disk to guard it."))
+                    .font(Design.Typography.note)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Design.Spacing.s)
+                    .padding(.top, Design.Spacing.xs)
+            }
+        }
+        .padding(.horizontal, Design.Spacing.m)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
     }
 }
 
@@ -325,6 +342,8 @@ private struct DiskCard: View {
     let disk: KnownDisk
     /// Position in the list, which is also its keyboard shortcut.
     let shortcutIndex: Int
+    /// Set only when another listed disk has the same name.
+    var detail: String?
 
     @State private var isHovering = false
 
@@ -341,6 +360,11 @@ private struct DiskCard: View {
     private var backingUp: Bool { controller.isBackingUp(disk) }
 
     private var subtitle: String {
+        guard let detail else { return status }
+        return "\(status) · \(detail)"
+    }
+
+    private var status: String {
         if backingUp {
             if let percent = controller.backup.percent {
                 return Loc.t("disk.backingUpPercent", "Backing up… %@", Format.percent(percent))
@@ -348,6 +372,12 @@ private struct DiskCard: View {
             return Loc.t("disk.backingUp", "Backing up…")
         }
         let watch = guarded ? Loc.t("disk.guarded", "Guarded") : Loc.t("disk.notGuarded", "Not guarded")
+        // Unmounted for a meeting: "Disconnected" would read as unplugged.
+        // Only a guarded disk is ever waiting, so "Guarded" goes unsaid and
+        // the time fits the row.
+        if !connected, let pending = controller.pendingReconnect(for: disk) {
+            return Loc.t("disk.reconnectsAt", "Reconnects at %@", Format.clock(pending.notBefore))
+        }
         return "\(watch) · \(connectionLabel)"
     }
 
@@ -414,6 +444,7 @@ private struct DiskCard: View {
                                 .trim(from: 0, to: 0.7)
                                 .stroke(.secondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                                 .frame(width: 8, height: 8)
+                                .rotationEffect(.degrees(360 * PreviewDemo.spinnerTurns))
                                 .frame(width: 10, height: 10)
                             #else
                             ProgressView()
@@ -422,10 +453,23 @@ private struct DiskCard: View {
                                 .frame(width: 10, height: 10)
                             #endif
                         }
-                        Text(subtitle)
-                            .font(Design.Typography.cardSubtitle)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        // The detail after the status where the line has
+                        // room, on a line of its own where it does not: cut
+                        // off, it would be the very part that tells the two
+                        // disks apart.
+                        ViewThatFits(in: .horizontal) {
+                            Text(subtitle)
+                                .lineLimit(1)
+                            if let detail {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(status)
+                                    Text(detail)
+                                }
+                                .lineLimit(1)
+                            }
+                        }
+                        .font(Design.Typography.cardSubtitle)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -458,7 +502,56 @@ private struct DiskCard: View {
             // Settings has the way back.
             Button(Loc.t("disk.hide", "Hide this disk")) { controller.hide(disk) }
             Text(Loc.t("disk.hideHint", "Restore it later in Settings"))
+            // Only while it is unplugged: one that is plugged in would be
+            // listed again by the very next scan.
+            if controller.canForget(disk) {
+                Divider()
+                Button(Loc.t("disk.forget", "Forget this disk")) { forget() }
+                Text(Loc.t("disk.forgetHint", "Listed again when you plug it in"))
+            }
         }
+    }
+
+    /// A guarded disk is asked about first: forgetting one also stops
+    /// guarding it, and a click in a context menu is easy to get wrong.
+    /// An app-modal NSAlert rather than a SwiftUI alert, which a menu bar
+    /// popover closes along with itself. The popover may well close when the
+    /// alert takes focus; `runModal` still hands back the answer, and only
+    /// values captured here are used after it. Checked offscreen by closing
+    /// a stand-in popover window while the alert was up: Forget came back as
+    /// the first button, Return as Cancel.
+    private func forget() {
+        guard guarded else {
+            controller.forget(disk)
+            return
+        }
+        let alert = ForgetConfirmation.alert(
+            for: disk, reconnectPending: controller.pendingReconnect(for: disk) != nil)
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        controller.forget(disk)
+    }
+}
+
+/// The question asked before a guarded disk is forgotten. Apart from the
+/// row so the preview harness renders the very same alert.
+@MainActor
+enum ForgetConfirmation {
+    static func alert(for disk: KnownDisk, reconnectPending: Bool) -> NSAlert {
+        var message = Loc.t("disk.forgetConfirmDetail", "It is guarded. Forgetting it stops guarding it, and the next time you plug it in it is listed as not guarded.")
+        if reconnectPending {
+            message += " " + Loc.t("disk.forgetConfirmReconnect", "It will not be reconnected after the meeting either.")
+        }
+        let alert = NSAlert()
+        alert.messageText = Loc.t("disk.forgetConfirm", "Forget “%@”?", disk.name)
+        alert.informativeText = message
+        let forget = alert.addButton(withTitle: Loc.t("disk.forgetConfirmButton", "Forget"))
+        let cancel = alert.addButton(withTitle: Loc.t("disk.forgetCancel", "Cancel"))
+        // Destructive, so Return cancels, as macOS asks of such an alert.
+        forget.hasDestructiveAction = true
+        forget.keyEquivalent = ""
+        cancel.keyEquivalent = "\r"
+        return alert
     }
 }
 

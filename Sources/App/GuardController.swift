@@ -20,10 +20,16 @@ final class GuardController {
 
     private(set) var config = GuardConfig()
     private(set) var attached: [AttachedVolume] = []
+    /// The Time Machine destinations the last scan reported.
+    private(set) var reportedDestinationIDs: Set<String> = []
     private(set) var nextMeeting: EKEvent?
     private(set) var ejectDate: Date?
     private(set) var calendarAccess: CalendarAccess = .pending
     private(set) var isBusy = false
+    /// Mounting a disk back, which can take a minute and a half for a locked
+    /// Time Machine volume. Kept apart from `isBusy`, which the menu bar and
+    /// the footer show as an eject; an eject waits for it all the same.
+    private(set) var isReconnecting = false
     private(set) var lastFailure: String?
 
     private(set) var backup = BackupStatus()
@@ -32,6 +38,10 @@ final class GuardController {
     /// so SwiftUI's own symbol effects never run there - measured, not assumed.
     /// The only animation available is one we redraw ourselves.
     private(set) var backupPhase = 0
+
+    /// Plays the menu bar icon's eject animation once a guarded disk has
+    /// actually come off. Runs a timer only while it plays.
+    let iconAnimator = MenuBarIconAnimator()
 
     /// nil until we have asked. False means an eject will happen silently,
     /// which is worth saying out loud since the notification is the only
@@ -45,15 +55,25 @@ final class GuardController {
     private let work = DispatchQueue(label: "sk.moravcik.tmejectguard.work")
 
     private var ejectTimer: Timer?
+    /// Fires when the earliest disk unmounted for a meeting is due back.
+    private var reconnectTimer: Timer?
     private var heartbeat: Timer?
     /// Asks Time Machine what it is doing, but only while somewhere it could
     /// be writing to is reachable - see `updateBackupWatch`.
     private var backupTimer: Timer?
+    /// A status read is waiting on `work`. The queue is serial, so while a
+    /// pass spends minutes retrying an unmount every poll would otherwise
+    /// queue its own read, and they would all run back to back afterwards.
+    private var isBackupRefreshQueued = false
     /// Advances `backupPhase`. Pure bookkeeping, no process is spawned.
     private var breatheTimer: Timer?
     private var pendingReschedule: DispatchWorkItem?
     private var isScanning = false
     private var rescanWhenIdle = false
+    /// Run once a scan started after they were asked for has landed, so
+    /// they see the disks as they are now, not as a scan already under way
+    /// found them.
+    private var afterNextScan: [@MainActor () -> Void] = []
 
     /// Meetings already acted on, successfully or not. Without this a failed
     /// eject would reschedule itself into the past, fire again immediately, and
@@ -78,7 +98,7 @@ final class GuardController {
     private let backupPollWhileIdle: TimeInterval = 20
     /// Eight steps of a two second cycle: slow enough to read as breathing
     /// rather than blinking, cheap enough to run for the length of a backup.
-    static let breatheSteps = 8
+    static let breatheSteps = LiftIcon.breatheSteps
     private let breatheInterval: TimeInterval = 0.25
 
     var knownDisks: [KnownDisk] { config.knownDisks }
@@ -138,6 +158,12 @@ final class GuardController {
 
     func isGuarded(_ disk: KnownDisk) -> Bool { config.watchedDiskIDs.contains(disk.id) }
 
+    /// The disk was unmounted for a meeting and is waiting to be mounted again.
+    func pendingReconnect(for disk: KnownDisk) -> PendingReconnect? {
+        guard let uuid = disk.volumeUUID else { return nil }
+        return config.pendingReconnects.first { $0.volumeUUID == uuid }
+    }
+
     func isBackingUp(_ disk: KnownDisk) -> Bool {
         if disk.isNetworkDestination { return backup.isBackingUp(toDestination: disk.tmDestinationID) }
         guard let volume = Disks.attachedVolume(for: disk, among: attached) else { return false }
@@ -159,10 +185,18 @@ final class GuardController {
     /// Time Machine destination is reachable, which is the only time the
     /// answer can be anything but "no".
     func refreshBackupStatus() {
+        #if PREVIEW
+        // Demo state is what the harness renders; a real tmutil read must
+        // never overwrite it, and the harness reads nothing from this Mac.
+        if PreviewDemo.isActive { return }
+        #endif
+        guard !isBackupRefreshQueued else { return }
+        isBackupRefreshQueued = true
         work.async { [weak self] in
             let status = BackupStatus.current()
             Task { @MainActor in
                 guard let self else { return }
+                self.isBackupRefreshQueued = false
                 self.backup = status
                 // Both the poll interval and the breathing depend on the
                 // answer, so every answer re-evaluates them. The call is cheap:
@@ -237,10 +271,10 @@ final class GuardController {
         // UNUserNotificationCenter.current() traps when the executable has no
         // bundle identifier, which is exactly the preview harness.
         guard Bundle.main.bundleIdentifier != nil else { return }
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             let allowed = settings.authorizationStatus == .authorized
                 || settings.authorizationStatus == .provisional
-            Task { @MainActor [weak self] in self?.notificationsEnabled = allowed }
+            Task { @MainActor in self?.notificationsEnabled = allowed }
         }
     }
 
@@ -262,7 +296,7 @@ final class GuardController {
     /// ⌘E has something to do: a guarded disk to eject, or a backup to a
     /// guarded share to stop.
     var canEjectNow: Bool {
-        !isBusy && (!guardedVolumes.isEmpty || !guardedNetworkBackups.isEmpty)
+        !isBusy && !isReconnecting && (!guardedVolumes.isEmpty || !guardedNetworkBackups.isEmpty)
     }
 
     // MARK: - Lifecycle
@@ -273,8 +307,8 @@ final class GuardController {
 
         // The permission callback arrives on an arbitrary queue; the store
         // itself is only ever touched back on the main actor.
-        Meetings.requestAccess(store) { granted in
-            Task { @MainActor [weak self] in
+        Meetings.requestAccess(store) { [weak self] granted in
+            Task { @MainActor in
                 guard let self else { return }
                 self.calendarAccess = granted ? .granted : .denied
                 if granted { self.calendars = self.store.calendars(for: .event) }
@@ -338,7 +372,8 @@ final class GuardController {
     /// `Process.waitUntilExit` pumps the run loop, the run loop delivered the
     /// next volume notification, and the second pass blocked on the config lock
     /// the first pass was still holding.
-    private func reloadDisks() {
+    private func reloadDisks(then done: (@MainActor () -> Void)? = nil) {
+        if let done { afterNextScan.append(done) }
         guard !isScanning else {
             // A scan is already in flight and the world changed again; run one
             // more when it lands rather than queueing a pile of them.
@@ -346,6 +381,8 @@ final class GuardController {
             return
         }
         isScanning = true
+        let landed = afterNextScan
+        afterNextScan = []
         work.async { [weak self] in
             let snapshot = Disks.scan()
             Task { @MainActor in
@@ -356,12 +393,14 @@ final class GuardController {
                     return config
                 }
                 self.attached = snapshot.attached
+                self.reportedDestinationIDs = Set(snapshot.destinations.map(\.id))
                 // Once the disk that failed to eject is gone, or the backup
                 // that would not stop has ended, the warning is stale - it
                 // must not sit in the popover for days.
                 if self.guardedVolumes.isEmpty && self.guardedNetworkBackups.isEmpty {
                     self.lastFailure = nil
                 }
+                for done in landed { done() }
                 if self.rescanWhenIdle {
                     self.rescanWhenIdle = false
                     self.reloadDisks()
@@ -407,6 +446,9 @@ final class GuardController {
         reloadConfig()
         // After the reload, so it reads the settings that are now in force.
         updateBackupWatch()
+        // Independent of guarding and of calendar access: a disk the guard
+        // unmounted is put back even if either went away since.
+        scheduleReconnect()
         guard calendarAccess == .granted else { return }
 
         // Surface the next meeting even when the guard cannot act on it, so the
@@ -437,11 +479,50 @@ final class GuardController {
 
     @objc private func timerFired() { fire() }
 
+    private func scheduleReconnect() {
+        reconnectTimer?.invalidate()
+        reconnectTimer = nil
+        guard let earliest = config.pendingReconnects.map(\.notBefore).min() else { return }
+        if earliest <= Date() {
+            reconnect()
+            return
+        }
+        let timer = Timer(fireAt: earliest.addingTimeInterval(2), interval: 0,
+                          target: self, selector: #selector(reconnectTimerFired),
+                          userInfo: nil, repeats: false)
+        timer.tolerance = 10
+        RunLoop.main.add(timer, forMode: .common)
+        reconnectTimer = timer
+    }
+
+    @objc private func reconnectTimerFired() { reconnect() }
+
+    /// Read the calendar here, where the store lives, and mount on the work
+    /// queue. A meeting still running pushes the reconnect to its end.
+    private func reconnect() {
+        guard !isBusy, !isReconnecting else { return }
+        let busyUntil = calendarAccess == .granted ? Meetings.busyUntil(store, config: config) : nil
+        isReconnecting = true
+        work.async { [weak self] in
+            let reconnected = GuardRunner.reconnectDue(busyUntil: busyUntil).reconnected.count
+            Task { @MainActor in
+                guard let self else { return }
+                // Still reconnecting until the disk list shows the disk back:
+                // otherwise the icon would drop to the empty line in between,
+                // and the animation would land on a state about to change.
+                self.reloadDisks {
+                    self.isReconnecting = false
+                    self.iconAnimator.reconnectFinished(reconnectedDisks: reconnected)
+                }
+            }
+        }
+    }
+
     /// Decide here, on the main actor where the event store lives, then hand
     /// only the ejecting to a background queue. Ejecting can block for well over
     /// a minute while a volume is busy, and it needs no EventKit at all.
     private func fire() {
-        guard !isBusy else { return }
+        guard !isBusy, !isReconnecting else { return }
         reloadConfig()
 
         // Re-validate rather than trusting the schedule: the meeting may have
@@ -462,10 +543,10 @@ final class GuardController {
         let reason = GuardRunner.Reason.meeting(
             title: meeting.title ?? Loc.t("meeting.untitled", "Meeting"),
             minutesAhead: minutesAhead)
-        runEject(reason: reason, notifyOnSuccess: true)
+        runEject(reason: reason, notifyOnSuccess: true, reconnectAfter: meeting.endDate)
     }
 
-    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool) {
+    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool, reconnectAfter: Date? = nil) {
         let config = self.config
         // Check against the snapshot we already have; the eject itself rescans
         // on the work queue.
@@ -473,12 +554,18 @@ final class GuardController {
         isBusy = true
         work.async { [weak self] in
             let outcome = GuardRunner.ejectGuarded(
-                reason: reason, config: config, notifyOnSuccess: notifyOnSuccess)
+                reason: reason, config: config, notifyOnSuccess: notifyOnSuccess,
+                reconnectAfter: reconnectAfter)
             Task { @MainActor in
                 guard let self else { return }
                 self.isBusy = false
+                // Only a disk that actually came off is celebrated: not a
+                // failure, and not a backup to a share that was only stopped.
+                // Unmounted for a meeting counts: the disk came off all the
+                // same, and the icon lands on the dashed slot until it is back.
+                self.iconAnimator.ejectFinished(ejectedDisks: outcome.takenOff.count)
                 self.lastFailure = outcome.failed.first.map {
-                    Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, $0.detail)
+                    Loc.t("failure.heldBy", "%1$@: held by %2$@", $0.name, GuardRunner.holder($0.detail))
                 } ?? outcome.unstoppedBackups.first.map {
                     Loc.t("failure.backupNotStopped", "%@: the backup could not be stopped", $0)
                 }
@@ -511,6 +598,21 @@ final class GuardController {
                 config.dismissedDiskIDs.append(disk.id)
             }
         }
+    }
+
+    func canForget(_ disk: KnownDisk) -> Bool {
+        Disks.canForget(disk, attached: attached, reportedDestinationIDs: reportedDestinationIDs)
+    }
+
+    /// Forgets a disk that is not plugged in. Unlike hiding, nothing is kept:
+    /// it is listed again the next time it is plugged in. The popover asks
+    /// first when the disk is guarded.
+    func forget(_ disk: KnownDisk) {
+        guard canForget(disk) else { return }
+        Log.write("forgot \"\(disk.name)\" - by hand")
+        // The update reschedules, which re-arms the reconnect timer without
+        // an entry this disk had.
+        update { $0.forget(disk) }
     }
 
     func restoreHiddenDisks() {
@@ -579,7 +681,7 @@ final class GuardController {
     }
 
     func ejectNow() {
-        guard !isBusy else { return }
+        guard !isBusy, !isReconnecting else { return }
         reloadConfig()
         runEject(reason: .menu(), notifyOnSuccess: false)
     }
@@ -669,7 +771,140 @@ extension GuardController {
 
         calendarAccess = .granted
         notificationsEnabled = true
+        PreviewDemo.isActive = true
     }
+
+    /// The demo with `count` disks, more than the list shows without
+    /// scrolling once there are enough of them. `paused` adds the banner a
+    /// pause shows, for measuring the popover at its tallest.
+    func loadManyDisksDemo(_ count: Int, paused: Bool = false) {
+        loadDemo()
+        let names = ["Archive HDD", "Backup SSD", "Camera Cards", "Lacie Rugged", "Photos 2024",
+                     "Samsung T7", "SanDisk Extreme", "Scratch", "Time Machine", "Video Projects",
+                     "WD Elements", "Zeta"]
+        var demo = config
+        demo.knownDisks = (0..<count).map { index in
+            let name = names[index % names.count]
+            return KnownDisk(id: "demo-\(index)", name: index < names.count ? name : "\(name) \(index)",
+                             volumeUUID: "demo-\(index)-uuid",
+                             tmDestinationID: name == "Time Machine" ? "demo-tm-dest" : nil)
+        }
+        demo.watchedDiskIDs = demo.knownDisks.filter { $0.name == "Archive HDD" || $0.name == "Time Machine" }.map(\.id)
+        if paused { demo.pausedUntil = Date().addingTimeInterval(3600) }
+        config = demo
+        attached = demo.knownDisks.filter { $0.name == "Time Machine" || $0.name == "Samsung T7" }.map { disk in
+            AttachedVolume(path: "/Volumes/\(disk.name)", name: disk.name, volumeUUID: disk.volumeUUID,
+                           tmDestinationID: disk.tmDestinationID, connection: .usb)
+        }
+        backup = BackupStatus()
+    }
+
+    /// The demo with disks that share a name, for reviewing how a row tells
+    /// them apart and what its context menu offers. One pair differs in size,
+    /// the other only in its UUID.
+    func loadDisksDemo() {
+        loadDemo()
+        let small = KnownDisk(id: "demo-t7a", name: "Samsung T7", volumeUUID: "1C2F6A0B-demo",
+                              capacity: 1_000_000_000_000)
+        let large = KnownDisk(id: "demo-t7b", name: "Samsung T7", volumeUUID: "9E41D7C3-demo",
+                              absentSince: Date().addingTimeInterval(-3 * 86_400),
+                              capacity: 2_000_000_000_000)
+        let first = KnownDisk(id: "demo-u1", name: "Untitled", volumeUUID: "4BEED8FB-demo",
+                              capacity: 64_000_000_000)
+        let second = KnownDisk(id: "demo-u2", name: "Untitled", volumeUUID: "7496A0AE-demo",
+                               capacity: 64_000_000_000)
+        var demo = config
+        // Few enough that the list does not scroll, which ImageRenderer
+        // could not draw: `many` shows that.
+        demo.knownDisks = [small, large, demo.knownDisks[3], first, second]
+        demo.watchedDiskIDs = [demo.knownDisks[2].id, large.id]
+        config = demo
+        attached = attached.filter { $0.volumeUUID != "demo-t7-uuid" } + [
+            AttachedVolume(path: "/Volumes/Samsung T7", name: small.name,
+                           volumeUUID: small.volumeUUID, connection: .usb, capacity: small.capacity),
+        ]
+        reportedDestinationIDs = ["demo-tm-dest", "demo-nas"]
+        var status = backup
+        status.running = false
+        backup = status
+    }
+
+    /// The README motion demo: one guarded Time Machine disk and one portable
+    /// disk nobody ticked. `setMotionFrame` then moves it through a meeting.
+    func loadMotionDemo() {
+        let timeMachine = KnownDisk(id: "demo-tm", name: "Time Machine",
+                                    volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest")
+        let portable = KnownDisk(id: "demo-t7", name: "Samsung T7", volumeUUID: "demo-t7-uuid")
+        var demo = GuardConfig()
+        demo.knownDisks = [timeMachine, portable]
+        demo.watchedDiskIDs = [timeMachine.id]
+        demo.onboardingShown = true
+        config = demo
+        calendarAccess = .granted
+        notificationsEnabled = true
+        PreviewDemo.isActive = true
+    }
+
+    /// One moment of the motion demo, set the way the real controller sets it
+    /// at that point: `isBusy` while an eject pass runs, the Time Machine disk
+    /// in `attached` only while it is mounted, `ejectDate` only while a
+    /// guarded disk is connected and the meeting has not been acted on, and a
+    /// pending reconnect from the unmount until the disk list shows it back.
+    func setMotionFrame(timeMachineMounted: Bool, backupPercent: Double??,
+                        meeting: EKEvent?, ejectDate: Date?, busy: Bool,
+                        reconnectsAt: Date?, reconnecting: Bool) {
+        var volumes: [AttachedVolume] = []
+        if timeMachineMounted {
+            volumes.append(AttachedVolume(path: "/Volumes/Time Machine", name: "Time Machine",
+                                          volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest",
+                                          connection: .usb))
+        }
+        volumes.append(AttachedVolume(path: "/Volumes/Samsung T7", name: "Samsung T7",
+                                      volumeUUID: "demo-t7-uuid", connection: .thunderbolt))
+        attached = volumes
+
+        config.pendingReconnects = reconnectsAt.map {
+            [PendingReconnect(volumeUUID: "demo-tm-uuid", name: "Time Machine", notBefore: $0,
+                              tmDestinationID: "demo-tm-dest", stoppedBackup: true)]
+        } ?? []
+
+        var status = BackupStatus()
+        // Outer nil: no backup. Inner nil: Time Machine is still sizing it up.
+        if let percent = backupPercent {
+            status.running = true
+            status.mountPoint = "/Volumes/Time Machine"
+            status.destinationID = "demo-tm-dest"
+            status.percent = percent
+        }
+        backup = status
+        nextMeeting = meeting
+        self.ejectDate = ejectDate
+        isBusy = busy
+        isReconnecting = reconnecting
+    }
+
+    /// A demo meeting with no attendees list: the harness never asks the
+    /// store for events, so nothing filters it.
+    func demoMeeting(_ title: String, start: Date, minutes: Double) -> EKEvent {
+        let calendar = EKCalendar(for: .event, eventStore: store)
+        calendar.title = "Work"
+        let meeting = EKEvent(eventStore: store)
+        meeting.title = title
+        meeting.calendar = calendar
+        meeting.startDate = start
+        meeting.endDate = start.addingTimeInterval(minutes * 60)
+        return meeting
+    }
+}
+
+/// Knobs only the preview harness turns.
+enum PreviewDemo {
+    /// Demo data is loaded: nothing may read this Mac's Time Machine state.
+    nonisolated(unsafe) static var isActive = false
+    /// The time the demo pretends it is, for "in 5 min" and the menu bar clock.
+    nonisolated(unsafe) static var now: Date?
+    /// Turns of the stand-in spinner, which ImageRenderer cannot animate.
+    nonisolated(unsafe) static var spinnerTurns: Double = 0
 }
 #endif
 
@@ -677,7 +912,12 @@ extension GuardController {
 
 enum Format {
     static func relative(_ date: Date) -> String {
-        let minutes = Int((date.timeIntervalSinceNow / 60).rounded())
+        #if PREVIEW
+        let now = PreviewDemo.now ?? Date()
+        #else
+        let now = Date()
+        #endif
+        let minutes = Int((date.timeIntervalSince(now) / 60).rounded())
         if minutes <= 0 { return "now" }
         if minutes < 60 { return Loc.t("relative.minutes", "in %d min", minutes) }
         let hours = minutes / 60

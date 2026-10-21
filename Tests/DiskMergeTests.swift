@@ -170,24 +170,43 @@ final class DiskMergeTests: XCTestCase {
                        "you pick from this list while the disk is in a drawer")
     }
 
-    // A disk nobody guards is forgotten a week after it was unplugged: a
+    // A disk nobody guards is forgotten 30 days after it was unplugged: a
     // volume made while formatting a disk otherwise stayed listed for good,
     // and hiding it by hand was the only way out.
 
+    private let day: TimeInterval = 24 * 60 * 60
     private let week: TimeInterval = 7 * 24 * 60 * 60
+    private let month: TimeInterval = 30 * 24 * 60 * 60
     private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     private let unplugged = DiskSnapshot(destinations: [], attached: [])
 
-    func testAnUnguardedDiskUnpluggedForAWeekIsForgotten() {
+    func testAnUnguardedDiskUnpluggedFor30DaysIsForgotten() {
         var config = GuardConfig()
         Disks.merge(DiskSnapshot(destinations: [], attached: [volume("TmpInit", uuid: "VOL-1")]),
                     into: &config, now: start)
         Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60))
-
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + week - 1))
-        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "not a week yet")
+        XCTAssertEqual(config.knownDisks.first?.absentSince, start.addingTimeInterval(60))
 
         Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + week))
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "a week is no longer enough")
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + month - 1))
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "not 30 days yet")
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(60 + month))
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    func testAnEntryFromAnEarlierReleaseCountsFromItsStoredAbsence() {
+        // Written by 1.4.2 with the absence it found 20 days ago.
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "Speaker's SSD", volumeUUID: "VOL-1",
+                                       absentSince: start.addingTimeInterval(-20 * day))]
+
+        Disks.merge(unplugged, into: &config, now: start)
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(10 * day))
         XCTAssertTrue(config.knownDisks.isEmpty)
     }
 
@@ -202,48 +221,51 @@ final class DiskMergeTests: XCTestCase {
         XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"],
                        "you pick from this list while the disk is in a drawer")
         XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"])
+        XCTAssertNotNil(config.knownDisks.first?.absentSince, "absent all the same")
     }
 
     func testATimeMachineDiskIsNeverForgotten() {
         // Time Machine reports it again on every pass, so forgetting it would
-        // only make the row flicker. One it no longer backs up to is hidden.
+        // only make the row flicker. One it no longer backs up to is hidden
+        // or forgotten by hand.
         var config = GuardConfig()
         config.knownDisks = [
             KnownDisk(id: "VOL-2", name: "TM MBP", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
+            // Never seen mounted: only a destination ID.
+            KnownDisk(id: "TM-3", name: "TM Old", tmDestinationID: "TM-3"),
         ]
 
         Disks.merge(unplugged, into: &config, now: start)
         Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(52 * week))
 
-        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2"])
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2", "TM-3"])
     }
 
-    func testTheWeekCountsFromWhenTheDiskWasFoundMissing() {
+    func testTheMonthCountsFromWhenTheDiskWasFoundMissing() {
         // The app rescans only when something mounts, unmounts or wakes, so a
         // disk left plugged into a Mac that never sleeps, or one an earlier
         // release remembered, can carry a `lastSeen` weeks old the moment it
         // is found missing.
         var config = GuardConfig()
         config.knownDisks = [KnownDisk(id: "VOL-1", name: "Archive", volumeUUID: "VOL-1",
-                                       lastSeen: start.addingTimeInterval(-4 * week))]
+                                       lastSeen: start.addingTimeInterval(-8 * week))]
 
         Disks.merge(unplugged, into: &config, now: start)
         XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"], "found missing just now")
 
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(week))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(month))
         XCTAssertTrue(config.knownDisks.isEmpty)
     }
 
-    func testPluggingTheDiskBackInStartsTheWeekAgain() {
-        let day: TimeInterval = 24 * 60 * 60
+    func testPluggingTheDiskBackInStartsTheMonthAgain() {
         var config = GuardConfig()
         config.knownDisks = [KnownDisk(id: "VOL-1", name: "Archive", volumeUUID: "VOL-1")]
         let pluggedIn = DiskSnapshot(destinations: [], attached: [volume("Archive", uuid: "VOL-1")])
 
         Disks.merge(unplugged, into: &config, now: start)
-        Disks.merge(pluggedIn, into: &config, now: start.addingTimeInterval(6 * day))
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(6 * day + 60))
-        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(week + 1))
+        Disks.merge(pluggedIn, into: &config, now: start.addingTimeInterval(29 * day))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(29 * day + 60))
+        Disks.merge(unplugged, into: &config, now: start.addingTimeInterval(month + 1))
 
         XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
     }
@@ -258,20 +280,96 @@ final class DiskMergeTests: XCTestCase {
         XCTAssertTrue(config.knownDisks.isEmpty)
     }
 
-    func testAGuardedDiskIsNeverForgottenForSharingAnImagesUUID() {
-        // A block-level image of a real disk carries the same volume UUID.
+    func testAGuardedDiskImageIsForgottenButItsTickStays() {
+        // Images are never listed, guarded or not. A block-level image of a
+        // real disk carries the same volume UUID, so the tick is left alone:
+        // the real disk comes back guarded the next time it is plugged in.
         var config = GuardConfig()
-        config.knownDisks = [
-            KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1"),
-            KnownDisk(id: "VOL-2", name: "TM", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
-        ]
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
         config.watchedDiskIDs = ["VOL-1"]
 
-        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-1", "VOL-2"]),
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-1"]),
+                    into: &config)
+        XCTAssertTrue(config.knownDisks.isEmpty)
+        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"], "an image must never unguard a disk")
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [volume("WD", uuid: "VOL-1")]),
+                    into: &config)
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(Disks.guardedVolumes(config, among: [volume("WD", uuid: "VOL-1")]).map(\.volumeUUID),
+                       ["VOL-1"])
+    }
+
+    func testARealDiskPluggedInBesideItsImageStaysListedAndGuarded() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+        config.watchedDiskIDs = ["VOL-1"]
+        let real = volume("WD", uuid: "VOL-1")
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [real], diskImageIDs: ["VOL-1"]),
                     into: &config)
 
-        XCTAssertEqual(Set(config.knownDisks.map(\.id)), ["VOL-1", "VOL-2"])
-        XCTAssertEqual(config.watchedDiskIDs, ["VOL-1"], "an image must never unguard a disk")
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(Disks.guardedVolumes(config, among: [real]).map(\.volumeUUID), ["VOL-1"])
+    }
+
+    func testATimeMachineDestinationIsNeverForgottenForBeingAnImage() {
+        var config = GuardConfig()
+        config.knownDisks = [
+            KnownDisk(id: "VOL-2", name: "TM", volumeUUID: "VOL-2", tmDestinationID: "TM-2"),
+        ]
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["VOL-2"]),
+                    into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-2"])
+    }
+
+    func testADiskImageIsNeverRemembered() {
+        // What a test tool's scratch image looks like to a scan: listed as an
+        // image, never attached. Two of them, sharing a name.
+        var config = GuardConfig()
+        Disks.merge(DiskSnapshot(destinations: [], attached: [], diskImageIDs: ["IMG-1", "IMG-2"]),
+                    into: &config)
+        XCTAssertTrue(config.knownDisks.isEmpty)
+    }
+
+    // MARK: What a mounted volume is
+
+    func testDiskImagesAreToldApartByModelOrDriver() {
+        // Observed on macOS 27: HFS+ and APFS images through `hdiutil attach`
+        // and `diskutil image attach`, and a Time Machine share's bundle.
+        XCTAssertTrue(Disks.isDiskImage(deviceModel: "Disk Image"))
+        XCTAssertTrue(Disks.isDiskImage(
+            deviceModel: nil,
+            devicePath: "IOService:/IOResources/IOHDIXController/IOHDIXHDDriveOutKernel@f0/IODiskImageBlockStorageDeviceOutKernel"))
+        XCTAssertTrue(Disks.isDiskImage(
+            deviceModel: nil,
+            devicePath: "IOService:/IOResources/AppleDiskImagesController/AppleDiskImageDevice@2d"))
+        // A USB disk, by the shape a USB storage path takes, and the internal SSD.
+        XCTAssertFalse(Disks.isDiskImage(
+            deviceModel: "Elements 25A3",
+            devicePath: "IOService:/AppleARMPE/arm-io@10F00000/AppleT811xIO/usb-drd0@2280000/AppleUSBHostPort@01100000/Elements 25A3@01100000/IOUSBHostInterface@0/IOUSBMassStorageInterfaceNub/IOUSBMassStorageDriverNub/IOUSBMassStorageDriver/IOSCSILogicalUnitNub@0/IOSCSIPeripheralDeviceType00"))
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: "APPLE SSD AP1024Z"))
+        XCTAssertFalse(Disks.isDiskImage(deviceModel: nil, devicePath: nil))
+    }
+
+    func testAVolumeThatVanishedMidScanIsNotAttached() {
+        XCTAssertEqual(Disks.kind(ofDevice: nil, isTimeMachineDestination: false, stillMounted: { false }), .gone)
+        // Still there but unknown to DiskArbitration: offered, as an unknown
+        // model always was, rather than hiding a real disk.
+        XCTAssertEqual(Disks.kind(ofDevice: nil, isTimeMachineDestination: false, stillMounted: { true }), .disk)
+    }
+
+    func testAnImageIsOfferedOnlyAsATimeMachineDestination() {
+        let image = (model: Optional("Disk Image"), path: Optional<String>.none)
+        XCTAssertEqual(Disks.kind(ofDevice: image, isTimeMachineDestination: false, stillMounted: { true }),
+                       .diskImage)
+        XCTAssertEqual(Disks.kind(ofDevice: image, isTimeMachineDestination: true, stillMounted: { true }),
+                       .disk)
+        let disk = (model: Optional("Elements 25A3"), path: Optional<String>.none)
+        XCTAssertEqual(Disks.kind(ofDevice: disk, isTimeMachineDestination: false, stillMounted: { true }),
+                       .disk)
     }
 
     func testOnlyTickedDisksThatArePresentAreGuarded() {
@@ -386,6 +484,88 @@ final class DiskMergeTests: XCTestCase {
         let old = #"{"id":"TM-1","name":"WD","tmDestinationID":"TM-1"}"#
         let disk = try JSONDecoder().decode(KnownDisk.self, from: Data(old.utf8))
         XCTAssertFalse(disk.isNetworkDestination)
+    }
+
+    // MARK: Telling apart disks that share a name
+
+    private let english = Locale(identifier: "en_US")
+
+    func testASizeIsStoredWhenTheDiskIsSeenAndKeptWhileItIsAway() {
+        var config = GuardConfig()
+        var plugged = volume("WD", uuid: "VOL-1")
+        plugged.capacity = 999_995_129_856
+        Disks.merge(DiskSnapshot(destinations: [], attached: [plugged]), into: &config)
+        XCTAssertEqual(config.knownDisks.first?.capacity, 999_995_129_856)
+
+        Disks.merge(unplugged, into: &config)
+        XCTAssertEqual(config.knownDisks.first?.capacity, 999_995_129_856)
+    }
+
+    func testAnEntryFromAnOlderFileGetsItsSizeOnceSeen() {
+        var config = GuardConfig()
+        config.knownDisks = [KnownDisk(id: "VOL-1", name: "WD", volumeUUID: "VOL-1")]
+        var plugged = volume("WD", uuid: "VOL-1")
+        plugged.capacity = 2_000_000_000_000
+
+        Disks.merge(DiskSnapshot(destinations: [], attached: [plugged]), into: &config)
+
+        XCTAssertEqual(config.knownDisks.map(\.id), ["VOL-1"])
+        XCTAssertEqual(config.knownDisks.first?.capacity, 2_000_000_000_000)
+    }
+
+    func testOnlyDisksSharingANameGetADetail() {
+        let disks = [
+            KnownDisk(id: "VOL-1", name: "Macintosh HD", volumeUUID: "VOL-1", capacity: 999_995_129_856),
+            KnownDisk(id: "VOL-2", name: "macintosh hd", volumeUUID: "VOL-2", capacity: 499_963_174_912),
+            KnownDisk(id: "VOL-3", name: "Archive", volumeUUID: "VOL-3", capacity: 999_995_129_856),
+        ]
+
+        XCTAssertEqual(Disks.distinguishingDetails(for: disks, locale: english),
+                       ["VOL-1": "1 TB", "VOL-2": "500 GB"])
+    }
+
+    func testTheUUIDTellsThemApartWhenTheSizeCannot() {
+        let sameSize = [
+            KnownDisk(id: "4BEED8FB-FE3C-4976-926E-C0E17CD588AD", name: "Macintosh HD",
+                      volumeUUID: "4BEED8FB-FE3C-4976-926E-C0E17CD588AD", capacity: 41_902_080),
+            KnownDisk(id: "749640AE-ADFC-3275-B8A0-CA490DE810FB", name: "Macintosh HD",
+                      volumeUUID: "749640AE-ADFC-3275-B8A0-CA490DE810FB", capacity: 41_902_080),
+        ]
+        XCTAssertEqual(Disks.distinguishingDetails(for: sameSize, locale: english),
+                       ["4BEED8FB-FE3C-4976-926E-C0E17CD588AD": "ID 4BEE",
+                        "749640AE-ADFC-3275-B8A0-CA490DE810FB": "ID 7496"])
+
+        // One of them never seen with a size, as an entry from an older file.
+        var unsized = sameSize
+        unsized[1].capacity = nil
+        XCTAssertEqual(Disks.distinguishingDetails(for: unsized, locale: english).values.sorted(),
+                       ["ID 4BEE", "ID 7496"])
+    }
+
+    func testTheUUIDPrefixGrowsUntilItTellsThemApart() {
+        let disks = [
+            KnownDisk(id: "A", name: "WD", volumeUUID: "ABCDEF01-0000-0000-0000-000000000000"),
+            KnownDisk(id: "B", name: "WD", volumeUUID: "ABCDEF02-0000-0000-0000-000000000000"),
+        ]
+        XCTAssertEqual(Disks.distinguishingDetails(for: disks, locale: english),
+                       ["A": "ID ABCDEF01", "B": "ID ABCDEF02"])
+    }
+
+    func testADiskWithNeitherSizeNorUUIDGetsNoGuess() {
+        // A path-keyed volume that reported no UUID, beside a share.
+        let disks = [
+            KnownDisk(id: "/Volumes/Backup", name: "Backup"),
+            KnownDisk(id: "NET-1", name: "Backup", tmDestinationID: "NET-1", network: true),
+        ]
+        XCTAssertEqual(Disks.distinguishingDetails(for: disks, locale: english), ["NET-1": "ID NET1"])
+    }
+
+    func testSizesReadTheWayDisksAreSold() {
+        XCTAssertEqual(Disks.capacityLabel(999_995_129_856, locale: english), "1 TB")
+        XCTAssertEqual(Disks.capacityLabel(499_963_174_912, locale: english), "500 GB")
+        XCTAssertEqual(Disks.capacityLabel(255_850_000_000, locale: english), "256 GB")
+        XCTAssertEqual(Disks.capacityLabel(1_499_000_000_000, locale: english), "1.5 TB")
+        XCTAssertEqual(Disks.capacityLabel(1_499_000_000_000, locale: Locale(identifier: "sk_SK")), "1,5 TB")
     }
 
     // MARK: How a disk is connected

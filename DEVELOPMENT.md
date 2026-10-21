@@ -28,8 +28,62 @@ When the timer fires, three questions are re-asked, stopping at the first "no":
 3. **Is the guard active?** Not disabled, not paused.
 
 If all three hold, it stops a Time Machine backup that is writing to that disk,
-ejects it with retries while Spotlight or `backupd` still holds it, and posts a
-notification.
+unmounts it with retries while Spotlight or `backupd` still holds it, and posts
+a notification.
+
+## Reconnecting after a meeting
+
+The guard cannot know whether the user will leave the desk. Location, network
+and "is this meeting online or hybrid" were all considered and dropped: most
+meetings are hybrid, and the cost of a needless unmount is small once it is
+undone. So it undoes it. Before a meeting the disk is **unmounted, not
+ejected** (`diskutil unmountDisk`): every volume is down and flushed, so pulling
+the cable is as safe as after an eject, but the device stays attached. When the
+meeting ends, a disk that is still there was never unplugged, and it is mounted
+again. A Time Machine backup the guard stopped is started again straight away
+rather than at the next hourly run.
+
+- **Persisted** in `pendingReconnects`, so a restart or a sleep through the
+  meeting keeps it. Its own timer, independent of guarding being on and of
+  calendar access: a disk the guard took down is put back regardless.
+- **Found by volume UUID** with `diskutil info`, which still answers for an
+  unmounted volume and stops answering once the cable is out. Only a string
+  that parses as a UUID is ever passed: diskutil also accepts volume names.
+  A volume without one could never be found again, so it is ejected as
+  before, and the notification only promises a reconnect when every disk of
+  that pass got one.
+- **The whole disk comes back.** When diskutil confirms the volume's whole
+  disk is external, `diskutil mountDisk` mounts every volume on it, the ones
+  the user had left unmounted included, mirroring `unmountDisk`. Only when
+  the device cannot be confirmed external is just that volume mounted, by its
+  UUID.
+- **Not between meetings.** While a real meeting is running or starts within
+  the lead time, the reconnect waits for it to end, following back-to-back
+  chains (`Meetings.busyUntil`).
+- **Encrypted volumes lock on unmount.** Measured on APFS: after any unmount
+  the volume reads `Locked`, and `diskutil mountDisk` exits 0 and prints
+  "mounted successfully" while nothing is mounted. Only reading the mount
+  point back is trusted. The guard reads the volume's "Encrypted Volume
+  Password" item from the login keychain (service and account both the volume
+  UUID; the first read needs the user's approval) and passes it to `diskutil
+  apfs unlockVolume -stdinpassphrase`. If the volume is still down and it is a
+  Time Machine disk, the guard asks Time Machine to start a backup to it
+  (`tmutil startbackup --destination`) and waits up to 90 s for the volume to
+  appear; this was not seen to unlock a disk. Failing that, the user is told to
+  replug it.
+- **⌘E and eject on sleep clear everything pending whenever they run.** They
+  say the user is leaving, and on a fixed USB disk the device can outlive an
+  eject, so it would otherwise be found "still plugged in" and mounted again.
+  `ejectGuarded` drops every entry before it ejects anything, even when it
+  then finds nothing to eject. They only run with a guarded target to act on:
+  eject on sleep needs a mounted guarded disk or any guarded network
+  destination, ⌘E a mounted guarded disk or a backup running to a guarded
+  share; `eject-guard --eject-now` always runs. So with only a waiting disk
+  and no guarded network destination nothing runs and the entry stays, and a
+  disk still attached after the meeting is mounted again. That is intended:
+  a waiting disk was never ejected, so its device cannot have outlived one,
+  and if it is still attached after a wake the user is at the desk.
+- An entry more than 12 hours past its time is dropped without acting on it.
 
 A guarded **network** Time Machine destination counts as attached for the first
 question: Time Machine reports it on every pass and a backup to it can start at
@@ -84,31 +138,64 @@ build if either rule comes back.
 
 ## The menu bar icon
 
-Each state has its own shape rather than a different badge, because a badge
-swap is too quiet to notice during the few seconds an eject takes.
+The icon is Eject Guard's own symbol, the app icon in miniature: an eject
+triangle over a bar. Each state has its own shape rather than a different
+fill, because a fill swap is too quiet to notice during the few seconds an
+eject takes, and outline against fill alone does not read at 1x.
 
 | | |
 |---|---|
-| `externaldrive` | No guarded disk connected. |
-| `externaldrive.fill.badge.checkmark` | A guarded disk is connected and armed. |
-| `externaldrive.fill.badge.timemachine` | Time Machine is backing up, with a progress bar under it. Any destination, guarded or not, and even with guarding off. |
-| `eject.fill` | Ejecting right now. |
-| `externaldrive.badge.xmark` | Guarding is off or paused. |
+| idle | Outline triangle over a thin line: no guarded disk connected. |
+| armed | Solid triangle over a solid slab: a guarded disk is connected. |
+| backing up | The bar fills with Time Machine's progress, with Time Machine's clock-and-arrow badge in the corner. Any destination, guarded or not, and even with guarding off. The triangle is solid only while a disk is guarded. |
+| ejecting | Triangle lifted, speed lines where the bar was. |
+| off | Idle with a slash through it: guarding is off or paused. |
+| waiting to reconnect | Outline triangle over a dashed slot, the slab's outline drawn the way a placeholder is: the disk's place, kept for it while it is away for a meeting. Something else guarded and plugged in shows armed instead. |
+| reconnecting | The slot stays while the disk is mounted again, then the settle animation plays. A locked Time Machine disk comes back through a backup to it, which shows as backing up. |
 
-While a backup runs, a 15x2 pt bar sits under the drive: filled to the
-percentage Time Machine reports, or a short segment travelling left to right
-while it is still sizing the job up - a bar frozen at zero reads as a stalled
-backup. Both forms breathe between 55% and 100% opacity, because progress can
-sit on one number for minutes and a still icon in a menu bar reads as a dead
-one.
+**When a disk comes back after a meeting, the icon settles**, 1.8 s: a beat,
+the slot's gaps close, the slot fills from its middle while the triangle
+presses down and comes up solid with the smallest overshoot. It lands on
+armed, or on the empty line if nothing is guarded. It plays once the disk
+list shows the disk back (`MenuBarIconAnimator.reconnectFinished`), on the same
+ticker as the eject; with Reduce Motion the slot simply turns into the state.
+
+The triangle's base, a 1.4 pt line, is centred on a device pixel row at
+whatever scale it is drawn (`LiftIcon.snappedBase`): at 8.0 pt it straddled two
+rows at 1x and drew as two half-grey ones. The whole triangle moves, by at most
+half a pixel, so its shape is unchanged.
+
+While a backup runs, the bar fills to the percentage Time Machine reports, or a
+short segment travels left to right while it is still sizing the job up - a bar
+frozen at zero reads as a stalled backup. Both forms breathe between 55% and
+100% opacity, because progress can sit on one number for minutes and a still
+icon in a menu bar reads as a dead one. If the badge and the bar ever compete
+at 1x, the badge wins: it is what says "Time Machine".
 
 **A `MenuBarExtra` label is rendered to a static image, so SwiftUI's own symbol
 effects never run there.** That was measured rather than assumed: a throwaway
 menu bar app with `.symbolEffect(.pulse, options: .repeating)` was screenshotted
 twenty times over two seconds and its icon brightness did not move by a
-hundredth. The animation is therefore driven by `GuardController.backupPhase`,
-an integer advanced four times a second - and only while a backup is actually
-running.
+hundredth. So every state and every animation frame is drawn in code
+(`LiftIcon`) as a template `NSImage` on a fixed 22 x 16 pt canvas: crisp at
+every scale, tinted by the menu bar on light, dark, highlighted and
+tinted-wallpaper bars, and never wider or taller from one state to the next.
+The label stays a plain `Image`, which the menu bar never scales. VibeRes and
+ClipShot draw theirs the same way.
+
+The breathing is driven by `GuardController.backupPhase`, an integer advanced
+four times a second - and only while a backup is actually running.
+
+**When the guard ejects a disk, the icon plays a two second animation**: a beat,
+then the triangle crouches as the bar drains, launches out of the frame, and
+drops back with a squash and a small hop onto the state it rests in: the dashed
+slot after an unmount for a meeting, the empty bar after an eject. It plays only
+when a disk actually came off, unmounted for a meeting or ejected (`MenuBarIconAnimator.ejectFinished`): never for a
+failed eject, a backup to a share that was only stopped, or anything shown in
+the preview harness. A 30 Hz timer runs while it plays and not otherwise, a
+second eject restarts it rather than stacking a second timer, and with Reduce
+Motion on the icon goes straight to its state. The sleep eject does not play
+it: the Mac is going to sleep.
 
 Knowing a backup is running costs one `tmutil status` every 5 s while one is,
 20 s while a guarded disk is merely attached, and nothing at all when none is.
@@ -117,15 +204,19 @@ and it is bounded by the thing that matters: the disk being plugged in. A
 guarded network destination is always "plugged in", so ticking one keeps the
 20 s poll running for as long as guarding is on.
 
-The states are hard to review in place - the icon is 16 pt wide and some of them
-only appear mid-backup - so the preview harness renders them all side by side:
+The states are hard to review in place - the icon is 22 pt wide and some of them
+only appear mid-backup or mid-eject - so the preview harness renders them all
+side by side, with every tenth of a second of the eject animation:
 
 ```sh
 ./preview.sh icons
 ```
 
-That is how the backing-up glyph was caught shrinking: stacking a bar under the
-symbol stole its height until the size was pinned.
+Its size is pinned by tests against `externaldrive` at 15 pt, the symbol it
+replaced and the size its neighbours draw at: ink 25 to 29 px tall at 2x, the
+body (triangle and bar) at least as tall as the drive, the triangle as wide,
+and the line as heavy as the drive's outline. A menu bar icon that comes out
+smaller than its neighbours is the regression these exist for.
 
 ## Languages
 
@@ -200,11 +291,12 @@ fetched as "latest".
 
 ```
 Sources/Core/     the engine: no UI, compiled into both binaries and the tests
+Sources/Icon/     the menu bar icon and its animator, compiled into the app and the tests
 Sources/App/      the SwiftUI menu bar app
 Sources/CLI/      the command line tool
 Sources/Preview/  renders the popover to PNG so the layout can be reviewed
 Resources/        en, sk, cs and de translations, copied into the bundle
-Tests/            unit tests over Sources/Core
+Tests/            unit tests over Sources/Core and Sources/Icon
 ```
 
 Everything is built in **Swift 6 language mode** with warnings as errors. That
@@ -219,7 +311,7 @@ swift test
 ```
 
 `Package.swift` exists for the tests, not for shipping: it exposes `Sources/Core`
-as a library so `swift test` can reach it with `@testable`. The app and CLI are
+and `Sources/Icon` as libraries so `swift test` can reach them with `@testable`. The app and CLI are
 still assembled by `build.sh` from the same sources, so the shipping binaries are
 unaffected by the test setup.
 
@@ -229,17 +321,25 @@ this project has been so far:
 | Area | Why it is tested |
 |---|---|
 | Config decoding | A key added later once wiped every setting the user had. |
-| `Disks.merge` | Identity of a disk, and whether re-keying it silently unguards it. A disk made a Time Machine destination after it was remembered was listed twice; while it is unplugged, only Time Machine's own preferences (`/Library/Preferences/com.apple.TimeMachine.plist`, undocumented, so used for matching only) link the two. A disk nobody guards is forgotten a week after it was unplugged, counted from the first pass that found it gone: `lastSeen` is written only on a rescan, so it can be weeks old the moment a disk is pulled out. |
+| `Disks.merge` | Identity of a disk, and whether re-keying it silently unguards it. A disk made a Time Machine destination after it was remembered was listed twice; while it is unplugged, only Time Machine's own preferences (`/Library/Preferences/com.apple.TimeMachine.plist`, undocumented, so used for matching only) link the two. A disk nobody guards, and that is not a Time Machine destination, is forgotten 30 days after it was unplugged, counted from the first pass that found it gone: `lastSeen` is written only on a rescan, so it can be weeks old the moment a disk is pulled out. |
 | `Disks.guardedVolumes` | An unticked disk must never become a target. |
 | `Disks.isMountedVolume` | The boot volume must never be an eject candidate. |
 | `Disks.mayChangeDiskList` | Time Machine's own mounts set off rescans whose `tmutil` hung past SIGKILL; a plugged-in disk must still rescan. |
 | `Sanitize.oneLine` | Untrusted titles must not forge log lines or break AppleScript. |
 | `BackupStatus` | `Percent: -1` means unknown, not zero. The figure is the one the Time Machine menu shows, `(1 - FractionOfProgressBar) + FractionOfProgressBar x Percent`, and only while copying. A backup to a share is matched by destination ID; its mount point is a disk image. |
+| Telling disks apart | Two disks with one name show their size, or the shortest UUID prefix that differs. A size is only stored once a disk is seen, so an entry from an older file decodes without one. |
+| Forgetting a disk | Takes its tick, hidden mark and waiting reconnect with it; offered only while unplugged and not for a destination Time Machine still reports, which the next scan would bring back. |
 | Network destinations | Never an eject target, never folded into a plugged-in disk by name, and an entry an older release stripped of its flag is still the same destination. |
 | `Disks.connection` | Only interfaces we recognise are named. |
+| Reconnecting | A volume diskutil no longer knows was unplugged; an empty mount point is attached but down. Nothing is mounted while a meeting runs or is about to start, back-to-back meetings chain, a day-old entry is dropped, and only a UUID reaches diskutil. |
+| `LiftIcon` | Every state and animation frame is a template image on the fixed canvas, or the menu bar cannot tint it. Its size is anchored on `externaldrive`: an icon smaller than its neighbours was the complaint before it. Idle and armed have to differ at 1x, not only at 2x. |
+| `MenuBarIconAnimator` | Plays only on a disk actually ejected or mounted again, runs no timer at rest, restarts on a burst instead of stacking timers, and respects Reduce Motion. |
 
 The tests were checked by putting two real bugs back in: removing the hand
 written config decoder, and dropping the ticked-disk filter. Both were caught.
+The icon tests were checked the same way: a non-template image, a narrower
+triangle, a thin bar for armed, playing on an eject that ejected nothing, and
+ignoring Reduce Motion were each caught.
 
 CI runs the tests, builds the app and CLI, and enforces two rules that are
 easier to state than to remember: no shell is ever invoked, and `waitUntilExit`
@@ -249,22 +349,33 @@ is banned.
 
 - Only volumes that are **external, ejectable and directly under `/Volumes`** are
   ever considered. The boot disk cannot be reached by any code path.
-- Disk images (an installer `.dmg`, a sparse bundle) are never offered: there
-  is nothing to unplug. DiskArbitration reports their device model as
-  `Disk Image`; the volume keys alone cannot tell one from an external disk.
+- Disk images (an installer `.dmg`, a sparse bundle, a scratch image a test
+  tool mounts for a moment) are never offered or remembered: there is nothing
+  to unplug. DiskArbitration reports their device model as `Disk Image` and a
+  device path under `IOHDIXController` or `AppleDiskImagesController`
+  (measured on macOS 27 with `hdiutil attach` and `diskutil image attach`);
+  the volume keys alone cannot tell one from an external disk. A volume
+  DiskArbitration has lost by the time the scan asks, and that is no longer
+  mounted, is skipped rather than taken for a disk. The one image offered is a
+  local Time Machine destination. One remembered all the same is dropped the
+  next time it is mounted, guarded or not, but its tick stays: a block-level
+  copy of a real disk carries that disk's UUID.
 - Disks are identified by **volume UUID**, not by name, so another volume that
   happens to share a name is not touched.
 - A Time Machine backup is stopped only when it is writing to the disk being
-  ejected, or to a network destination the user ticked. A backup to a
-  different destination keeps running.
+  unmounted or ejected, or to a network destination the user ticked. A
+  backup to a different destination keeps running.
 - A network destination is never ejected, unmounted or linked to a volume.
-- A failed eject is reported with the processes holding the volume, so you know
-  not to pull the cable.
-- The eject targets the **whole physical disk**, not just the guarded volume,
-  which is what Finder's eject does. Other volumes on the same disk are
-  unmounted too; if one of them is busy the eject fails and names the process.
-- To use the disk again, unplug and replug it. An encrypted Time Machine volume
-  cannot be remounted in software once ejected - it unlocks from the keychain
+- A failed unmount or eject is reported with the processes holding the
+  volume, so you know not to pull the cable.
+- Both target the **whole physical disk**, not just the guarded volume, which
+  is what Finder's eject does. Other volumes on the same disk are unmounted
+  too; if one of them is busy it fails and names the process.
+- A disk unmounted for a meeting is mounted again only if it is still attached
+  when the meeting ends, found by its volume UUID. When diskutil confirms an
+  external whole disk, `diskutil mountDisk` brings back every volume on it;
+  otherwise only that volume is mounted. After ⌘E or eject on sleep, unplug
+  and replug it: an encrypted Time Machine volume unlocks from the keychain
   when the disk is reattached.
 - The log names your meetings, so it is created `0600`, as is the config file.
   At 512 KB it rolls over to `.log.1` rather than being deleted, because the
@@ -323,10 +434,13 @@ the popover straight to PNG in both appearances:
 ./preview.sh demo     # invented data, the bare popover
 ./preview.sh update   # the demo popover with an update ready to install
 ./preview.sh onboarding  # the welcome tour a fresh install opens on
+./preview.sh disks    # disks sharing a name, a row's context menu, the Forget alert
+./preview.sh many     # ten disks: the list scrolls, and the popover's height is printed
 ./preview.sh hero     # the same, open under the menu bar: docs/popover-*.png
 ./preview.sh icons    # every menu bar icon state
 ./preview.sh settings # every Settings tab at the window's real size
 PREVIEW_LANG=sk ./preview.sh demo
+./readme-motion.sh <dir> [dark]  # the README hero animation, GIF and MP4
 ```
 
 Output lands in `build/preview/`. The published screenshot always comes from

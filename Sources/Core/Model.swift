@@ -20,6 +20,9 @@ struct KnownDisk: Codable, Equatable {
     /// disk behind it to eject: guarding one means stopping a backup to it
     /// before a meeting, so the laptop never leaves the network mid-write.
     var network: Bool?
+    /// The volume's size in bytes, as of the last time it was plugged in.
+    /// Only ever shown to tell apart two disks that share a name.
+    var capacity: Int64?
 
     var isTimeMachineDestination: Bool { tmDestinationID != nil }
     var isNetworkDestination: Bool { network == true }
@@ -38,6 +41,8 @@ struct AttachedVolume: Equatable {
     var tmDestinationID: String?
     /// Nil when DiskArbitration reports an interface we do not name.
     var connection: Connection?
+    /// Total size in bytes, when the volume reports one.
+    var capacity: Int64?
 }
 
 
@@ -73,8 +78,24 @@ struct GuardConfig: Codable, Equatable {
     var launchAtLoginIntent: Bool?
     /// The welcome tour in the popover has been finished or skipped.
     var onboardingShown: Bool = false
+    /// Disks unmounted before a meeting, to mount again once it is over if
+    /// they are still plugged in.
+    var pendingReconnects: [PendingReconnect] = []
 
     static let maxSkippedEvents = 50
+
+    /// Drop a remembered disk as if it had never been seen: its tick, a
+    /// hidden mark and a reconnect still waiting for it go with it. Unlike
+    /// hiding, nothing is kept, so the disk is listed again, unguarded, the
+    /// next time it is plugged in.
+    mutating func forget(_ disk: KnownDisk) {
+        knownDisks.removeAll { $0.id == disk.id }
+        watchedDiskIDs.removeAll { $0 == disk.id }
+        dismissedDiskIDs.removeAll { $0 == disk.id }
+        if let uuid = disk.volumeUUID {
+            pendingReconnects.removeAll { $0.volumeUUID == uuid }
+        }
+    }
 
     /// Record a skip, keeping the list bounded. Stale identifiers cost nothing
     /// but the file should not grow forever.
@@ -107,7 +128,7 @@ struct GuardConfig: Codable, Equatable {
         case watchAllCalendars, watchedCalendarIDs
         case leadMinutes, minAttendees, enabled, ignoreFreeEvents, ejectOnSleep
         case pausedUntil, pauseHours, skippedEventIDs, ejectAttempts, ejectRetryDelay
-        case launchAtLoginIntent, onboardingShown
+        case launchAtLoginIntent, onboardingShown, pendingReconnects
     }
 
     init(from decoder: Decoder) throws {
@@ -138,6 +159,7 @@ struct GuardConfig: Codable, Equatable {
         // so its owner is already using the app and should not be walked
         // through it after an update. Only a fresh install starts at false.
         onboardingShown = value(.onboardingShown, true)
+        pendingReconnects = value(.pendingReconnects, fallback.pendingReconnects)
     }
 }
 
