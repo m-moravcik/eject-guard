@@ -388,7 +388,7 @@ is banned.
 
 ```sh
 ./build.sh      # build/Eject Guard.app and build/eject-guard, ad-hoc signed
-./install.sh    # build, install to /Applications and ~/bin, launch
+./install.sh    # build, install to /Applications and ~/.local/bin, launch
 ./uninstall.sh  # stop and remove, keeping config and log
 ```
 

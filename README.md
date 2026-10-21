@@ -109,7 +109,8 @@ get a notification to plug it in again.
 
 ## Command line
 
-An optional CLI, `eject-guard`, is installed by `./install.sh` from source.
+An optional CLI, `eject-guard`, is installed to `~/.local/bin` by `./install.sh` from source.
+If that folder is not on your PATH, add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc`.
 It is handy for setup and debugging:
 
 ```sh
@@ -131,7 +132,7 @@ settings: they move to the new folder on first launch.
 ## Building from source
 
 ```sh
-./install.sh     # build, install to /Applications and ~/bin, launch
+./install.sh     # build, install to /Applications and ~/.local/bin, launch
 ./uninstall.sh   # remove, keeping config and log
 ```
 

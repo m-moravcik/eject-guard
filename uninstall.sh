@@ -10,6 +10,7 @@ launchctl bootout "gui/$UID/com.local.tm-eject-guard" 2>/dev/null || true
 
 for path in "/Applications/Eject Guard.app" "$HOME/Applications/Eject Guard.app" \
             "/Applications/TM Eject Guard.app" "$HOME/Applications/TM Eject Guard.app" \
+            "$HOME/.local/bin/eject-guard" \
             "$HOME/bin/eject-guard" "$HOME/bin/tm-eject-guard" \
             "$HOME/Library/LaunchAgents/com.local.tm-eject-guard.plist"; do
     [ -e "$path" ] && mv "$path" "$HOME/.Trash/" && echo "moved to Trash: $path"

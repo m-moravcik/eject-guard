@@ -48,7 +48,7 @@ done
 
 mkdir -p "$DEST"
 rm -rf "$DEST/$APP_NAME.app"
-for old in "/Applications/$LEGACY_APP.app" "$HOME/Applications/$LEGACY_APP.app" "$HOME/bin/tm-eject-guard"; do
+for old in "/Applications/$LEGACY_APP.app" "$HOME/Applications/$LEGACY_APP.app" "$HOME/bin/tm-eject-guard" "$HOME/bin/eject-guard"; do
     [ -e "$old" ] && mv "$old" "$HOME/.Trash/" && echo "moved to Trash: $old"
 done
 # ditto, not cp -R: the bundle embeds Sparkle.framework, which is a tree of
@@ -56,8 +56,10 @@ done
 # documented way to reproduce that exactly, extended attributes and all.
 ditto "build/$APP_NAME.app" "$DEST/$APP_NAME.app"
 
-mkdir -p "$HOME/bin"
-cp "build/eject-guard" "$HOME/bin/eject-guard"
+# ~/.local/bin is the conventional per-user bin dir that most shell setups
+# already put on PATH; the summary below says how to add it when it is missing.
+mkdir -p "$HOME/.local/bin"
+cp "build/eject-guard" "$HOME/.local/bin/eject-guard"
 
 open "$DEST/$APP_NAME.app"
 sleep 2
@@ -67,7 +69,11 @@ pgrep -f "$APP_NAME.app/Contents/MacOS/" >/dev/null \
 echo
 echo "installed:"
 echo "  $DEST/$APP_NAME.app   (menu bar)"
-echo "  $HOME/bin/eject-guard  (cli)"
+echo "  $HOME/.local/bin/eject-guard  (cli)"
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) echo "  add ~/.local/bin to your PATH: export PATH=\"\$HOME/.local/bin:\$PATH\" in ~/.zshrc" ;;
+esac
 codesign -dv --verbose=2 "$DEST/$APP_NAME.app" 2>&1 | grep -E "^Authority=" | head -1 || true
 echo
 echo "Next: allow Calendar access when macOS asks, then tick your disk in the"
