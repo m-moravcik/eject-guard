@@ -444,6 +444,7 @@ private struct DiskCard: View {
                                 .trim(from: 0, to: 0.7)
                                 .stroke(.secondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                                 .frame(width: 8, height: 8)
+                                .rotationEffect(.degrees(360 * PreviewDemo.spinnerTurns))
                                 .frame(width: 10, height: 10)
                             #else
                             ProgressView()

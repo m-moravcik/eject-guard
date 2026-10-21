@@ -23,6 +23,14 @@ MainActor.assumeIsolated {
         exit(0)
     }
 
+    // Motion mode renders the README hero animation, frame by frame, into the
+    // folder named first. Demo data only; see Motion.swift.
+    if CommandLine.arguments.contains("motion") {
+        let dark = CommandLine.arguments.contains("dark")
+        renderMotion(outputDir: CommandLine.arguments[1], scheme: dark ? .dark : .light, fps: 25)
+        exit(0)
+    }
+
     // Demo mode renders invented disks and a meeting, for the screenshot in the
     // README. Without it the shot shows this Mac's real calendar and disks.
     // Hero wraps the demo popover in a menu bar and a desktop, as it looks

@@ -185,6 +185,11 @@ final class GuardController {
     /// Time Machine destination is reachable, which is the only time the
     /// answer can be anything but "no".
     func refreshBackupStatus() {
+        #if PREVIEW
+        // Demo state is what the harness renders; a real tmutil read must
+        // never overwrite it, and the harness reads nothing from this Mac.
+        if PreviewDemo.isActive { return }
+        #endif
         guard !isBackupRefreshQueued else { return }
         isBackupRefreshQueued = true
         work.async { [weak self] in
@@ -766,6 +771,7 @@ extension GuardController {
 
         calendarAccess = .granted
         notificationsEnabled = true
+        PreviewDemo.isActive = true
     }
 
     /// The demo with `count` disks, more than the list shows without
@@ -822,6 +828,83 @@ extension GuardController {
         status.running = false
         backup = status
     }
+
+    /// The README motion demo: one guarded Time Machine disk and one portable
+    /// disk nobody ticked. `setMotionFrame` then moves it through a meeting.
+    func loadMotionDemo() {
+        let timeMachine = KnownDisk(id: "demo-tm", name: "Time Machine",
+                                    volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest")
+        let portable = KnownDisk(id: "demo-t7", name: "Samsung T7", volumeUUID: "demo-t7-uuid")
+        var demo = GuardConfig()
+        demo.knownDisks = [timeMachine, portable]
+        demo.watchedDiskIDs = [timeMachine.id]
+        demo.onboardingShown = true
+        config = demo
+        calendarAccess = .granted
+        notificationsEnabled = true
+        PreviewDemo.isActive = true
+    }
+
+    /// One moment of the motion demo, set the way the real controller sets it
+    /// at that point: `isBusy` while an eject pass runs, the Time Machine disk
+    /// in `attached` only while it is mounted, `ejectDate` only while a
+    /// guarded disk is connected and the meeting has not been acted on, and a
+    /// pending reconnect from the unmount until the disk list shows it back.
+    func setMotionFrame(timeMachineMounted: Bool, backupPercent: Double??,
+                        meeting: EKEvent?, ejectDate: Date?, busy: Bool,
+                        reconnectsAt: Date?, reconnecting: Bool) {
+        var volumes: [AttachedVolume] = []
+        if timeMachineMounted {
+            volumes.append(AttachedVolume(path: "/Volumes/Time Machine", name: "Time Machine",
+                                          volumeUUID: "demo-tm-uuid", tmDestinationID: "demo-tm-dest",
+                                          connection: .usb))
+        }
+        volumes.append(AttachedVolume(path: "/Volumes/Samsung T7", name: "Samsung T7",
+                                      volumeUUID: "demo-t7-uuid", connection: .thunderbolt))
+        attached = volumes
+
+        config.pendingReconnects = reconnectsAt.map {
+            [PendingReconnect(volumeUUID: "demo-tm-uuid", name: "Time Machine", notBefore: $0,
+                              tmDestinationID: "demo-tm-dest", stoppedBackup: true)]
+        } ?? []
+
+        var status = BackupStatus()
+        // Outer nil: no backup. Inner nil: Time Machine is still sizing it up.
+        if let percent = backupPercent {
+            status.running = true
+            status.mountPoint = "/Volumes/Time Machine"
+            status.destinationID = "demo-tm-dest"
+            status.percent = percent
+        }
+        backup = status
+        nextMeeting = meeting
+        self.ejectDate = ejectDate
+        isBusy = busy
+        isReconnecting = reconnecting
+    }
+
+    /// A demo meeting with no attendees list: the harness never asks the
+    /// store for events, so nothing filters it.
+    func demoMeeting(_ title: String, start: Date, minutes: Double) -> EKEvent {
+        let calendar = EKCalendar(for: .event, eventStore: store)
+        calendar.title = "Work"
+        let meeting = EKEvent(eventStore: store)
+        meeting.title = title
+        meeting.calendar = calendar
+        meeting.startDate = start
+        meeting.endDate = start.addingTimeInterval(minutes * 60)
+        return meeting
+    }
+}
+
+/// Knobs only the preview harness turns.
+enum PreviewDemo {
+    /// Demo data is loaded: nothing may read this Mac's Time Machine state.
+    nonisolated(unsafe) static var isActive = false
+    /// The time the demo pretends it is, for "in 5 min" and the menu bar clock.
+    nonisolated(unsafe) static var now: Date?
+    /// Turns of the stand-in spinner, which ImageRenderer cannot animate.
+    nonisolated(unsafe) static var spinnerTurns: Double = 0
 }
 #endif
 
@@ -829,7 +912,12 @@ extension GuardController {
 
 enum Format {
     static func relative(_ date: Date) -> String {
-        let minutes = Int((date.timeIntervalSinceNow / 60).rounded())
+        #if PREVIEW
+        let now = PreviewDemo.now ?? Date()
+        #else
+        let now = Date()
+        #endif
+        let minutes = Int((date.timeIntervalSince(now) / 60).rounded())
         if minutes <= 0 { return "now" }
         if minutes < 60 { return Loc.t("relative.minutes", "in %d min", minutes) }
         let hours = minutes / 60

@@ -440,6 +440,7 @@ the popover straight to PNG in both appearances:
 ./preview.sh icons    # every menu bar icon state
 ./preview.sh settings # every Settings tab at the window's real size
 PREVIEW_LANG=sk ./preview.sh demo
+./readme-motion.sh <dir> [dark]  # the README hero animation, GIF and MP4
 ```
 
 Output lands in `build/preview/`. The published screenshot always comes from
