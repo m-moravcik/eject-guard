@@ -48,7 +48,7 @@ done
 
 mkdir -p "$DEST"
 rm -rf "$DEST/$APP_NAME.app"
-for old in "/Applications/$LEGACY_APP.app" "$HOME/Applications/$LEGACY_APP.app" "$HOME/bin/tm-eject-guard"; do
+for old in "/Applications/$LEGACY_APP.app" "$HOME/Applications/$LEGACY_APP.app" "$HOME/bin/tm-eject-guard" "$HOME/bin/eject-guard"; do
     [ -e "$old" ] && mv "$old" "$HOME/.Trash/" && echo "moved to Trash: $old"
 done
 # ditto, not cp -R: the bundle embeds Sparkle.framework, which is a tree of
@@ -56,11 +56,10 @@ done
 # documented way to reproduce that exactly, extended attributes and all.
 ditto "build/$APP_NAME.app" "$DEST/$APP_NAME.app"
 
-# ~/bin is not on the default macOS PATH, so the CLI lives in ~/.local/bin.
+# ~/.local/bin is the conventional per-user bin dir that most shell setups
+# already put on PATH; the summary below says how to add it when it is missing.
 mkdir -p "$HOME/.local/bin"
 cp "build/eject-guard" "$HOME/.local/bin/eject-guard"
-old="$HOME/bin/eject-guard"
-[ -e "$old" ] && mv "$old" "$HOME/.Trash/" && echo "moved to Trash: $old"
 
 open "$DEST/$APP_NAME.app"
 sleep 2
