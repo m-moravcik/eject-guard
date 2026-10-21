@@ -56,8 +56,11 @@ done
 # documented way to reproduce that exactly, extended attributes and all.
 ditto "build/$APP_NAME.app" "$DEST/$APP_NAME.app"
 
-mkdir -p "$HOME/bin"
-cp "build/eject-guard" "$HOME/bin/eject-guard"
+# ~/bin is not on the default macOS PATH, so the CLI lives in ~/.local/bin.
+mkdir -p "$HOME/.local/bin"
+cp "build/eject-guard" "$HOME/.local/bin/eject-guard"
+old="$HOME/bin/eject-guard"
+[ -e "$old" ] && mv "$old" "$HOME/.Trash/" && echo "moved to Trash: $old"
 
 open "$DEST/$APP_NAME.app"
 sleep 2
@@ -67,7 +70,11 @@ pgrep -f "$APP_NAME.app/Contents/MacOS/" >/dev/null \
 echo
 echo "installed:"
 echo "  $DEST/$APP_NAME.app   (menu bar)"
-echo "  $HOME/bin/eject-guard  (cli)"
+echo "  $HOME/.local/bin/eject-guard  (cli)"
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) echo "  add ~/.local/bin to your PATH: export PATH=\"\$HOME/.local/bin:\$PATH\" in ~/.zshrc" ;;
+esac
 codesign -dv --verbose=2 "$DEST/$APP_NAME.app" 2>&1 | grep -E "^Authority=" | head -1 || true
 echo
 echo "Next: allow Calendar access when macOS asks, then tick your disk in the"
