@@ -38,6 +38,8 @@ final class GuardController {
     /// so SwiftUI's own symbol effects never run there - measured, not assumed.
     /// The only animation available is one we redraw ourselves.
     private(set) var backupPhase = 0
+    /// A stop or a start the user asked for, until Time Machine shows it took.
+    private(set) var backupRequest: BackupRequest?
 
     /// Plays the menu bar icon's eject animation once a guarded disk has
     /// actually come off. Runs a timer only while it plays.
@@ -178,6 +180,37 @@ final class GuardController {
         isBackupRunning ? backup.percent : nil
     }
 
+    /// "Stop backup" has something to stop: any backup, guarded or not, since
+    /// stopping one is the user's call. Not while an eject pass runs, which
+    /// stops what it has to on its own.
+    var canStopBackup: Bool {
+        isBackupRunning && backupRequest == nil && !isBusy && !isReconnecting
+    }
+
+    var isStoppingBackup: Bool { backupRequest?.kind == .stop }
+
+    /// "Back up now" is offered for `disk`: a destination Time Machine can
+    /// reach right now, guarded or not.
+    func offersBackUpNow(_ disk: KnownDisk) -> Bool {
+        destinationToStart(disk) != nil
+    }
+
+    /// Time Machine runs one backup at a time, so only while nothing else
+    /// runs or has been asked for.
+    func canBackUpNow(_ disk: KnownDisk) -> Bool {
+        offersBackUpNow(disk) && !isBackupRunning && backupRequest == nil && !isBusy && !isReconnecting
+    }
+
+    /// Asked to back up to `disk`, and Time Machine has not started yet.
+    func isStartingBackup(_ disk: KnownDisk) -> Bool {
+        guard let id = backupRequest?.startingDestinationID else { return false }
+        return id == disk.tmDestinationID
+    }
+
+    private func destinationToStart(_ disk: KnownDisk) -> String? {
+        BackupControl.destinationToStart(disk, attached: attached, reportedDestinationIDs: reportedDestinationIDs)
+    }
+
     /// Reading this spawns `tmutil`, so that part stays off the main actor.
     ///
     /// Called both by the popover while it is open and, since the menu bar icon
@@ -198,6 +231,7 @@ final class GuardController {
                 guard let self else { return }
                 self.isBackupRefreshQueued = false
                 self.backup = status
+                self.settleBackupRequest()
                 // Both the poll interval and the breathing depend on the
                 // answer, so every answer re-evaluates them. The call is cheap:
                 // it rebuilds a timer only when the interval actually changed.
@@ -225,7 +259,8 @@ final class GuardController {
             return
         }
 
-        let interval = backup.running ? backupPollWhileRunning : backupPollWhileIdle
+        // A request waits on the answer, so it is read as often as progress.
+        let interval = backup.running || backupRequest != nil ? backupPollWhileRunning : backupPollWhileIdle
         // A backup already running at launch would otherwise wait out a whole
         // idle interval before the icon shows it. The read lands back here
         // with the timer in place, so this runs once per watch.
@@ -293,10 +328,10 @@ final class GuardController {
         Disks.attachedVolume(for: disk, among: attached)
     }
 
-    /// ⌘E has something to do: a guarded disk to eject, or a backup to a
-    /// guarded share to stop.
+    /// ⌘E has something to do: a guarded disk to eject. A backup to a
+    /// guarded share is stopped on the way; on its own, "Stop backup" stops it.
     var canEjectNow: Bool {
-        !isBusy && !isReconnecting && (!guardedVolumes.isEmpty || !guardedNetworkBackups.isEmpty)
+        !isBusy && !isReconnecting && !guardedVolumes.isEmpty
     }
 
     // MARK: - Lifecycle
@@ -552,6 +587,9 @@ final class GuardController {
         // on the work queue.
         guard hasGuardedTargets else { return }
         isBusy = true
+        // The pass stops a backup to a guarded disk itself; a request still
+        // waiting on Time Machine would only end up reading as a failure.
+        backupRequest = nil
         work.async { [weak self] in
             let outcome = GuardRunner.ejectGuarded(
                 reason: reason, config: config, notifyOnSuccess: notifyOnSuccess,
@@ -686,6 +724,64 @@ final class GuardController {
         runEject(reason: .menu(), notifyOnSuccess: false)
     }
 
+    /// Stops whatever Time Machine is writing, guarded or not. Not
+    /// remembered: nothing starts it again after a meeting, and Time Machine
+    /// carries on at its next backup.
+    func stopBackup() {
+        guard canStopBackup else { return }
+        let request = BackupRequest(kind: .stop, name: backingUpNames.joined(separator: ", "),
+                                    deadline: Date().addingTimeInterval(BackupControl.stopBudget))
+        send(request) { BackupControl.stop() }
+    }
+
+    /// Starts a backup to `disk` now, guarded or not.
+    func backUpNow(_ disk: KnownDisk) {
+        guard canBackUpNow(disk), let id = destinationToStart(disk) else { return }
+        let name = disk.name
+        let request = BackupRequest(kind: .start(destinationID: id), name: name,
+                                    deadline: Date().addingTimeInterval(BackupControl.startBudget))
+        send(request) { BackupControl.start(destinationID: id, name: name) }
+    }
+
+    /// Hands the request to Time Machine on the work queue, where every
+    /// process runs. Whether it took is read off the status polls that follow
+    /// rather than waited out there: a stop to a share takes most of a
+    /// minute, and an eject pass may need the queue in the meantime.
+    private func send(_ request: BackupRequest, _ ask: @escaping @Sendable () -> Bool) {
+        backupRequest = request
+        updateBackupWatch()
+        work.async { [weak self] in
+            let taken = ask()
+            Task { @MainActor in
+                guard let self, self.backupRequest == request else { return }
+                if taken {
+                    self.refreshBackupStatus()
+                } else {
+                    self.fail(request)
+                }
+            }
+        }
+    }
+
+    private func settleBackupRequest() {
+        guard let request = backupRequest else { return }
+        switch request.settle(backup, now: Date()) {
+        case .pending: break
+        case .done: backupRequest = nil
+        case .failed: fail(request)
+        }
+    }
+
+    private func fail(_ request: BackupRequest) {
+        backupRequest = nil
+        switch request.kind {
+        case .stop:
+            lastFailure = Loc.t("failure.backupNotStopped", "%@: the backup could not be stopped", request.name)
+        case .start:
+            lastFailure = Loc.t("failure.backupNotStarted", "%@: the backup could not be started", request.name)
+        }
+    }
+
     /// Best effort only.
     ///
     /// macOS gives sleep observers a short window, and stopping a running backup
@@ -764,7 +860,7 @@ extension GuardController {
         let meeting = EKEvent(eventStore: store)
         meeting.title = demoNames.meeting
         meeting.calendar = calendar
-        meeting.startDate = Date().addingTimeInterval(12 * 60)
+        meeting.startDate = (PreviewDemo.now ?? Date()).addingTimeInterval(12 * 60)
         meeting.endDate = meeting.startDate.addingTimeInterval(45 * 60)
         nextMeeting = meeting
         ejectDate = meeting.startDate.addingTimeInterval(-demo.leadMinutes * 60)

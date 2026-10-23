@@ -27,11 +27,12 @@ enum Design {
         static let diskListMaxHeight: CGFloat = 316
         /// A backstop, not the layout: the scrolling list keeps the popover
         /// under it. Banners add 49pt each (update ready, paused: measured
-        /// together at 98pt), so the tallest state stays around 740pt. The
-        /// smallest screen a 13-inch MacBook that runs macOS 14 opens at is
-        /// 1440 x 900 points, 876pt under a 24pt menu bar; this leaves more
-        /// than 120pt for the Dock.
-        static let popoverMaxHeight: CGFloat = 750
+        /// together at 98pt), and "Stop backup" a 24pt row while Time Machine
+        /// runs, so the tallest state stays around 765pt. The smallest screen
+        /// a 13-inch MacBook that runs macOS 14 opens at is 1440 x 900
+        /// points, 876pt under a 24pt menu bar; this leaves about 100pt for
+        /// the Dock.
+        static let popoverMaxHeight: CGFloat = 775
         /// A 13pt line plus 4 + 4 is 24pt, the height of a native menu item
         /// on macOS 26 (measured with `NSMenu.size`).
         static let rowVerticalPadding: CGFloat = 4

@@ -24,6 +24,7 @@
 "banner.updateReadyHelp" = "Nainštaluje stiahnutú aktualizáciu a znova spustí Eject Guard.";
 "calendar.accessDetail" = "Bez neho stráž nevidí tvoje stretnutia.";
 "calendar.accessNeeded" = "Treba prístup ku kalendáru";
+"disk.backUpNow" = "Zálohovať teraz";
 "disk.backingUp" = "Zálohuje sa…";
 "disk.backingUpPercent" = "Zálohuje sa… %@";
 "disk.connected" = "Pripojený";
@@ -43,9 +44,11 @@
 "disk.reconnectsAt" = "Pripojí sa o %@";
 "disk.sdCard" = "SD karta";
 "disk.shortID" = "ID %@";
+"disk.startingBackup" = "Spúšťa sa záloha…";
 "disk.timeMachineBadge" = "Cieľ zálohovania Time Machine";
 "disks.empty" = "Zatiaľ žiadny externý disk.\nPripoj ho a objaví sa tu.";
 "disks.hint" = "Klikni na disk a bude strážený.";
+"failure.backupNotStarted" = "%@: zálohu sa nepodarilo spustiť";
 "failure.backupNotStopped" = "%@: zálohu sa nepodarilo zastaviť";
 "failure.heldBy" = "%1$@: drží ho %2$@";
 "footer.ejectHelp" = "Vysunie %@. Nezaškrtnutých diskov sa nedotkne.";
@@ -58,7 +61,7 @@
 "footer.resume" = "Obnoviť stráženie";
 "footer.settings" = "Nastavenia…";
 "footer.stopBackup" = "Zastaviť zálohu";
-"footer.stopBackupHelp" = "Zastaví zálohu na %@.";
+"footer.stopBackupHelp" = "Zastaví zálohu na %@. Time Machine pokračuje pri ďalšej zálohe.";
 "footer.stoppingBackup" = "Zastavuje sa záloha…";
 "meeting.checking" = "Kontrolujem kalendár…";
 "meeting.ejectsAt" = "Vysunie o %@";

@@ -78,12 +78,17 @@ The menu bar popover shows your disks and today's next meeting:
   never listed, unless Time Machine backs up to one. Two disks with the same
   name show their size, or the start of their UUID, to tell them apart.
 - **Right-click a disk** to hide it for good, or, while it is unplugged, to
-  forget it until you plug it in again. A guarded disk asks first.
+  forget it until you plug it in again. A guarded disk asks first. On a Time
+  Machine destination that is plugged in, or on a share, **Back up now**
+  starts a backup to it straight away, guarded or not.
 - **While a disk waits** to be reconnected after a meeting, its row says when
   it comes back.
 - **Next meeting** shows what the guard will do and when it will eject.
   **Skip this meeting** leaves your disks alone for that one event.
-- **Eject now**, **Pause** and **Settings** sit at the bottom.
+- **Eject now**, **Pause** and **Settings** sit at the bottom. While Time
+  Machine is backing up, **Stop backup** stops it, whichever disk it writes
+  to, say when it slows the Mac down. Time Machine carries on at its next
+  backup.
 
 In Settings you can change the lead time, count any timed event as a meeting,
 ignore events marked *Free*, limit it to specific calendars, and enable ejecting
@@ -91,8 +96,9 @@ on sleep.
 
 ## Safe by design
 
-- Only external, ejectable disks you ticked are ever touched. The startup disk
-  cannot be ejected by any code path.
+- Only external, ejectable disks you ticked are ever ejected or unmounted. The
+  startup disk cannot be ejected by any code path. A backup to a disk you did
+  not tick is stopped or started only when you ask.
 - Disks are recognised by their volume UUID, not by name.
 - Nothing leaves your Mac. The calendar is read locally, and the app talks to
   the network only to check for updates.

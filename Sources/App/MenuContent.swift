@@ -358,6 +358,8 @@ private struct DiskCard: View {
     private var connected: Bool { controller.isAttached(disk) }
 
     private var backingUp: Bool { controller.isBackingUp(disk) }
+    /// "Back up now" was clicked, and Time Machine has not started yet.
+    private var starting: Bool { controller.isStartingBackup(disk) }
 
     private var subtitle: String {
         guard let detail else { return status }
@@ -371,6 +373,7 @@ private struct DiskCard: View {
             }
             return Loc.t("disk.backingUp", "Backing up…")
         }
+        if starting { return Loc.t("disk.startingBackup", "Starting backup…") }
         let watch = guarded ? Loc.t("disk.guarded", "Guarded") : Loc.t("disk.notGuarded", "Not guarded")
         // Unmounted for a meeting: "Disconnected" would read as unplugged.
         // Only a guarded disk is ever waiting, so "Guarded" goes unsaid and
@@ -435,7 +438,7 @@ private struct DiskCard: View {
                         }
                     }
                     HStack(spacing: Design.Spacing.s) {
-                        if backingUp {
+                        if backingUp || starting {
                             #if PREVIEW
                             // ImageRenderer cannot draw the AppKit-backed spinner
                             // and paints a placeholder instead; a still arc of
@@ -497,6 +500,14 @@ private struct DiskCard: View {
         .onHover { isHovering = $0 }
         .accessibilityLabel("\(disk.name), \(subtitle)")
         .contextMenu {
+            // Any destination Time Machine can reach, guarded or not, as the
+            // system menu offers it. Greyed out while a backup runs: Time
+            // Machine runs one at a time, and the footer stops it.
+            if controller.offersBackUpNow(disk) {
+                Button(Loc.t("disk.backUpNow", "Back up now")) { controller.backUpNow(disk) }
+                    .disabled(!controller.canBackUpNow(disk))
+                Divider()
+            }
             // Anything can be hidden, including a Time Machine destination that
             // belongs to another Mac and will never be plugged into this one.
             // Settings has the way back.
@@ -665,8 +676,6 @@ private struct FooterBar: View {
                 : Loc.t("footer.ejecting", "Ejecting…")
         }
         switch volumes.count {
-        case 0 where !controller.guardedNetworkBackups.isEmpty:
-            return Loc.t("footer.stopBackup", "Stop backup")
         case 0: return Loc.t("footer.ejectNow", "Eject now")
         case 1: return Loc.t("footer.ejectOne", "Eject %@", volumes[0].name)
         default: return Loc.t("footer.ejectMany", "Eject %d disks", volumes.count)
@@ -686,10 +695,6 @@ private struct FooterBar: View {
 
     private var ejectHelp: String {
         let volumes = controller.guardedVolumes
-        let backups = controller.guardedNetworkBackups
-        if volumes.isEmpty, !backups.isEmpty {
-            return Loc.t("footer.stopBackupHelp", "Stops the backup to %@.", backups.map(\.name).joined(separator: ", "))
-        }
         guard !volumes.isEmpty else { return Loc.t("footer.ejectHelpNone", "No guarded disk is connected.") }
         return Loc.t("footer.ejectHelp", "Ejects %@. Disks you have not ticked are left alone.", volumes.map(\.name).joined(separator: ", "))
     }
@@ -710,6 +715,21 @@ private struct FooterBar: View {
                 ) { controller.ejectNow() }
                     .keyboardShortcut("e")
                     .help(ejectHelp)
+
+                // Any backup, guarded or not: one slowing the Mac down is the
+                // user's to stop. Gone during an eject pass, whose own row
+                // says what it is doing to the backup.
+                if controller.isBackupRunning && !controller.isBusy {
+                    MenuRow(
+                        icon: "stop.circle",
+                        label: controller.isStoppingBackup
+                            ? Loc.t("footer.stoppingBackup", "Stopping backup…")
+                            : Loc.t("footer.stopBackup", "Stop backup"),
+                        isEnabled: controller.canStopBackup
+                    ) { controller.stopBackup() }
+                        .help(Loc.t("footer.stopBackupHelp", "Stops the backup to %@. Time Machine carries on at its next backup.",
+                                    controller.backingUpNames.joined(separator: ", ")))
+                }
 
                 if paused {
                     MenuRow(icon: "play.circle", label: Loc.t("footer.resume", "Resume guarding")) {

@@ -24,6 +24,7 @@
 "banner.updateReadyHelp" = "Nainstaluje staženou aktualizaci a znovu spustí Eject Guard.";
 "calendar.accessDetail" = "Bez něj hlídání nevidí tvoje schůzky.";
 "calendar.accessNeeded" = "Je potřeba přístup ke kalendáři";
+"disk.backUpNow" = "Zálohovat nyní";
 "disk.backingUp" = "Zálohuje se…";
 "disk.backingUpPercent" = "Zálohuje se… %@";
 "disk.connected" = "Připojený";
@@ -43,9 +44,11 @@
 "disk.reconnectsAt" = "Připojí se v %@";
 "disk.sdCard" = "SD karta";
 "disk.shortID" = "ID %@";
+"disk.startingBackup" = "Spouští se záloha…";
 "disk.timeMachineBadge" = "Cíl zálohování Time Machine";
 "disks.empty" = "Zatím žádný externí disk.\nPřipoj ho a objeví se tady.";
 "disks.hint" = "Klikni na disk a bude hlídaný.";
+"failure.backupNotStarted" = "%@: zálohu se nepodařilo spustit";
 "failure.backupNotStopped" = "%@: zálohu se nepodařilo zastavit";
 "failure.heldBy" = "%1$@: drží ho %2$@";
 "footer.ejectHelp" = "Vysune %@. Nezaškrtnutých disků se nedotkne.";
@@ -58,7 +61,7 @@
 "footer.resume" = "Obnovit hlídání";
 "footer.settings" = "Nastavení…";
 "footer.stopBackup" = "Zastavit zálohu";
-"footer.stopBackupHelp" = "Zastaví zálohu na %@.";
+"footer.stopBackupHelp" = "Zastaví zálohu na %@. Time Machine pokračuje při další záloze.";
 "footer.stoppingBackup" = "Zastavuje se záloha…";
 "meeting.checking" = "Kontroluji kalendář…";
 "meeting.ejectsAt" = "Vysune v %@";

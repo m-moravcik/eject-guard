@@ -77,8 +77,8 @@ rather than at the next hourly run.
   `ejectGuarded` drops every entry before it ejects anything, even when it
   then finds nothing to eject. They only run with a guarded target to act on:
   eject on sleep needs a mounted guarded disk or any guarded network
-  destination, ⌘E a mounted guarded disk or a backup running to a guarded
-  share; `eject-guard --eject-now` always runs. So with only a waiting disk
+  destination, ⌘E a mounted guarded disk; `eject-guard --eject-now` always
+  runs. So with only a waiting disk
   and no guarded network destination nothing runs and the entry stays, and a
   disk still attached after the meeting is mounted again. That is intended:
   a waiting disk was never ejected, so its device cannot have outlived one,
@@ -113,6 +113,39 @@ pull and macOS drops them on its own.
 - `tmutil destinationinfo` took 21.7 s while a backup to a share was mounting
   its disk image, past the 15 s the scan allows. That pass sees no
   destinations and the merge keeps what it had.
+
+## Stopping and starting a backup by hand
+
+On its own the guard stops a backup only to a guarded disk, on its way to
+taking that disk off. By hand the user can stop or start one for any
+destination, guarded or not: a backup slowing the Mac down is theirs to stop,
+and the system menu's "Back Up Now" may be hidden because this icon already
+shows the progress.
+
+- **Stop backup** sits in the footer while Time Machine runs, and is gone
+  during an eject pass, whose own row says what it does to the backup.
+  `tmutil stopbackup` takes no destination: Time Machine runs one backup at a
+  time. ⌘E no longer doubles as the stop for a guarded share; it ejects, and
+  stops a backup to a guarded share on the way, as before.
+- **Back up now** is in a row's context menu, for a destination Time Machine
+  reports and, for a disk, one that is plugged in (`BackupControl.destinationToStart`).
+  Not for a disk unmounted for a meeting: an encrypted one is locked again, and
+  a backup to it fails. Greyed out while any backup runs. It runs `tmutil
+  startbackup --destination`, without `--auto`, which is the background mode of
+  a scheduled backup.
+- **Not remembered.** A stop by hand never sets `stoppedBackup`, so nothing
+  starts the backup again after a meeting; Time Machine carries on at its next
+  scheduled backup.
+- **Settled against the status polls**, not waited out on the work queue,
+  which an eject pass may need meanwhile (`BackupRequest.settle`). The poll
+  runs every 5 s while a request is open. A stop is done once nothing runs,
+  given 120 s, since a share sat in `Stopping` for ~55 s; a start once a
+  backup runs, given 30 s. Past that the popover's problem row says it did not
+  take. An eject pass drops an open request: it deals with the backup itself.
+- Measured on a USB disk, 2026-10-24: `tmutil startbackup --destination`
+  returned 0 and `tmutil status` read `Running = 1`, `BackupPhase = Starting`
+  within half a second. `tmutil stopbackup` by hand had ended the backup
+  within 3 s.
 
 ## How a disk is connected
 

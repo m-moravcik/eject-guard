@@ -37,6 +37,11 @@ MainActor.assumeIsolated {
     // open: the published screenshot.
     let banner = CommandLine.arguments.contains("banner")
     let hero = banner || CommandLine.arguments.contains("hero")
+    // The published shot is set at nine in the morning, whenever it is
+    // rendered, so a retake does not show the hour it was taken at.
+    if hero {
+        PreviewDemo.now = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date())
+    }
     // Update shows the demo popover with an update staged, for the card that
     // otherwise only appears once a release is actually downloaded.
     let update = CommandLine.arguments.contains("update")
@@ -314,7 +319,7 @@ struct HeroScene<Popover: View>: View {
                         .fill(Color.primary.opacity(0.14)))
                 Image(systemName: "wifi")
                     .font(.system(size: 13, weight: .medium))
-                Text(Format.clock(Date()))
+                Text(Format.clock(PreviewDemo.now ?? Date()))
                     .font(.system(size: 13, weight: .medium))
                     .monospacedDigit()
             }
