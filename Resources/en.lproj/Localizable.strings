@@ -24,6 +24,7 @@
 "banner.updateReadyHelp" = "Installs the downloaded update and relaunches Eject Guard.";
 "calendar.accessDetail" = "Without it the guard cannot see your meetings.";
 "calendar.accessNeeded" = "Calendar access needed";
+"disk.backUpNow" = "Back up now";
 "disk.backingUp" = "Backing up…";
 "disk.backingUpPercent" = "Backing up… %@";
 "disk.connected" = "Connected";
@@ -43,9 +44,11 @@
 "disk.reconnectsAt" = "Reconnects at %@";
 "disk.sdCard" = "SD card";
 "disk.shortID" = "ID %@";
+"disk.startingBackup" = "Starting backup…";
 "disk.timeMachineBadge" = "A Time Machine backup destination";
 "disks.empty" = "No external disks seen yet.\nPlug one in and it shows up here.";
 "disks.hint" = "Click a disk to guard it.";
+"failure.backupNotStarted" = "%@: the backup could not be started";
 "failure.backupNotStopped" = "%@: the backup could not be stopped";
 "failure.heldBy" = "%1$@: held by %2$@";
 "footer.ejectHelp" = "Ejects %@. Disks you have not ticked are left alone.";
@@ -58,7 +61,7 @@
 "footer.resume" = "Resume guarding";
 "footer.settings" = "Settings…";
 "footer.stopBackup" = "Stop backup";
-"footer.stopBackupHelp" = "Stops the backup to %@.";
+"footer.stopBackupHelp" = "Stops the backup to %@. Time Machine carries on at its next backup.";
 "footer.stoppingBackup" = "Stopping backup…";
 "meeting.checking" = "Checking your calendar…";
 "meeting.ejectsAt" = "Ejects at %@";

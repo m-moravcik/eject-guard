@@ -24,6 +24,7 @@
 "banner.updateReadyHelp" = "Installiert das geladene Update und startet Eject Guard neu.";
 "calendar.accessDetail" = "Ohne ihn sieht die Überwachung deine Besprechungen nicht.";
 "calendar.accessNeeded" = "Kalenderzugriff erforderlich";
+"disk.backUpNow" = "Backup jetzt erstellen";
 "disk.backingUp" = "Sicherung läuft…";
 "disk.backingUpPercent" = "Sicherung läuft… %@";
 "disk.connected" = "Verbunden";
@@ -43,9 +44,11 @@
 "disk.reconnectsAt" = "Ab %@ wieder verbunden";
 "disk.sdCard" = "SD-Karte";
 "disk.shortID" = "ID %@";
+"disk.startingBackup" = "Backup wird gestartet…";
 "disk.timeMachineBadge" = "Ein Time-Machine-Backupziel";
 "disks.empty" = "Noch keine externen Laufwerke gesehen.\nSchließe eines an, dann erscheint es hier.";
 "disks.hint" = "Auf ein Laufwerk klicken, um es zu überwachen.";
+"failure.backupNotStarted" = "%@: Das Backup konnte nicht gestartet werden";
 "failure.backupNotStopped" = "%@: Das Backup konnte nicht gestoppt werden";
 "failure.heldBy" = "%1$@: belegt von %2$@";
 "footer.ejectHelp" = "Wirft %@ aus. Nicht angehakte Laufwerke bleiben unberührt.";
@@ -58,7 +61,7 @@
 "footer.resume" = "Überwachung fortsetzen";
 "footer.settings" = "Einstellungen…";
 "footer.stopBackup" = "Backup stoppen";
-"footer.stopBackupHelp" = "Stoppt das Backup auf %@.";
+"footer.stopBackupHelp" = "Stoppt das Backup auf %@. Time Machine macht beim nächsten Backup weiter.";
 "footer.stoppingBackup" = "Backup wird gestoppt…";
 "meeting.checking" = "Kalender wird geprüft…";
 "meeting.ejectsAt" = "Wirft um %@ aus";
