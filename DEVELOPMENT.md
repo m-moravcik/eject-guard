@@ -310,6 +310,18 @@ The notes in `release-notes/<version>.md` are embedded in the appcast as HTML,
 so Sparkle's update window shows only them. Paragraphs, `- ` bullets and
 backtick code are the whole format.
 
+The notes always end with this line, as in VibeRes:
+
+```
+Signed with an Apple Developer ID and notarized by Apple. Requires macOS 14.
+```
+
+The update window is where people decide whether to trust an update, so it
+says who stands behind it. It says exactly what happens: the app is signed with
+a Developer ID certificate Apple issued, and Apple notarizes it, which is not
+the same as Apple signing it. `release.sh` checks the line, and that the notes
+exist and hold no em dash, before it builds anything.
+
 **The repository has to be public for updates to work.** Sparkle carries no
 GitHub credentials, so on a private repository both the feed on
 raw.githubusercontent.com and the release asset answer 404 and every check fails

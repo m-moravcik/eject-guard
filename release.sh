@@ -50,6 +50,18 @@ die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 step "Preflight"
+# The notes are the update window's text and the GitHub release body, so they
+# are checked before anything is built: a missing file or a wrong last line
+# must not cost a notarization. See DEVELOPMENT.md, Updates.
+APPLE_LINE="Signed with an Apple Developer ID and notarized by Apple."
+NOTES="release-notes/$(cat VERSION).md"
+[ -s "$NOTES" ] || die "write $NOTES before releasing"
+if grep -q $'\xe2\x80\x94' "$NOTES"; then die "$NOTES contains an em dash"; fi
+case "$(grep -v '^[[:space:]]*$' "$NOTES" | tail -n 1)" in
+    "$APPLE_LINE"*) ;;
+    *) die "$NOTES must end with: $APPLE_LINE Requires macOS 14." ;;
+esac
+echo "notes: $NOTES"
 security find-identity -v -p codesigning | grep -q "Developer ID Application" \
     || die "no Developer ID Application certificate in the keychain"
 if [ -z "${SKIP_NOTARIZE:-}" ]; then
