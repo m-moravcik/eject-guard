@@ -84,6 +84,20 @@ final class BackupControlTests: XCTestCase {
         XCTAssertEqual(start.settle(running(false), now: now.addingTimeInterval(1)), .failed)
     }
 
+    // MARK: - When saying it failed is stale
+
+    func testAStopThatDidNotTakeIsStaleOnceNothingRuns() {
+        let stop = BackupRequest(kind: .stop, name: "WD", deadline: Date())
+        XCTAssertFalse(stop.took(running(true)), "the backup it could not stop still runs")
+        XCTAssertTrue(stop.took(running(false)))
+    }
+
+    func testAStartThatDidNotTakeIsStaleOnceABackupRuns() {
+        let start = BackupRequest(kind: .start(destinationID: "TM-1"), name: "WD", deadline: Date())
+        XCTAssertFalse(start.took(running(false)))
+        XCTAssertTrue(start.took(running(true)), "whichever destination it writes to")
+    }
+
     func testOnlyAStartNamesADestination() {
         let start = BackupRequest(kind: .start(destinationID: "TM-1"), name: "WD", deadline: Date())
         XCTAssertEqual(start.startingDestinationID, "TM-1")

@@ -17,10 +17,11 @@ struct MenuContent: View {
                 OnboardingView(initialStep: onboardingStep)
             } else {
                 VStack(spacing: 0) {
-                    // A failed eject first, as VibeRes puts its problems: it
-                    // is about something that just went wrong and still needs
-                    // dealing with.
-                    if let failure = controller.lastFailure {
+                    // A failed eject, or else a stop or start that did not
+                    // take, first, as VibeRes puts its problems: it is about
+                    // something that just went wrong and still needs dealing
+                    // with.
+                    if let failure = controller.lastFailure ?? controller.backupFailure {
                         ProblemRow(message: failure) { controller.dismissFailure() }
                     }
 

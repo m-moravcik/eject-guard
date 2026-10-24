@@ -82,8 +82,14 @@ struct BackupRequest: Equatable, Sendable {
     /// backup runs: Time Machine runs one at a time, and whichever it is, the
     /// popover now shows where it writes. A late answer still counts.
     func settle(_ status: BackupStatus, now: Date) -> Settled {
-        let took = kind == .stop ? !status.running : status.running
-        if took { return .done }
+        if took(status) { return .done }
         return now > deadline ? .failed : .pending
+    }
+
+    /// Whether `status` shows what was asked for, deadline or not. Once it
+    /// does, saying the request failed is stale: a stop that did not take is
+    /// over once nothing runs, and a start once a backup runs.
+    func took(_ status: BackupStatus) -> Bool {
+        kind == .stop ? !status.running : status.running
     }
 }

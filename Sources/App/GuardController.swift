@@ -32,7 +32,11 @@ final class GuardController {
     private(set) var isReconnecting = false
     private(set) var lastFailure: String?
 
-    private(set) var backup = BackupStatus()
+    private(set) var backup = BackupStatus() {
+        didSet {
+            if failedBackupRequest?.took(backup) == true { failedBackupRequest = nil }
+        }
+    }
     /// Advances while Time Machine is backing up, and is what makes the
     /// menu bar icon move. A MenuBarExtra label is rendered to a static image,
     /// so SwiftUI's own symbol effects never run there - measured, not assumed.
@@ -40,6 +44,19 @@ final class GuardController {
     private(set) var backupPhase = 0
     /// A stop or a start the user asked for, until Time Machine shows it took.
     private(set) var backupRequest: BackupRequest?
+    /// A stop or a start that did not take, until Time Machine shows otherwise.
+    /// Kept apart from `lastFailure`, which is about the eject pass.
+    private(set) var failedBackupRequest: BackupRequest?
+
+    var backupFailure: String? {
+        guard let request = failedBackupRequest else { return nil }
+        switch request.kind {
+        case .stop:
+            return Loc.t("failure.backupNotStopped", "%@: the backup could not be stopped", request.name)
+        case .start:
+            return Loc.t("failure.backupNotStarted", "%@: the backup could not be started", request.name)
+        }
+    }
 
     /// Plays the menu bar icon's eject animation once a guarded disk has
     /// actually come off. Runs a timer only while it plays.
@@ -313,7 +330,10 @@ final class GuardController {
         }
     }
 
-    func dismissFailure() { lastFailure = nil }
+    func dismissFailure() {
+        lastFailure = nil
+        failedBackupRequest = nil
+    }
 
     /// Ends the welcome tour, finished or skipped. Settings can clear it again.
     func setOnboardingShown(_ shown: Bool) {
@@ -749,6 +769,7 @@ final class GuardController {
     /// minute, and an eject pass may need the queue in the meantime.
     private func send(_ request: BackupRequest, _ ask: @escaping @Sendable () -> Bool) {
         backupRequest = request
+        failedBackupRequest = nil
         updateBackupWatch()
         work.async { [weak self] in
             let taken = ask()
@@ -774,12 +795,7 @@ final class GuardController {
 
     private func fail(_ request: BackupRequest) {
         backupRequest = nil
-        switch request.kind {
-        case .stop:
-            lastFailure = Loc.t("failure.backupNotStopped", "%@: the backup could not be stopped", request.name)
-        case .start:
-            lastFailure = Loc.t("failure.backupNotStarted", "%@: the backup could not be started", request.name)
-        }
+        failedBackupRequest = request
     }
 
     /// Best effort only.
