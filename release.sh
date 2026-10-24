@@ -50,6 +50,21 @@ die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 step "Preflight"
+# The notes are the update window's text and the GitHub release body, so they
+# are checked before anything is built: a missing file or a wrong last line
+# must not cost a notarization. See DEVELOPMENT.md, Updates.
+if [ -z "${SKIP_NOTARIZE:-}" ]; then
+    MIN_OS="$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" App/Info.plist)"
+    APPLE_LINE="Signed with an Apple Developer ID and notarized by Apple. Requires macOS ${MIN_OS%.0}."
+    # Read as build.sh reads it, so a stray space or newline cannot point here
+    # at a file other than the one the build and the appcast use.
+    NOTES="release-notes/$(tr -d ' \n' < VERSION).md"
+    [ -s "$NOTES" ] || die "write $NOTES before releasing"
+    if grep -q $'\xe2\x80\x94' "$NOTES"; then die "$NOTES contains an em dash"; fi
+    [ "$(grep -v '^[[:space:]]*$' "$NOTES" | tail -n 1 | sed 's/[[:space:]]*$//')" = "$APPLE_LINE" ] \
+        || die "$NOTES must end with: $APPLE_LINE"
+    echo "notes: $NOTES"
+fi
 security find-identity -v -p codesigning | grep -q "Developer ID Application" \
     || die "no Developer ID Application certificate in the keychain"
 if [ -z "${SKIP_NOTARIZE:-}" ]; then

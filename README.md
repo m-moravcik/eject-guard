@@ -57,7 +57,8 @@ It works in English, Slovak, Czech and German, and updates itself.
 4. Click the menu bar icon and tick the disks to guard.
 
 Turn on **Launch at login** in Settings so it survives a restart. The app is
-signed and notarized by Apple and requires macOS 14 or newer.
+signed with an Apple Developer ID, notarized by Apple and requires macOS 14 or
+newer.
 
 ## Using it
 
