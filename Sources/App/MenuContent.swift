@@ -20,7 +20,7 @@ struct MenuContent: View {
 
     private var banner: Banner? {
         if controller.calendarAccess == .denied { return .calendarAccess }
-        if let until = controller.config.pausedUntil, until > Date() { return .paused(until: until) }
+        if controller.config.isPaused, let until = controller.config.pausedUntil { return .paused(until: until) }
         if !controller.config.enabled { return .guardingOff }
         if controller.notificationsEnabled == false { return .notificationsOff }
         return nil
@@ -134,7 +134,7 @@ struct MenuContent: View {
                    value: controller.offersStopBackup)
         // Pause and Resume swap places, with or without the paused banner.
         .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
-                   value: controller.config.pausedUntil)
+                   value: controller.config.isPaused)
     }
 }
 
@@ -768,7 +768,7 @@ private struct FooterBar: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var paused: Bool { (controller.config.pausedUntil ?? .distantPast) > Date() }
+    private var paused: Bool { controller.config.isPaused }
 
     private var pauseLabel: String {
         let hours = controller.config.pauseHours
