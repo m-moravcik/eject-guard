@@ -55,7 +55,10 @@ if [ -e "$DEST/$APP_NAME.app" ]; then
     echo "moved the previous install to the Trash"
 fi
 for old in "/Applications/$LEGACY_APP.app" "$HOME/Applications/$LEGACY_APP.app" "$HOME/bin/tm-eject-guard" "$HOME/bin/eject-guard"; do
-    [ -e "$old" ] && trash "$old" && echo "moved to Trash: $old"
+    if [ -e "$old" ]; then
+        trash "$old"
+        echo "moved to Trash: $old"
+    fi
 done
 # ditto, not cp -R: the bundle embeds Sparkle.framework, which is a tree of
 # symlinks into Versions plus four separately signed helpers. ditto is the
@@ -65,6 +68,10 @@ ditto "build/$APP_NAME.app" "$DEST/$APP_NAME.app"
 # ~/.local/bin is the conventional per-user bin dir that most shell setups
 # already put on PATH; the summary below says how to add it when it is missing.
 mkdir -p "$HOME/.local/bin"
+if [ -e "$HOME/.local/bin/eject-guard" ]; then
+    trash "$HOME/.local/bin/eject-guard"
+    echo "moved the previous cli to the Trash"
+fi
 cp "build/eject-guard" "$HOME/.local/bin/eject-guard"
 
 open "$DEST/$APP_NAME.app"

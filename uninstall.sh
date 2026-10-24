@@ -14,7 +14,10 @@ for path in "/Applications/Eject Guard.app" "$HOME/Applications/Eject Guard.app"
             "$HOME/.local/bin/eject-guard" \
             "$HOME/bin/eject-guard" "$HOME/bin/tm-eject-guard" \
             "$HOME/Library/LaunchAgents/com.local.tm-eject-guard.plist"; do
-    [ -e "$path" ] && trash "$path" && echo "moved to Trash: $path"
+    if [ -e "$path" ]; then
+        trash "$path"
+        echo "moved to Trash: $path"
+    fi
 done
 
 echo "config kept at: $HOME/Library/Application Support/EjectGuard/config.json"
