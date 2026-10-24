@@ -92,4 +92,16 @@ struct BackupRequest: Equatable, Sendable {
     func took(_ status: BackupStatus) -> Bool {
         kind == .stop ? !status.running : status.running
     }
+
+    /// Whether a start can no longer be made where it was asked for: the disk
+    /// is unplugged, or Time Machine no longer reports the destination. Saying
+    /// it failed is then stale too. A stop names no destination.
+    func lostDestination(_ knownDisks: [KnownDisk], attached: [AttachedVolume],
+                         reportedDestinationIDs: Set<String>) -> Bool {
+        guard let id = startingDestinationID else { return false }
+        return !knownDisks.contains {
+            BackupControl.destinationToStart($0, attached: attached,
+                                             reportedDestinationIDs: reportedDestinationIDs) == id
+        }
+    }
 }

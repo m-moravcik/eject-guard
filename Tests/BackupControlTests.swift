@@ -98,6 +98,26 @@ final class BackupControlTests: XCTestCase {
         XCTAssertTrue(start.took(running(true)), "whichever destination it writes to")
     }
 
+    func testAStartThatDidNotTakeIsStaleOnceItsDiskIsUnplugged() {
+        let start = BackupRequest(kind: .start(destinationID: "TM-1"), name: "WD", deadline: Date())
+        XCTAssertFalse(start.lostDestination([wd, stick], attached: [volume(wd)],
+                                             reportedDestinationIDs: ["TM-1"]))
+        XCTAssertTrue(start.lostDestination([wd, stick], attached: [volume(stick)],
+                                            reportedDestinationIDs: ["TM-1"]))
+    }
+
+    func testAStartThatDidNotTakeIsStaleOnceTimeMachineNoLongerReportsIt() {
+        let start = BackupRequest(kind: .start(destinationID: "TM-2"), name: "NAS", deadline: Date())
+        XCTAssertFalse(start.lostDestination([nas], attached: [], reportedDestinationIDs: ["TM-2"]),
+                       "a share is never plugged in")
+        XCTAssertTrue(start.lostDestination([nas], attached: [], reportedDestinationIDs: []))
+    }
+
+    func testAStopThatDidNotTakeNamesNoDestinationToLose() {
+        let stop = BackupRequest(kind: .stop, name: "WD", deadline: Date())
+        XCTAssertFalse(stop.lostDestination([], attached: [], reportedDestinationIDs: []))
+    }
+
     func testOnlyAStartNamesADestination() {
         let start = BackupRequest(kind: .start(destinationID: "TM-1"), name: "WD", deadline: Date())
         XCTAssertEqual(start.startingDestinationID, "TM-1")
