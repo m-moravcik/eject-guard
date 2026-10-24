@@ -118,7 +118,10 @@ struct MenuContent: View {
                    value: controller.lastFailure ?? controller.backupFailure)
         .animation(Design.Motion.rows(arriving: updateStatus.isUpdateReady, reduceMotion: reduceMotion),
                    value: updateStatus.isUpdateReady)
+        // A banner coming or going on its own; one swapping with another.
         .animation(Design.Motion.rows(arriving: banner != nil, reduceMotion: reduceMotion),
+                   value: banner != nil)
+        .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
                    value: banner)
         .animation(Design.Motion.rows(arriving: controller.config.watchedDiskIDs.isEmpty, reduceMotion: reduceMotion),
                    value: controller.config.watchedDiskIDs.isEmpty)
@@ -129,6 +132,9 @@ struct MenuContent: View {
                    value: controller.skippedMeeting?.eventIdentifier)
         .animation(Design.Motion.rows(arriving: controller.offersStopBackup, reduceMotion: reduceMotion),
                    value: controller.offersStopBackup)
+        // Pause and Resume swap places, with or without the paused banner.
+        .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
+                   value: controller.config.pausedUntil)
     }
 }
 
@@ -538,7 +544,8 @@ private struct DiskCard: View {
                         .foregroundStyle(Design.Palette.cardSubtitle)
                         // Time Machine's progress ticks up between polls.
                         .rollingNumbers(on: backingUp ? controller.backup.percent : nil,
-                                        counting: backingUp, reduceMotion: reduceMotion)
+                                        counting: backingUp && controller.backup.percent != nil,
+                                        reduceMotion: reduceMotion)
                     }
                 }
 
