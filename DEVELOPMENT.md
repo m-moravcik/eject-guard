@@ -319,8 +319,10 @@ Signed with an Apple Developer ID and notarized by Apple. Requires macOS 14.
 The update window is where people decide whether to trust an update, so it
 says who stands behind it. It says exactly what happens: the app is signed with
 a Developer ID certificate Apple issued, and Apple notarizes it, which is not
-the same as Apple signing it. `release.sh` checks the line, and that the notes
-exist and hold no em dash, before it builds anything.
+the same as Apple signing it. The macOS part follows `LSMinimumSystemVersion`
+in `App/Info.plist`, a trailing `.0` dropped. `release.sh` checks the line, and
+that the notes exist and hold no em dash, before it builds anything. A
+sign-only run (`SKIP_NOTARIZE=1`) skips the check.
 
 **The repository has to be public for updates to work.** Sparkle carries no
 GitHub credentials, so on a private repository both the feed on
