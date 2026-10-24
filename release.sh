@@ -54,7 +54,9 @@ step "Preflight"
 # are checked before anything is built: a missing file or a wrong last line
 # must not cost a notarization. See DEVELOPMENT.md, Updates.
 APPLE_LINE="Signed with an Apple Developer ID and notarized by Apple."
-NOTES="release-notes/$(cat VERSION).md"
+# Read as build.sh reads it, so a stray space or newline cannot point here
+# at a file other than the one the build and the appcast use.
+NOTES="release-notes/$(tr -d ' \n' < VERSION).md"
 [ -s "$NOTES" ] || die "write $NOTES before releasing"
 if grep -q $'\xe2\x80\x94' "$NOTES"; then die "$NOTES contains an em dash"; fi
 case "$(grep -v '^[[:space:]]*$' "$NOTES" | tail -n 1)" in
