@@ -119,7 +119,9 @@ struct MenuContent: View {
         .animation(Design.Motion.rows(arriving: updateStatus.isUpdateReady, reduceMotion: reduceMotion),
                    value: updateStatus.isUpdateReady)
         // A banner coming or going on its own; one swapping with another.
-        .animation(Design.Motion.rows(arriving: banner != nil, reduceMotion: reduceMotion),
+        // The paused banner never comes on its own: Pause swaps for Resume
+        // with it, so the rows close up over the Pause row first.
+        .animation(Design.Motion.rows(arriving: banner != nil && !controller.config.isPaused, reduceMotion: reduceMotion),
                    value: banner != nil)
         .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
                    value: banner)
@@ -187,8 +189,11 @@ struct MenuRow: View {
                     .frame(width: Design.Layout.iconColumn, alignment: .center)
                     .accessibilityHidden(true)
 
+                // A new label replaces the old one at once, as in a menu,
+                // rather than crossfading with it while the rows move.
                 Text(label)
                     .font(Design.Typography.row)
+                    .contentTransition(.identity)
 
                 Spacer(minLength: Design.Spacing.s)
 
@@ -691,8 +696,11 @@ private struct NextMeetingSection: View {
                             Text(countdown)
                                 .rollingNumbers(on: countdown, countsDown: true, reduceMotion: reduceMotion)
                         }
+                        // Swapped at once: crossfading while the rows move,
+                        // the old and new plan overlapped.
                         if let plan {
                             Text(plan)
+                                .contentTransition(.identity)
                         }
                     }
                     .font(Design.Typography.cardSubtitle)
