@@ -8,6 +8,23 @@ struct MenuContent: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(UpdateStatus.self) private var updateStatus
     @Environment(\.updater) private var updater
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The one abnormal state worth a banner, the most pressing first.
+    private enum Banner: Equatable {
+        case calendarAccess
+        case paused(until: Date)
+        case guardingOff
+        case notificationsOff
+    }
+
+    private var banner: Banner? {
+        if controller.calendarAccess == .denied { return .calendarAccess }
+        if controller.config.isPaused, let until = controller.config.pausedUntil { return .paused(until: until) }
+        if !controller.config.enabled { return .guardingOff }
+        if controller.notificationsEnabled == false { return .notificationsOff }
+        return nil
+    }
 
     var body: some View {
         Group {
@@ -16,55 +33,7 @@ struct MenuContent: View {
             if !controller.config.onboardingShown {
                 OnboardingView(initialStep: onboardingStep)
             } else {
-                VStack(spacing: 0) {
-                    // A failed eject, or else a stop or start that did not
-                    // take, first, as VibeRes puts its problems: it is about
-                    // something that just went wrong and still needs dealing
-                    // with.
-                    if let failure = controller.lastFailure ?? controller.backupFailure {
-                        ProblemRow(message: failure) { controller.dismissFailure() }
-                    }
-
-                    // Only when there is something staged. Sparkle installs on
-                    // quit by default, and a menu bar app can go weeks without
-                    // quitting, so this is the moment the update becomes real.
-                    // Near the top, as in VibeRes: it asks for a click.
-                    if updateStatus.isUpdateReady {
-                        UpdateReadyBanner { updater?.installUpdate() }
-                    }
-
-                    if controller.calendarAccess == .denied {
-                        CalendarAccessBanner()
-                    } else if let until = controller.config.pausedUntil, until > Date() {
-                        StateBanner(icon: "pause.circle.fill",
-                                    tint: .orange,
-                                    title: Loc.t("banner.pausedUntil", "Paused until %@", Format.clock(until)),
-                                    detail: Loc.t("banner.pausedDetail", "Nothing will be ejected until then."))
-                    } else if !controller.config.enabled {
-                        StateBanner(icon: "xmark.circle.fill",
-                                    tint: .orange,
-                                    title: Loc.t("banner.guardingOff", "Guarding is off"),
-                                    detail: Loc.t("banner.guardingOffDetail", "Turn it back on in Settings."))
-                    } else if controller.notificationsEnabled == false {
-                        StateBanner(icon: "bell.slash.fill",
-                                    tint: .orange,
-                                    title: Loc.t("banner.notificationsOff", "Notifications are off"),
-                                    detail: Loc.t("banner.notificationsOffDetail", "Disks will still be ejected, but silently."))
-                    }
-
-                    VStack(spacing: 0) {
-                        DisksSection()
-
-                        Divider()
-                            .padding(.horizontal, Design.Spacing.m)
-                            .padding(.vertical, Design.Spacing.m)
-
-                        NextMeetingSection()
-                    }
-                    .padding(.top, Design.Spacing.m)
-
-                    FooterBar()
-                }
+                popover
             }
         }
         .frame(width: Design.Layout.popoverWidth)
@@ -82,6 +51,92 @@ struct MenuContent: View {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+    }
+
+    private var popover: some View {
+        VStack(spacing: 0) {
+            // A failed eject, or else a stop or start that did not take,
+            // first, as VibeRes puts its problems: it is about something that
+            // just went wrong and still needs dealing with.
+            if let failure = controller.lastFailure ?? controller.backupFailure {
+                ProblemRow(message: failure) { controller.dismissFailure() }
+                    .transition(.row(reduceMotion: reduceMotion))
+            }
+
+            // Only when there is something staged. Sparkle installs on quit
+            // by default, and a menu bar app can go weeks without quitting, so
+            // this is the moment the update becomes real. Near the top, as in
+            // VibeRes: it asks for a click.
+            if updateStatus.isUpdateReady {
+                UpdateReadyBanner { updater?.installUpdate() }
+                    .transition(.row(reduceMotion: reduceMotion))
+            }
+
+            Group {
+                switch banner {
+                case .calendarAccess:
+                    CalendarAccessBanner()
+                case .paused(let until):
+                    StateBanner(icon: "pause.circle.fill",
+                                tint: .orange,
+                                title: Loc.t("banner.pausedUntil", "Paused until %@", Format.clock(until)),
+                                detail: Loc.t("banner.pausedDetail", "Nothing will be ejected until then."))
+                case .guardingOff:
+                    StateBanner(icon: "xmark.circle.fill",
+                                tint: .orange,
+                                title: Loc.t("banner.guardingOff", "Guarding is off"),
+                                detail: Loc.t("banner.guardingOffDetail", "Turn it back on in Settings."))
+                case .notificationsOff:
+                    StateBanner(icon: "bell.slash.fill",
+                                tint: .orange,
+                                title: Loc.t("banner.notificationsOff", "Notifications are off"),
+                                detail: Loc.t("banner.notificationsOffDetail", "Disks will still be ejected, but silently."))
+                case nil:
+                    EmptyView()
+                }
+            }
+            .transition(.row(reduceMotion: reduceMotion))
+
+            VStack(spacing: 0) {
+                DisksSection()
+
+                Divider()
+                    .padding(.horizontal, Design.Spacing.m)
+                    .padding(.vertical, Design.Spacing.m)
+
+                NextMeetingSection()
+            }
+            .padding(.top, Design.Spacing.m)
+
+            FooterBar()
+        }
+        // The rows around these make room before they fade in, and close up
+        // only after they have faded out. On values seen here rather than
+        // where they change, so it reaches every row of the popover.
+        .animation(Design.Motion.rows(arriving: (controller.lastFailure ?? controller.backupFailure) != nil,
+                                      reduceMotion: reduceMotion),
+                   value: controller.lastFailure ?? controller.backupFailure)
+        .animation(Design.Motion.rows(arriving: updateStatus.isUpdateReady, reduceMotion: reduceMotion),
+                   value: updateStatus.isUpdateReady)
+        // A banner coming or going on its own; one swapping with another.
+        // The paused banner never comes on its own: Pause swaps for Resume
+        // with it, so the rows close up over the Pause row first.
+        .animation(Design.Motion.rows(arriving: banner != nil && !controller.config.isPaused, reduceMotion: reduceMotion),
+                   value: banner != nil)
+        .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
+                   value: banner)
+        .animation(Design.Motion.rows(arriving: controller.config.watchedDiskIDs.isEmpty, reduceMotion: reduceMotion),
+                   value: controller.config.watchedDiskIDs.isEmpty)
+        // Today's meeting and the line saying there is none swap places.
+        .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
+                   value: controller.meetingIsToday)
+        .animation(Design.Motion.rows(arriving: controller.skippedMeeting != nil, reduceMotion: reduceMotion),
+                   value: controller.skippedMeeting?.eventIdentifier)
+        .animation(Design.Motion.rows(arriving: controller.offersStopBackup, reduceMotion: reduceMotion),
+                   value: controller.offersStopBackup)
+        // Pause and Resume swap places, with or without the paused banner.
+        .animation(Design.Motion.rows(arriving: false, reduceMotion: reduceMotion),
+                   value: controller.config.isPaused)
     }
 }
 
@@ -111,9 +166,17 @@ struct MenuRow: View {
     let label: String
     var shortcut: String?
     var isEnabled = true
+    /// The row is doing what it says ("Ejecting…", "Stopping backup…"): its
+    /// icon pulses until that is done. It takes no second click, so it keeps
+    /// the system's disabled look, but not the extra fade of a row with
+    /// nothing to do: on a faded icon the pulse was all but invisible in a
+    /// recording. The label says it too, so Reduce Motion stops the pulse and
+    /// loses nothing.
+    var isWorking = false
     let action: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var highlighted: Bool { isHovering && isEnabled }
 
@@ -122,11 +185,15 @@ struct MenuRow: View {
             HStack(spacing: Design.Spacing.m) {
                 Image(systemName: icon)
                     .font(.system(size: 12))
+                    .symbolEffect(.pulse, options: .repeating, isActive: isWorking && !reduceMotion)
                     .frame(width: Design.Layout.iconColumn, alignment: .center)
                     .accessibilityHidden(true)
 
+                // A new label replaces the old one at once, as in a menu,
+                // rather than crossfading with it while the rows move.
                 Text(label)
                     .font(Design.Typography.row)
+                    .contentTransition(.identity)
 
                 Spacer(minLength: Design.Spacing.s)
 
@@ -150,7 +217,7 @@ struct MenuRow: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.4)
+        .opacity(isEnabled || isWorking ? 1 : 0.4)
         .onHover { isHovering = $0 }
         .accessibilityLabel(label)
     }
@@ -285,6 +352,7 @@ private struct UpdateReadyBanner: View {
 
 private struct DisksSection: View {
     @Environment(GuardController.self) private var controller
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The rows' natural height, measured; past the cap they scroll.
     @State private var rowsHeight: CGFloat = 0
 
@@ -331,6 +399,7 @@ private struct DisksSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Design.Spacing.s)
                     .padding(.top, Design.Spacing.xs)
+                    .transition(.row(reduceMotion: reduceMotion))
             }
         }
         .padding(.horizontal, Design.Spacing.m)
@@ -347,6 +416,10 @@ private struct DiskCard: View {
     var detail: String?
 
     @State private var isHovering = false
+    /// Goes up each time the disk becomes guarded while on screen, for the
+    /// checkmark's one bounce.
+    @State private var guardings = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Only the first nine get one; past that the number stops being a shortcut
     /// and starts being a lookup.
@@ -473,7 +546,11 @@ private struct DiskCard: View {
                             }
                         }
                         .font(Design.Typography.cardSubtitle)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Design.Palette.cardSubtitle)
+                        // Time Machine's progress ticks up between polls.
+                        .rollingNumbers(on: backingUp ? controller.backup.percent : nil,
+                                        counting: backingUp && controller.backup.percent != nil,
+                                        reduceMotion: reduceMotion)
                     }
                 }
 
@@ -486,17 +563,31 @@ private struct DiskCard: View {
                         .accessibilityHidden(true)
                 }
 
+                // One symbol that changes, rather than two in an if/else, so
+                // the swap to the checkmark is the system's symbol replace
+                // instead of one image cut for another. It bounces once when
+                // the disk becomes guarded, as a VibeRes pill does when it
+                // turns active. Reduce Motion: the swap crossfades, no bounce.
                 Image(systemName: guarded ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 15))
                     .foregroundStyle(guarded ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
+                    .contentTransition(reduceMotion ? .opacity : .symbolEffect(.replace))
+                    .symbolEffect(.bounce, options: .nonRepeating, value: guardings)
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, Design.Spacing.l)
             .padding(.vertical, Design.Spacing.m)
             .background(RoundedRectangle(cornerRadius: Design.Radius.card).fill(fill))
             .contentShape(RoundedRectangle(cornerRadius: Design.Radius.card))
+            // The fill, the tints and the status line cross over to the new
+            // state together. Colour only, so Reduce Motion keeps it.
+            .animation(Design.Motion.quick, value: isHovering)
+            .animation(Design.Motion.quick, value: guarded)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle(scale: Design.Motion.cardPressScale))
+        .onChange(of: guarded) { _, nowGuarded in
+            if nowGuarded, !reduceMotion { guardings += 1 }
+        }
         .modifier(OptionalShortcut(key: shortcut))
         .onHover { isHovering = $0 }
         .accessibilityLabel("\(disk.name), \(subtitle)")
@@ -584,6 +675,7 @@ private struct OptionalShortcut: ViewModifier {
 
 private struct NextMeetingSection: View {
     @Environment(GuardController.self) private var controller
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Design.Spacing.xs) {
@@ -594,10 +686,26 @@ private struct NextMeetingSection: View {
                     Text(meeting.title ?? Loc.t("meeting.untitledEvent", "Untitled"))
                         .font(Design.Typography.cardTitle)
                         .lineLimit(1)
-                    Text(detail(for: meeting))
-                        .font(Design.Typography.cardSubtitle)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 0) {
+                        // "in 7 min" is worked out when it is drawn, and
+                        // nothing else here changes by the minute, so without
+                        // the timeline an open popover kept the minute it
+                        // opened on. The minutes count down rather than flick.
+                        TimelineView(.everyMinute) { _ in
+                            let countdown = countdown(for: meeting)
+                            Text(countdown)
+                                .rollingNumbers(on: countdown, countsDown: true, reduceMotion: reduceMotion)
+                        }
+                        // Swapped at once: crossfading while the rows move,
+                        // the old and new plan overlapped.
+                        if let plan {
+                            Text(plan)
+                                .contentTransition(.identity)
+                        }
+                    }
+                    .font(Design.Typography.cardSubtitle)
+                    .foregroundStyle(Design.Palette.cardSubtitle)
+                    .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Design.Spacing.l)
@@ -605,10 +713,12 @@ private struct NextMeetingSection: View {
                 .background(RoundedRectangle(cornerRadius: Design.Radius.card).fill(Design.Palette.cardFill))
                 .padding(.horizontal, Design.Spacing.m)
                 .padding(.bottom, Design.Spacing.xs)
+                .transition(.row(reduceMotion: reduceMotion))
 
                 MenuRow(icon: "forward.end", label: Loc.t("meeting.skip", "Skip this meeting")) {
                     controller.skipNextMeeting()
                 }
+                .transition(.row(reduceMotion: reduceMotion))
             } else {
                 Text(emptyText)
                     .font(Design.Typography.note)
@@ -616,6 +726,7 @@ private struct NextMeetingSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Design.Spacing.l)
                     .padding(.bottom, Design.Spacing.xs)
+                    .transition(.row(reduceMotion: reduceMotion))
             }
 
             // Skipping is one click and would otherwise be irreversible, so the
@@ -625,6 +736,7 @@ private struct NextMeetingSection: View {
                         label: Loc.t("meeting.undoSkip", "Undo skip: %@", skipped.title ?? Loc.t("meeting.lowercase", "meeting"))) {
                     controller.undoLastSkip()
                 }
+                .transition(.row(reduceMotion: reduceMotion))
             }
         }
     }
@@ -637,20 +749,23 @@ private struct NextMeetingSection: View {
         }
     }
 
-    private func detail(for meeting: EKEvent) -> String {
-        var parts = ["\(Format.relative(meeting.startDate)) · \(meeting.calendar.title)"]
+    /// "in 7 min · Work": the line that counts down.
+    private func countdown(for meeting: EKEvent) -> String {
+        "\(Format.relative(meeting.startDate)) · \(meeting.calendar.title)"
+    }
+
+    /// What the guard will do about the meeting, when there is anything to say.
+    private var plan: String? {
         if let ejectDate = controller.ejectDate {
             // With only a network destination guarded there is nothing to
             // eject, and saying so would promise the wrong thing.
-            parts.append(controller.guardedVolumes.isEmpty
+            return controller.guardedVolumes.isEmpty
                 ? Loc.t("meeting.stopsBackupAt", "Stops a running backup at %@", Format.clock(ejectDate))
-                : Loc.t("meeting.ejectsAt", "Ejects at %@", Format.clock(ejectDate)))
-        } else if controller.guardedVolumes.isEmpty {
-            parts.append(Loc.t("meeting.noGuardedDisk", "No guarded disk connected"))
-        } else if !controller.config.isActive {
-            parts.append(Loc.t("meeting.guardOff", "Guard is off"))
+                : Loc.t("meeting.ejectsAt", "Ejects at %@", Format.clock(ejectDate))
         }
-        return parts.joined(separator: "\n")
+        if controller.guardedVolumes.isEmpty { return Loc.t("meeting.noGuardedDisk", "No guarded disk connected") }
+        if !controller.config.isActive { return Loc.t("meeting.guardOff", "Guard is off") }
+        return nil
     }
 }
 
@@ -659,8 +774,9 @@ private struct NextMeetingSection: View {
 private struct FooterBar: View {
     @Environment(GuardController.self) private var controller
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var paused: Bool { (controller.config.pausedUntil ?? .distantPast) > Date() }
+    private var paused: Bool { controller.config.isPaused }
 
     private var pauseLabel: String {
         let hours = controller.config.pauseHours
@@ -712,34 +828,38 @@ private struct FooterBar: View {
                     icon: "eject",
                     label: ejectLabel,
                     shortcut: "⌘E",
-                    isEnabled: controller.canEjectNow
+                    isEnabled: controller.canEjectNow,
+                    isWorking: controller.isBusy
                 ) { controller.ejectNow() }
                     .keyboardShortcut("e")
                     .help(ejectHelp)
 
-                // Any backup, guarded or not: one slowing the Mac down is the
-                // user's to stop. Gone during an eject pass, whose own row
-                // says what it is doing to the backup.
-                if controller.isBackupRunning && !controller.isBusy {
+                if controller.offersStopBackup {
                     MenuRow(
                         icon: "stop.circle",
                         label: controller.isStoppingBackup
                             ? Loc.t("footer.stoppingBackup", "Stopping backup…")
                             : Loc.t("footer.stopBackup", "Stop backup"),
-                        isEnabled: controller.canStopBackup
+                        isEnabled: controller.canStopBackup,
+                        isWorking: controller.isStoppingBackup
                     ) { controller.stopBackup() }
                         .help(Loc.t("footer.stopBackupHelp", "Stops the backup to %@. Time Machine carries on at its next backup.",
                                     controller.backingUpNames.joined(separator: ", ")))
+                        .transition(.row(reduceMotion: reduceMotion))
                 }
 
+                // The two swap places as the paused banner comes and goes,
+                // so they fade around the rows moving, as the banner does.
                 if paused {
                     MenuRow(icon: "play.circle", label: Loc.t("footer.resume", "Resume guarding")) {
                         controller.resume()
                     }
+                    .transition(.row(reduceMotion: reduceMotion))
                 } else {
                     MenuRow(icon: "pause.circle", label: pauseLabel) {
                         controller.pause(for: controller.config.pauseHours * 3600)
                     }
+                    .transition(.row(reduceMotion: reduceMotion))
                 }
 
                 MenuRow(icon: "gearshape", label: Loc.t("footer.settings", "Settings…"), shortcut: "⌘,") {

@@ -128,6 +128,17 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(config.isActive, "an expired pause does not")
     }
 
+    func testIsPaused() {
+        var config = GuardConfig()
+        XCTAssertFalse(config.isPaused)
+
+        config.pausedUntil = Date().addingTimeInterval(600)
+        XCTAssertTrue(config.isPaused)
+
+        config.pausedUntil = Date().addingTimeInterval(-600)
+        XCTAssertFalse(config.isPaused, "a pause that has run out is over though still recorded")
+    }
+
     func testSkipListIsBoundedAndDeduplicated() {
         var config = GuardConfig()
         config.skip("event-1")

@@ -111,11 +111,10 @@ struct GuardConfig: Codable, Equatable {
     var ejectAttempts: Int = 6
     var ejectRetryDelay: Double = 15
 
-    var isActive: Bool {
-        guard enabled else { return false }
-        if let until = pausedUntil, until > Date() { return false }
-        return true
-    }
+    /// A pause is on now. Nothing clears `pausedUntil` once it has passed.
+    var isPaused: Bool { (pausedUntil ?? .distantPast) > Date() }
+
+    var isActive: Bool { enabled && !isPaused }
 
     init() {}
 

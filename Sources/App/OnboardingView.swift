@@ -6,7 +6,11 @@ import SwiftUI
 /// records it in the config; Settings can replay it.
 struct OnboardingView: View {
     @Environment(GuardController.self) private var controller
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step: Int
+    /// Which way the last move went, so a step comes in from the side it is
+    /// on: Next from the right, Back from the left.
+    @State private var forward = true
 
     /// `initialStep` exists for the preview harness, which renders each step.
     init(initialStep: Int = 0) {
@@ -51,37 +55,15 @@ struct OnboardingView: View {
             .padding(.horizontal, Design.Spacing.l)
             .padding(.top, Design.Spacing.l)
 
-            let current = steps[step]
-            VStack(spacing: 10) {
-                Group {
-                    if let symbol = current.symbol {
-                        Image(systemName: symbol)
-                            .font(.system(size: 36))
-                            .foregroundStyle(.tint)
-                    } else {
-                        // As Finder and the Dock draw it, glass included on
-                        // macOS 26. The icon art carries its own margin, so it
-                        // is drawn larger than the symbols to look the same size.
-                        Image(nsImage: NSApp.applicationIconImage)
-                            .resizable()
-                            .frame(width: 56, height: 56)
-                    }
-                }
-                .frame(height: 56)
-                .accessibilityHidden(true)
-                .padding(.top, Design.Spacing.s)
-                Text(current.title)
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                Text(current.body)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+            // The step leaving and the one arriving overlap: in the VStack
+            // they would stand one above the other for the length of the
+            // transition, and the popover would grow by a whole step.
+            ZStack {
+                stepContent(steps[step])
+                    // A new identity per step, so SwiftUI runs the transition.
+                    .id(step)
+                    .transition(stepTransition)
             }
-            // A new identity per step, so SwiftUI runs the transition.
-            .id(step)
-            .transition(.opacity.combined(with: .move(edge: .trailing)))
             .padding(.horizontal, 18)
             .padding(.top, Design.Spacing.m)
             .padding(.bottom, Design.Spacing.l)
@@ -97,9 +79,7 @@ struct OnboardingView: View {
             .padding(.bottom, Design.Spacing.m)
 
             HStack {
-                Button(Loc.t("onboarding.back", "Back")) {
-                    withAnimation(.easeInOut(duration: 0.18)) { step = max(0, step - 1) }
-                }
+                Button(Loc.t("onboarding.back", "Back")) { go(to: max(0, step - 1)) }
                 .controlSize(.small)
                 .buttonStyle(.bordered)
                 .disabled(step == 0)
@@ -110,7 +90,7 @@ struct OnboardingView: View {
                     if isLast {
                         finish()
                     } else {
-                        withAnimation(.easeInOut(duration: 0.18)) { step += 1 }
+                        go(to: step + 1)
                     }
                 }
                 .controlSize(.small)
@@ -119,6 +99,61 @@ struct OnboardingView: View {
             }
             .padding(.horizontal, Design.Spacing.l)
             .padding(.bottom, Design.Spacing.l)
+        }
+    }
+
+    private func stepContent(_ current: Step) -> some View {
+        VStack(spacing: 10) {
+            Group {
+                if let symbol = current.symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 36))
+                        .foregroundStyle(.tint)
+                } else {
+                    // As Finder and the Dock draw it, glass included on
+                    // macOS 26. The icon art carries its own margin, so it
+                    // is drawn larger than the symbols to look the same size.
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 56, height: 56)
+                }
+            }
+            .frame(height: 56)
+            .accessibilityHidden(true)
+            .padding(.top, Design.Spacing.s)
+            Text(current.title)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text(current.body)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The step slides a little towards where it goes, and fades. Reduce
+    /// Motion: only the fade.
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let slide = Design.Motion.stepSlide
+        return .asymmetric(
+            insertion: .offset(x: forward ? slide : -slide).combined(with: .opacity),
+            removal: .offset(x: forward ? -slide : slide).combined(with: .opacity))
+    }
+
+    private func go(to target: Int) {
+        guard target != step else { return }
+        let ahead = target > step
+        guard ahead != forward else {
+            withAnimation(Design.Motion.quick) { step = target }
+            return
+        }
+        // A step that leaves takes the transition it was last drawn with, so
+        // the new direction has to be drawn once before the step changes.
+        forward = ahead
+        DispatchQueue.main.async {
+            withAnimation(Design.Motion.quick) { step = target }
         }
     }
 
