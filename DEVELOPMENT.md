@@ -489,6 +489,37 @@ the bottom edge. The `MenuBarExtra` panel adds no inset of its own at the
 bottom, so the numbers in `DesignTokens` are the ones on screen. VibeRes uses
 the same values, and the two apps are meant to feel like one family.
 
+### Popover motion
+
+The popover moves the way VibeRes does, with its vocabulary (`Design.Motion`)
+and helpers (`PopoverMotion.swift`), and every movement has a job:
+
+- A disk card gives under the pointer, and its checkmark swaps in and bounces
+  once when the disk becomes guarded: the click was taken.
+- A row that comes and goes (a problem, a banner, Stop backup, Undo skip, the
+  hint, Pause and Resume, today's meeting and the line saying there is none)
+  fades in only after the rows around it have made room, and fades out before
+  they close up, so no text ever crosses another.
+- Time Machine's percentage and the minutes to the meeting roll their digits.
+  The countdown ticks with a `TimelineView`: before it, an open popover kept
+  the minute it was opened on.
+- The Ejecting… and Stopping backup… rows pulse their icon while it lasts.
+
+Under Reduce Motion the rows jump and fade, the checkmark crossfades without
+the bounce, the digits crossfade, a press dims instead of shrinking, and
+nothing pulses. The welcome tour fades between steps instead of sliding.
+
+Text whose digits roll is drawn without the material's vibrancy while it rolls,
+so `.secondary` turns near black for most of a second, every two seconds while
+a backup runs. Rolling lines use `Design.Palette.cardSubtitle`, the plain label
+colour, which looks the same at rest. Rolling words only scramble them, so the
+status line rolls only while it shows a percentage.
+
+`preview.sh` and the README animation render end states only: ImageRenderer
+does not animate. The motion was checked by screen recording the popover views
+on demo state in a plain window, frame by frame, in both appearances and with
+Reduce Motion, and the disk card in the real popover.
+
 ## The rename
 
 Until 1.3 the app was TM Eject Guard. Everything a person sees is now Eject

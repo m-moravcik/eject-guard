@@ -30,7 +30,7 @@ swiftc -O -swift-version 6 -D PREVIEW -target arm64-apple-macos14.0 \
     Sources/Core/*.swift Sources/Icon/*.swift Sources/App/DesignTokens.swift \
     Sources/App/GuardController.swift Sources/App/MenuContent.swift \
     Sources/App/SettingsView.swift Sources/App/UpdaterProtocol.swift \
-    Sources/App/LoginItem.swift Sources/App/OnboardingView.swift \
+    Sources/App/LoginItem.swift Sources/App/OnboardingView.swift Sources/App/PopoverMotion.swift \
     Sources/App/StatusIcon.swift Sources/Preview/main.swift Sources/Preview/Motion.swift \
     -o "$OUT/preview"
 

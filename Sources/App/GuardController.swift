@@ -206,6 +206,11 @@ final class GuardController {
 
     var isStoppingBackup: Bool { backupRequest?.kind == .stop }
 
+    /// The footer has a "Stop backup" row: any backup, guarded or not, since
+    /// one slowing the Mac down is the user's to stop. Gone during an eject
+    /// pass, whose own row says what it is doing to the backup.
+    var offersStopBackup: Bool { isBackupRunning && !isBusy }
+
     /// "Back up now" is offered for `disk`: a destination Time Machine can
     /// reach right now, guarded or not.
     func offersBackUpNow(_ disk: KnownDisk) -> Bool {
