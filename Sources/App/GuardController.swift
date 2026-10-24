@@ -455,11 +455,12 @@ final class GuardController {
                 if self.guardedVolumes.isEmpty && self.guardedNetworkBackups.isEmpty {
                     self.lastFailure = nil
                 }
-                if self.failedBackupRequest?.lostDestination(
-                    self.config.knownDisks, attached: self.attached,
-                    reportedDestinationIDs: self.reportedDestinationIDs) == true {
-                    self.failedBackupRequest = nil
+                let lost = { (request: BackupRequest?) in
+                    request?.lostDestination(self.config.knownDisks, attached: self.attached,
+                                             reportedDestinationIDs: self.reportedDestinationIDs) == true
                 }
+                if lost(self.backupRequest) { self.backupRequest = nil }
+                if lost(self.failedBackupRequest) { self.failedBackupRequest = nil }
                 for done in landed { done() }
                 if self.rescanWhenIdle {
                     self.rescanWhenIdle = false
