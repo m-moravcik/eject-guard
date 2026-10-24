@@ -8,6 +8,7 @@
 # Developer ID signature and throw away the stapled notarization ticket.
 set -euo pipefail
 cd "$(dirname "$0")"
+source ./trash.sh
 
 APP_NAME="Eject Guard"
 # The name before 1.3. Same bundle identifier, so it is the same app and must
@@ -28,7 +29,7 @@ fi
 LEGACY="com.local.tm-eject-guard"
 launchctl bootout "gui/$UID/$LEGACY" 2>/dev/null || true
 if [ -f "$HOME/Library/LaunchAgents/$LEGACY.plist" ]; then
-    mv "$HOME/Library/LaunchAgents/$LEGACY.plist" "$HOME/.Trash/"
+    trash "$HOME/Library/LaunchAgents/$LEGACY.plist"
     echo "removed legacy LaunchAgent"
 fi
 
@@ -47,9 +48,14 @@ for name in "$APP_NAME" "$LEGACY_APP"; do
 done
 
 mkdir -p "$DEST"
-rm -rf "$DEST/$APP_NAME.app"
+# The version being replaced goes to the Trash like everything else here, so
+# an install that turns out worse can be undone by putting it back.
+if [ -e "$DEST/$APP_NAME.app" ]; then
+    trash "$DEST/$APP_NAME.app"
+    echo "moved the previous install to the Trash"
+fi
 for old in "/Applications/$LEGACY_APP.app" "$HOME/Applications/$LEGACY_APP.app" "$HOME/bin/tm-eject-guard" "$HOME/bin/eject-guard"; do
-    [ -e "$old" ] && mv "$old" "$HOME/.Trash/" && echo "moved to Trash: $old"
+    [ -e "$old" ] && trash "$old" && echo "moved to Trash: $old"
 done
 # ditto, not cp -R: the bundle embeds Sparkle.framework, which is a tree of
 # symlinks into Versions plus four separately signed helpers. ditto is the
