@@ -53,7 +53,9 @@ It works in English, Slovak, Czech and German, and updates itself.
 1. Download `Eject-Guard-<version>.zip` from the
    [latest release](https://github.com/m-moravcik/eject-guard/releases/latest).
 2. Unzip it and move **Eject Guard** to Applications.
-3. Open it and allow Calendar access.
+3. Open it and allow Calendar access. If you guard an encrypted Time Machine
+   disk, also turn on Eject Guard in System Settings > Privacy & Security >
+   Full Disk Access.
 4. Click the menu bar icon and tick the disks to guard.
 
 Turn on **Launch at login** in Settings so it survives a restart. The app is
@@ -112,7 +114,9 @@ encrypted disk is locked again whenever it is unmounted. If macOS remembers its
 password in your login keychain, the app unlocks it with that password, after
 you allow it once when macOS asks. Otherwise, for a Time Machine disk, it asks
 Time Machine to start a backup to bring it back. If the disk stays locked, you
-get a notification to plug it in again.
+get a notification to plug it in again. macOS unlocks an encrypted Time Machine
+disk only for an app with Full Disk Access; without it the notification says
+so, and clicking it opens that setting.
 
 ## Command line
 

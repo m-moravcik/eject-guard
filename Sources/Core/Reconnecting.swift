@@ -20,6 +20,10 @@
 //   the user ticked "Remember this password": a generic password, service and
 //   account both the volume UUID, stored with a trailing NUL. Read through
 //   the Security framework, that unlocks it with one keychain approval.
+// - That measurement ran from a terminal with Full Disk Access. The app
+//   without it, 2026-10-27: the keychain read worked and diskutil was refused
+//   the Time Machine volume with -69464, while Sync on the same disk unlocked.
+//   See `unlockWasRefused`.
 
 import Foundation
 import Security
@@ -58,7 +62,17 @@ enum Reconnector {
         case remounted(backupStarted: Bool)
         case alreadyMounted(backupStarted: Bool)
         case unplugged
-        case failed(locked: Bool)
+        case failed(Failure)
+    }
+
+    /// Why a disk that is still attached stayed down.
+    enum Failure: Equatable {
+        case notMounted
+        /// Encrypted and still locked: no passphrase in the keychain, or one
+        /// diskutil did not take.
+        case locked
+        /// macOS refused this app the unlock. See `unlockWasRefused`.
+        case needsFullDiskAccess
     }
 
     /// Read a `diskutil info -plist <volume UUID>` answer. Nil means diskutil
@@ -121,8 +135,9 @@ enum Reconnector {
 
         // A locked encrypted volume stays down after a mount. The user's
         // keychain holds its passphrase if macOS was told to remember it.
+        var unlockRefused = false
         if case .unmounted(_, locked: true) = currentState(of: pending.volumeUUID) {
-            unlockFromKeychain(pending)
+            unlockRefused = unlockFromKeychain(pending)
         }
 
         if currentState(of: pending.volumeUUID) == .mounted {
@@ -149,8 +164,11 @@ enum Reconnector {
         if after == .gone { return .unplugged }
         let locked: Bool
         if case .unmounted(_, let isLocked) = after { locked = isLocked } else { locked = false }
-        Log.write("RECONNECT FAILED \(pending.name): still not mounted\(locked ? ", volume locked" : "")")
-        return .failed(locked: locked)
+        let failure: Failure = !locked ? .notMounted : unlockRefused ? .needsFullDiskAccess : .locked
+        Log.write("RECONNECT FAILED \(pending.name): still not mounted"
+            + (locked ? ", volume locked" : "")
+            + (failure == .needsFullDiskAccess ? ", unlocking needs Full Disk Access for Eject Guard" : ""))
+        return .failed(failure)
     }
 
     private static func currentState(of volumeUUID: String) -> VolumeState {
@@ -173,16 +191,27 @@ enum Reconnector {
     /// Unlock and mount an encrypted APFS volume with the passphrase macOS
     /// saved in the login keychain. The passphrase goes to diskutil on stdin
     /// and is never logged. The first read asks the user to allow it.
-    private static func unlockFromKeychain(_ pending: PendingReconnect) {
+    /// True when macOS refused the unlock to this app.
+    private static func unlockFromKeychain(_ pending: PendingReconnect) -> Bool {
         guard var passphrase = keychainPassphrase(volumeUUID: pending.volumeUUID) else {
             Log.write("unlock \(pending.name): no passphrase in the keychain")
-            return
+            return false
         }
         defer { passphrase.resetBytes(in: 0..<passphrase.count) }
         let result = Shell.run("/usr/sbin/diskutil",
                                ["apfs", "unlockVolume", pending.volumeUUID, "-stdinpassphrase"],
                                timeout: 60, input: passphrase)
         Log.write("unlock \(pending.name) -> status \(result.status)\(result.output.isEmpty ? "" : ": \(result.output)")")
+        return result.status != 0 && unlockWasRefused(result.output)
+    }
+
+    /// DiskManagement's "restricted by Sandbox" (-69464). Measured on a real
+    /// encrypted disk, 2026-10-27: storagekitd checks the app that started
+    /// diskutil before unlocking a Time Machine backup volume, and refuses it
+    /// without Full Disk Access. A plain volume on the same disk unlocks
+    /// without the check. Matched on the code, which no translation touches.
+    static func unlockWasRefused(_ output: String) -> Bool {
+        output.contains("(-69464)")
     }
 
     /// The "Encrypted Volume Password" item macOS keeps for a volume, without

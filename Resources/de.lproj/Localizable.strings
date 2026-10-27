@@ -83,6 +83,8 @@
 "notify.doNotUnplug" = "%@ Nicht abziehen.";
 "notify.ejected" = "%@ ausgeworfen";
 "notify.heldBy" = "Belegt von %@.";
+"notify.needsFullDiskAccess" = "Zum Entsperren braucht Eject Guard „Festplattenvollzugriff“. Schalte ihn ein, zieh dann das Laufwerk ab und schließe es erneut an.";
+"notify.openSettings" = "Einstellungen öffnen";
 "notify.reason.manual" = "Auf Anforderung ausgeworfen";
 "notify.reason.meeting" = "%1$@ in %2$d Min.";
 "notify.reason.menu" = "Über das Menü ausgeworfen";

@@ -83,6 +83,8 @@
 "notify.doNotUnplug" = "%@ Do not unplug it.";
 "notify.ejected" = "%@ ejected";
 "notify.heldBy" = "Held by %@.";
+"notify.needsFullDiskAccess" = "Unlocking it needs Full Disk Access for Eject Guard. Turn it on, then unplug the disk and plug it back in.";
+"notify.openSettings" = "Open Settings";
 "notify.reason.manual" = "Ejected on request";
 "notify.reason.meeting" = "%1$@ in %2$d min";
 "notify.reason.menu" = "Ejected from the menu";

@@ -66,7 +66,12 @@ rather than at the next hourly run.
   point back is trusted. The guard reads the volume's "Encrypted Volume
   Password" item from the login keychain (service and account both the volume
   UUID; the first read needs the user's approval) and passes it to `diskutil
-  apfs unlockVolume -stdinpassphrase`. If the volume is still down and it is a
+  apfs unlockVolume -stdinpassphrase`. For a Time Machine backup volume,
+  storagekitd first checks the app that started diskutil and refuses it
+  without Full Disk Access: -69464, "restricted by Sandbox" (measured
+  2026-10-27; Sync on the same disk unlocked without the check). That
+  failure gets its own notification, which opens the Full Disk Access pane
+  when clicked. If the volume is still down and it is a
   Time Machine disk, the guard asks Time Machine to start a backup to it
   (`tmutil startbackup --destination`) and waits up to 90 s for the volume to
   appear; this was not seen to unlock a disk. Failing that, the user is told to
@@ -378,7 +383,7 @@ this project has been so far:
 | Forgetting a disk | Takes its tick, hidden mark and waiting reconnect with it; offered only while unplugged and not for a destination Time Machine still reports, which the next scan would bring back. |
 | Network destinations | Never an eject target, never folded into a plugged-in disk by name, and an entry an older release stripped of its flag is still the same destination. |
 | `Disks.connection` | Only interfaces we recognise are named. |
-| Reconnecting | A volume diskutil no longer knows was unplugged; an empty mount point is attached but down. Nothing is mounted while a meeting runs or is about to start, back-to-back meetings chain, a day-old entry is dropped, and only a UUID reaches diskutil. |
+| Reconnecting | A volume diskutil no longer knows was unplugged; an empty mount point is attached but down. Nothing is mounted while a meeting runs or is about to start, back-to-back meetings chain, a day-old entry is dropped, and only a UUID reaches diskutil. An unlock macOS refused for want of Full Disk Access is told apart, and its notification opens that setting. |
 | `LiftIcon` | Every state and animation frame is a template image on the fixed canvas, or the menu bar cannot tint it. Its size is anchored on `externaldrive`: an icon smaller than its neighbours was the complaint before it. Idle and armed have to differ at 1x, not only at 2x. |
 | `MenuBarIconAnimator` | Plays only on a disk actually ejected or mounted again, runs no timer at rest, restarts on a burst instead of stacking timers, and respects Reduce Motion. |
 
