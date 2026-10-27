@@ -83,6 +83,8 @@
 "notify.doNotUnplug" = "%@ Neodpájaj ho.";
 "notify.ejected" = "%@ vysunutý";
 "notify.heldBy" = "Drží ho %@.";
+"notify.needsFullDiskAccess" = "Na odomknutie potrebuje Eject Guard „Plný prístup k disku“. Zapni ho, potom disk odpoj a znova zapoj.";
+"notify.openSettings" = "Otvoriť nastavenia";
 "notify.reason.manual" = "Vysunuté na požiadanie";
 "notify.reason.meeting" = "%1$@ o %2$d min";
 "notify.reason.menu" = "Vysunuté z menu";

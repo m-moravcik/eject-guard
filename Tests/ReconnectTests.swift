@@ -142,6 +142,38 @@ final class ReconnectTests: XCTestCase {
         XCTAssertNil(Reconnector.stripTrailingNULs(Data()))
     }
 
+    // MARK: - Unlock refused
+
+    func testAnUnlockMacOSRefusedIsToldApartFromOneThatWorked() {
+        // Verbatim from 2026-10-27: the passphrase came from the keychain, and
+        // storagekitd refused to unlock the Time Machine volume because Eject
+        // Guard had no Full Disk Access. Sync, on the same disk, unlocked.
+        let refused = "Error unlocking APFS Volume: This operation is restricted by Sandbox; "
+            + "check your settings in System Settings > Privacy & Security > Files and Folders (-69464) "
+            + "Unlocking any cryptographic user on APFS Volume disk5s2"
+        let unlocked = "Unlocking any cryptographic user on APFS Volume disk5s3 Unlocked and mounted APFS Volume"
+        XCTAssertTrue(Reconnector.unlockWasRefused(refused))
+        XCTAssertFalse(Reconnector.unlockWasRefused(unlocked))
+        XCTAssertFalse(Reconnector.unlockWasRefused(""))
+    }
+
+    func testARefusedUnlockOpensFullDiskAccessFromTheNotification() {
+        var posted: [(title: String, body: String, action: Notify.Action?)] = []
+        Notify.setHandler { posted.append(($0, $1, $2)) }
+
+        GuardRunner.announceReconnectFailure("Time Machine WD", .needsFullDiskAccess)
+        GuardRunner.announceReconnectFailure("Time Machine WD", .locked)
+
+        XCTAssertEqual(posted.count, 2)
+        XCTAssertEqual(posted[0].title, "Could not reconnect Time Machine WD")
+        XCTAssertTrue(posted[0].body.contains("Full Disk Access"), posted[0].body)
+        XCTAssertEqual(posted[0].action, .openFullDiskAccess)
+        // Replugging is the answer for a disk without that excuse, and there
+        // is nothing to open.
+        XCTAssertEqual(posted[1].body, "Unplug it and plug it back in.")
+        XCTAssertNil(posted[1].action)
+    }
+
     // MARK: - Volumes sharing a drive
 
     private func volume(_ name: String) -> AttachedVolume {

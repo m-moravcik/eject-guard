@@ -249,13 +249,27 @@ enum GuardRunner {
                                 : Loc.t("notify.reconnectedDetail", "It stayed plugged in through the meeting."))
             case .alreadyMounted, .unplugged:
                 break
-            case .failed:
+            case .failed(let failure):
                 outcome.failed.append(entry.name)
-                Notify.post(title: Loc.t("notify.couldNotReconnect", "Could not reconnect %@", entry.name),
-                            body: Loc.t("notify.replug", "Unplug it and plug it back in."))
+                announceReconnectFailure(entry.name, failure)
             }
         }
         return outcome
+    }
+
+    /// Replugging unlocks the disk from the keychain. When macOS refused the
+    /// unlock to this app, it has to be allowed first, or the next meeting
+    /// leaves the disk down again.
+    static func announceReconnectFailure(_ name: String, _ failure: Reconnector.Failure) {
+        let title = Loc.t("notify.couldNotReconnect", "Could not reconnect %@", name)
+        if failure == .needsFullDiskAccess {
+            Notify.post(title: title,
+                        body: Loc.t("notify.needsFullDiskAccess",
+                                    "Unlocking it needs Full Disk Access for Eject Guard. Turn it on, then unplug the disk and plug it back in."),
+                        action: .openFullDiskAccess)
+        } else {
+            Notify.post(title: title, body: Loc.t("notify.replug", "Unplug it and plug it back in."))
+        }
     }
 
     // MARK: - Notification wording

@@ -115,22 +115,28 @@ enum Shell {
 /// back to AppleScript. Under the hardened runtime the AppleScript route is not
 /// dependable, and the app has a bundle identity that can do it properly.
 enum Notify {
+    /// What clicking the notification opens. The AppleScript notification
+    /// has no buttons and drops it.
+    enum Action: String, Sendable {
+        case openFullDiskAccess
+    }
+
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var handler: (String, String) -> Void = { title, body in
+    nonisolated(unsafe) private static var handler: (String, String, Action?) -> Void = { title, body, _ in
         Shell.notifyViaAppleScript(title: title, body: body)
     }
 
     /// Set once at startup, before anything can eject. Behind a lock because
     /// the writer is the app launching and the readers are the work queue.
-    static func setHandler(_ newHandler: @escaping (String, String) -> Void) {
+    static func setHandler(_ newHandler: @escaping (String, String, Action?) -> Void) {
         lock.lock(); defer { lock.unlock() }
         handler = newHandler
     }
 
-    static func post(title: String, body: String) {
+    static func post(title: String, body: String, action: Action? = nil) {
         lock.lock()
         let current = handler
         lock.unlock()
-        current(title, body)
+        current(title, body, action)
     }
 }
