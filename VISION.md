@@ -37,7 +37,7 @@ Meetings come from whatever calendars macOS Calendar already syncs, Microsoft 36
 The app never signs in to a calendar service itself, and its only network traffic is the update check.
 The log names meetings, so it and the config are readable by the user alone, and public screenshots are rendered from invented data.
 Every child process has a timeout, and the logic that decides is kept pure and tested, because that is where the real bugs here have lived.
-It is a small native menu bar app that looks and moves like its sibling VibeRes and a native macOS menu, in English, Slovak, Czech and German.
+It is a small native menu bar app that looks and moves like its sibling VibeRes and a native macOS menu, in English, Slovak, Czech, German, Spanish and French.
 
 ## Scope
 

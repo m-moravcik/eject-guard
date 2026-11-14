@@ -11,7 +11,7 @@ import XCTest
 /// and the format specifiers match - a "%@" translated as "%d" does not show
 /// wrong text, it reads whatever is at that address.
 final class LocalizationTests: XCTestCase {
-    private static let languages = ["en", "sk", "cs", "de"]
+    private static let languages = ["en", "sk", "cs", "de", "es", "fr"]
 
     /// The repository, found from this file rather than from a bundle: these
     /// are source files, and SwiftPM does not copy them into the test bundle.
@@ -178,6 +178,20 @@ final class LocalizationTests: XCTestCase {
     /// Slovak and Czech have a separate form for 2-4, which English and German
     /// do not. Getting this wrong reads as broken grammar to every native
     /// speaker, so it is asserted rather than left to review.
+    /// Spanish and French use "many" for large round numbers ("1 000 000 de
+    /// minutes"), and CLDR lists it for both. A plural without it falls back
+    /// to "other", which is right today, but a missing category is how a
+    /// wrong form slips in later, so every one is required.
+    func testSpanishAndFrenchDefineEveryCLDRCategory() {
+        for language in ["es", "fr"] {
+            for (key, cases) in pluralForms(for: language) {
+                for category in ["one", "many", "other"] {
+                    XCTAssertNotNil(cases[category], "\(language): \(key) has no '\(category)' form")
+                }
+            }
+        }
+    }
+
     func testSlavicLanguagesDefineTheFewForm() {
         for language in ["sk", "cs"] {
             for (key, cases) in pluralForms(for: language) {
