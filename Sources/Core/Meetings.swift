@@ -77,6 +77,14 @@ enum Meetings {
             .min { $0.startDate < $1.startDate }
     }
 
+    /// The next meeting still ahead today: what Skip this meeting and
+    /// `eject-guard --skip-next` skip.
+    static func nextMeetingToday(_ store: EKEventStore, config: GuardConfig) -> EKEvent? {
+        let calendar = Calendar.current
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date()))!
+        return nextMeeting(store, within: endOfDay.timeIntervalSinceNow / 60, config: config)
+    }
+
     /// When the meetings running now or starting within the lead time are
     /// over, or nil when there are none. A disk is not mounted again in the
     /// gap between back-to-back meetings, when the user may be walking off.

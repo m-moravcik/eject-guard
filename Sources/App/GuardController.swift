@@ -238,26 +238,19 @@ final class GuardController {
     /// Called both by the popover while it is open and, since the menu bar icon
     /// shows backup progress, by `backupTimer`. That timer only runs while a
     /// Time Machine destination is reachable, which is the only time the
-    /// answer can be anything but "no". `then` runs once this read has
-    /// landed; a caller that passes it always gets a read of its own.
-    func refreshBackupStatus(then done: (@MainActor () -> Void)? = nil) {
+    /// answer can be anything but "no".
+    func refreshBackupStatus() {
         #if PREVIEW
         // Demo state is what the harness renders; a real tmutil read must
         // never overwrite it, and the harness reads nothing from this Mac.
-        if PreviewDemo.isActive {
-            done?()
-            return
-        }
+        if PreviewDemo.isActive { return }
         #endif
-        guard done != nil || !isBackupRefreshQueued else { return }
+        guard !isBackupRefreshQueued else { return }
         isBackupRefreshQueued = true
         work.async { [weak self] in
             let status = BackupStatus.current()
             Task { @MainActor in
-                guard let self else {
-                    done?()
-                    return
-                }
+                guard let self else { return }
                 self.isBackupRefreshQueued = false
                 self.backup = status
                 self.settleBackupRequest()
@@ -265,7 +258,6 @@ final class GuardController {
                 // answer, so every answer re-evaluates them. The call is cheap:
                 // it rebuilds a timer only when the interval actually changed.
                 self.updateBackupWatch()
-                done?()
             }
         }
     }
@@ -782,13 +774,27 @@ final class GuardController {
 
     /// Stops whatever Time Machine is writing, guarded or not. Not
     /// remembered: nothing starts it again after a meeting, and Time Machine
-    /// carries on at its next backup. `taken` hears whether Time Machine
-    /// took the request; the caller checks `canStopBackup` first.
-    func stopBackup(taken: (@MainActor (Bool) -> Void)? = nil) {
+    /// carries on at its next backup.
+    func stopBackup() {
         guard canStopBackup else { return }
         let request = BackupRequest(kind: .stop, name: backingUpNames.joined(separator: ", "),
                                     deadline: Date().addingTimeInterval(BackupControl.stopBudget))
-        send(request, taken: taken) { BackupControl.stop() }
+        send(request) { BackupControl.stop() }
+    }
+
+    /// Stop backup, asked from the command line: what the CLI does on its own,
+    /// on the work queue, and the caller hears the reply. The caller checks
+    /// `isBusy` and `isReconnecting` first.
+    func stopBackupFromCommandLine(completion: @escaping @MainActor (Control.Response) -> Void) {
+        let attached = self.attached
+        let known = config.knownDisks
+        work.async { [weak self] in
+            let response = Reports.stopBackup(attached: attached, known: known)
+            Task { @MainActor in
+                self?.refreshBackupStatus()
+                completion(response)
+            }
+        }
     }
 
     /// Starts a backup to `disk` now, guarded or not.
@@ -804,15 +810,13 @@ final class GuardController {
     /// process runs. Whether it took is read off the status polls that follow
     /// rather than waited out there: a stop to a share takes most of a
     /// minute, and an eject pass may need the queue in the meantime.
-    private func send(_ request: BackupRequest, taken done: (@MainActor (Bool) -> Void)? = nil,
-                      _ ask: @escaping @Sendable () -> Bool) {
+    private func send(_ request: BackupRequest, _ ask: @escaping @Sendable () -> Bool) {
         backupRequest = request
         failedBackupRequest = nil
         updateBackupWatch()
         work.async { [weak self] in
             let taken = ask()
             Task { @MainActor in
-                defer { done?(taken) }
                 guard let self, self.backupRequest == request else { return }
                 if taken {
                     self.refreshBackupStatus()

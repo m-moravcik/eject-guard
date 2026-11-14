@@ -389,9 +389,7 @@ case "skip-next":
     if let answer = askApp(Control.Request(command: .skipNext)) { finish(answer) }
     let store = EKEventStore()
     guard Meetings.requestAccess(store) else { finish(Reports.calendarAccessDenied) }
-    // Today only, as the popover's Skip this meeting.
-    let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))!
-    guard let meeting = Meetings.nextMeeting(store, within: endOfDay.timeIntervalSinceNow / 60, config: config),
+    guard let meeting = Meetings.nextMeetingToday(store, config: config),
           let id = meeting.eventIdentifier
     else { finish(Reports.nothingToSkip) }
     ConfigStore.mutate { $0.skip(id) }
@@ -399,8 +397,7 @@ case "skip-next":
 
 case "stop-backup":
     if let answer = askApp(Control.Request(command: .stopBackup)) { finish(answer) }
-    guard BackupStatus.current().running else { finish(Reports.noBackupRunning) }
-    finish(BackupControl.stop() ? Reports.stopRequested("its destination") : Reports.stopNotTaken)
+    finish(Reports.stopBackup(attached: snapshot.attached, known: config.knownDisks))
 
 default:
     if json {

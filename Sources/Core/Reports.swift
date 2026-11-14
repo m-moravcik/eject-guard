@@ -41,11 +41,15 @@ enum Reports {
 
     static let noBackupRunning = Control.Response.ok("Time Machine is not backing up - nothing to stop")
 
-    static let stopAlreadyRequested = Control.Response.ok(
-        "already asked Time Machine to stop; a backup to a share can take two minutes to end")
-
-    static func stopRequested(_ names: String) -> Control.Response {
-        .ok("asked Time Machine to stop the backup to \(names); a backup to a share can take two minutes to end")
+    /// `eject-guard --stop-backup`, in the app or in the CLI: a fresh read,
+    /// then the stop. Spawns `tmutil`, so never call it on the main thread.
+    static func stopBackup(attached: [AttachedVolume], known: [KnownDisk]) -> Control.Response {
+        let status = BackupStatus.current()
+        guard status.running else { return noBackupRunning }
+        guard BackupControl.stop() else { return stopNotTaken }
+        let names = status.destinationNames(attached: attached, known: known)
+        let target = names.isEmpty ? "its destination" : names.joined(separator: ", ")
+        return .ok("asked Time Machine to stop the backup to \(target); a backup to a share can take two minutes to end")
     }
 
     static let stopNotTaken = Control.Response.failure("Time Machine did not take the request to stop - see the log")

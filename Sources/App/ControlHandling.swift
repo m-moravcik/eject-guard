@@ -63,48 +63,25 @@ extension GuardController {
             reply(Reports.resumed)
 
         case .skipNext:
-            guard calendarAccess != .denied else {
+            guard calendarAccess == .granted else {
                 reply(Reports.calendarAccessDenied)
                 return
             }
-            reschedule()
-            // Today only, as the popover's Skip this meeting.
-            guard let meeting = nextMeeting, Calendar.current.isDateInToday(meeting.startDate) else {
+            reloadConfig()
+            guard let meeting = Meetings.nextMeetingToday(store, config: config),
+                  let id = meeting.eventIdentifier else {
                 reply(Reports.nothingToSkip)
                 return
             }
-            skipNextMeeting()
+            update { $0.skip(id) }
             reply(Reports.skipped(title: meeting.title, start: meeting.startDate))
 
         case .stopBackup:
-            if isBackupRunning {
-                answerStopBackup(reply)
-            } else {
-                refreshBackupStatus { [weak self] in
-                    guard let self else {
-                        reply(.failure("Eject Guard is quitting"))
-                        return
-                    }
-                    self.answerStopBackup(reply)
-                }
+            guard !isBusy, !isReconnecting else {
+                reply(Reports.busy)
+                return
             }
+            stopBackupFromCommandLine { reply($0) }
         }
-    }
-
-    private func answerStopBackup(_ reply: @escaping @Sendable (Control.Response) -> Void) {
-        guard isBackupRunning else {
-            reply(Reports.noBackupRunning)
-            return
-        }
-        guard !isStoppingBackup else {
-            reply(Reports.stopAlreadyRequested)
-            return
-        }
-        guard canStopBackup else {
-            reply(Reports.busy)
-            return
-        }
-        let names = backingUpNames.joined(separator: ", ")
-        stopBackup { taken in reply(taken ? Reports.stopRequested(names) : Reports.stopNotTaken) }
     }
 }
