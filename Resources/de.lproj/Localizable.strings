@@ -24,6 +24,15 @@
 "banner.updateReadyHelp" = "Installiert das geladene Update und startet Eject Guard neu.";
 "calendar.accessDetail" = "Ohne ihn sieht die Überwachung deine Besprechungen nicht.";
 "calendar.accessNeeded" = "Kalenderzugriff erforderlich";
+"cli.failed" = "Der Link konnte nicht angelegt werden: %@";
+"cli.footer" = "Richte eigene Auslöser ein, etwa eject-guard --eject-now am Ende des Arbeitstags. eject-guard --help zeigt den Rest.";
+"cli.install" = "Installieren…";
+"cli.linked" = "eject-guard ist unter %@ installiert.";
+"cli.moveFirst" = "Bewege Eject Guard zuerst in den Ordner „Programme“.";
+"cli.notInstalled" = "Nicht installiert. Installieren… legt einen Link in /usr/local/bin an und fragt nach deinem Passwort.";
+"cli.occupied" = "%@ gibt es schon und ist kein Link auf Eject Guard, daher bleibt es unangetastet.";
+"cli.relink" = "%@ zeigt auf eine andere Kopie von Eject Guard. Installieren… richtet ihn auf diese aus.";
+"cli.title" = "Befehlszeile";
 "disk.backUpNow" = "Backup jetzt erstellen";
 "disk.backingUp" = "Sicherung läuft…";
 "disk.backingUpPercent" = "Sicherung läuft… %@";
@@ -51,12 +60,12 @@
 "failure.backupNotStarted" = "%@: Das Backup konnte nicht gestartet werden";
 "failure.backupNotStopped" = "%@: Das Backup konnte nicht gestoppt werden";
 "failure.heldBy" = "%1$@: belegt von %2$@";
+"footer.about" = "Über Eject Guard";
 "footer.ejectHelp" = "Wirft %@ aus. Nicht angehakte Laufwerke bleiben unberührt.";
 "footer.ejectHelpNone" = "Es ist kein überwachtes Laufwerk verbunden.";
 "footer.ejectNow" = "Jetzt auswerfen";
 "footer.ejectOne" = "%@ auswerfen";
 "footer.ejecting" = "Wird ausgeworfen…";
-"footer.about" = "Über Eject Guard";
 "footer.quit" = "Beenden";
 "footer.resume" = "Überwachung fortsetzen";
 "footer.settings" = "Einstellungen…";
@@ -125,6 +134,7 @@
 "settings.replayTour" = "Einführung erneut zeigen";
 "settings.restoreHidden" = "Ausgeblendete Laufwerke wiederherstellen (%d)";
 "settings.tab.about" = "Über";
+"settings.tab.advanced" = "Erweitert";
 "settings.tab.calendars" = "Kalender";
 "settings.tab.general" = "Allgemein";
 "settings.tab.meetings" = "Besprechungen";

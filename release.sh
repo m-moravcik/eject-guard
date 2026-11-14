@@ -38,7 +38,7 @@ source ./sparkle.sh
 
 APP_NAME="Eject Guard"
 APP="build/$APP_NAME.app"
-CLI="build/eject-guard"
+CLI="$APP/Contents/Helpers/eject-guard"
 # Named for the release asset; spaces in a download URL are a nuisance.
 ZIP=""  # set once the version is known
 ENTITLEMENTS="App/EjectGuard.entitlements"
@@ -89,12 +89,17 @@ while IFS= read -r nested; do
 done < <(sparkle_nested_targets "$APP")
 
 # --options runtime enables the hardened runtime, which notarization requires.
-for target in "$CLI" "$APP"; do
-    codesign --force --options runtime --timestamp \
-        --entitlements "$ENTITLEMENTS" \
-        --sign "$SIGN_IDENTITY" "$target"
-    echo "signed: $target"
-done
+# The CLI before the app that seals it, and with the same calendar entitlement:
+# it reads the calendar itself when the app is not running. Its identifier is
+# set explicitly, or codesign would derive one from the file name.
+codesign --force --options runtime --timestamp \
+    --entitlements "$ENTITLEMENTS" --identifier sk.moravcik.tmejectguard.cli \
+    --sign "$SIGN_IDENTITY" "$CLI"
+echo "signed: $CLI"
+codesign --force --options runtime --timestamp \
+    --entitlements "$ENTITLEMENTS" \
+    --sign "$SIGN_IDENTITY" "$APP"
+echo "signed: $APP"
 
 step "Verify signature"
 codesign --verify --deep --strict --verbose=2 "$APP"
@@ -127,7 +132,13 @@ while IFS= read -r target; do
         unsigned=$((unsigned + 1))
     fi
 done < <(sparkle_nested_targets "$APP")
+if [ "$(team_of "$CLI")" != "$TEAM" ]; then
+    echo "  not signed by $TEAM: $CLI" >&2
+    unsigned=$((unsigned + 1))
+fi
 [ "$unsigned" -eq 0 ] || die "$unsigned nested target(s) are not signed by us"
+# The CLI reports the version it shipped with; a stale helper would not.
+[ "$("$CLI" --version)" = "$(tr -d ' \n' < VERSION)" ] || die "the bundled CLI does not report version $(tr -d ' \n' < VERSION)"
 echo "all nested targets carry team identifier $TEAM"
 
 if [ -n "${SKIP_NOTARIZE:-}" ]; then

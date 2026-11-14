@@ -229,7 +229,7 @@ enum ConfigStore {
     static func save(_ config: GuardConfig) {
         lock.lock(); defer { lock.unlock() }
         migrateOnce()
-        writeUnlocked(config)
+        acrossProcesses { writeUnlocked(config) }
     }
 
     /// Read-modify-write as one atomic step. Use this instead of load/save
@@ -238,12 +238,37 @@ enum ConfigStore {
     static func mutate<T>(_ body: (inout GuardConfig) -> T) -> T {
         lock.lock(); defer { lock.unlock() }
         migrateOnce()
-        let original = readUnlocked()
-        var config = original
-        let result = body(&config)
-        // Rewriting an unchanged file would mean a disk write on every pass.
-        if config != original { writeUnlocked(config) }
-        return result
+        return acrossProcesses {
+            let original = readUnlocked()
+            var config = original
+            let result = body(&config)
+            // Rewriting an unchanged file would mean a disk write on every pass.
+            if config != original { writeUnlocked(config) }
+            return result
+        }
+    }
+
+    static let lockURL = directory.appendingPathComponent("config.lock")
+
+    /// The app and the command line tool both write this file. `lock` only
+    /// serialises threads of one process, so a read-modify-write also holds an
+    /// advisory lock on a file next to it; without that, a change the other
+    /// process wrote between our read and our write would be lost.
+    ///
+    /// Runs after `migrateOnce`: creating the folder first would make the
+    /// migration think a newer config already exists.
+    private static func acrossProcesses<T>(_ body: () -> T) -> T {
+        try? FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        let fd = open(lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        // Without the lock file the in-process lock still holds, which is
+        // what every version before this one relied on.
+        guard fd >= 0 else { return body() }
+        defer { close(fd) }
+        while flock(fd, LOCK_EX) != 0 && errno == EINTR {}
+        defer { flock(fd, LOCK_UN) }
+        return body()
     }
 
     private static func readUnlocked() -> GuardConfig {

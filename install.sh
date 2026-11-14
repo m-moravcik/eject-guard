@@ -67,12 +67,16 @@ ditto "build/$APP_NAME.app" "$DEST/$APP_NAME.app"
 
 # ~/.local/bin is the conventional per-user bin dir that most shell setups
 # already put on PATH; the summary below says how to add it when it is missing.
+# A link to the tool inside the installed app, not a copy, so it is always the
+# app's own version. A link is replaced quietly; a file (a copy from an older
+# install.sh) goes to the Trash like everything else here.
 mkdir -p "$HOME/.local/bin"
-if [ -e "$HOME/.local/bin/eject-guard" ]; then
-    trash "$HOME/.local/bin/eject-guard"
+LINK="$HOME/.local/bin/eject-guard"
+if [ -e "$LINK" ] && [ ! -L "$LINK" ]; then
+    trash "$LINK"
     echo "moved the previous cli to the Trash"
 fi
-cp "build/eject-guard" "$HOME/.local/bin/eject-guard"
+ln -sfn "$DEST/$APP_NAME.app/Contents/Helpers/eject-guard" "$LINK"
 
 open "$DEST/$APP_NAME.app"
 sleep 2
@@ -82,7 +86,7 @@ pgrep -f "$APP_NAME.app/Contents/MacOS/" >/dev/null \
 echo
 echo "installed:"
 echo "  $DEST/$APP_NAME.app   (menu bar)"
-echo "  $HOME/.local/bin/eject-guard  (cli)"
+echo "  $LINK -> the app's Contents/Helpers/eject-guard  (cli)"
 case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
     *) echo "  add ~/.local/bin to your PATH: export PATH=\"\$HOME/.local/bin:\$PATH\" in ~/.zshrc" ;;

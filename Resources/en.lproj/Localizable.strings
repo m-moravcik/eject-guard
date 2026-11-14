@@ -24,6 +24,15 @@
 "banner.updateReadyHelp" = "Installs the downloaded update and relaunches Eject Guard.";
 "calendar.accessDetail" = "Without it the guard cannot see your meetings.";
 "calendar.accessNeeded" = "Calendar access needed";
+"cli.failed" = "The link could not be created: %@";
+"cli.footer" = "Wire up your own triggers, such as eject-guard --eject-now at the end of the workday. eject-guard --help lists the rest.";
+"cli.install" = "Install…";
+"cli.linked" = "eject-guard is installed at %@.";
+"cli.moveFirst" = "Move Eject Guard to the Applications folder first.";
+"cli.notInstalled" = "Not installed. Install… puts a link to it in /usr/local/bin and asks for your password.";
+"cli.occupied" = "%@ already exists and is not a link to Eject Guard, so it is left alone.";
+"cli.relink" = "%@ points to another copy of Eject Guard. Install… points it to this one.";
+"cli.title" = "Command line";
 "disk.backUpNow" = "Back up now";
 "disk.backingUp" = "Backing up…";
 "disk.backingUpPercent" = "Backing up… %@";
@@ -51,12 +60,12 @@
 "failure.backupNotStarted" = "%@: the backup could not be started";
 "failure.backupNotStopped" = "%@: the backup could not be stopped";
 "failure.heldBy" = "%1$@: held by %2$@";
+"footer.about" = "About Eject Guard";
 "footer.ejectHelp" = "Ejects %@. Disks you have not ticked are left alone.";
 "footer.ejectHelpNone" = "No guarded disk is connected.";
 "footer.ejectNow" = "Eject now";
 "footer.ejectOne" = "Eject %@";
 "footer.ejecting" = "Ejecting…";
-"footer.about" = "About Eject Guard";
 "footer.quit" = "Quit";
 "footer.resume" = "Resume guarding";
 "footer.settings" = "Settings…";
@@ -125,6 +134,7 @@
 "settings.replayTour" = "Replay welcome tour";
 "settings.restoreHidden" = "Restore hidden disks (%d)";
 "settings.tab.about" = "About";
+"settings.tab.advanced" = "Advanced";
 "settings.tab.calendars" = "Calendars";
 "settings.tab.general" = "General";
 "settings.tab.meetings" = "Meetings";

@@ -515,12 +515,6 @@ enum Disks {
         return rounded.formatted(.byteCount(style: .file).locale(locale))
     }
 
-    /// Scan and merge in one step. Fine for the command line tool, which is
-    /// single threaded; the app scans and merges separately.
-    static func refreshKnownDisks(in config: inout GuardConfig) {
-        merge(scan(), into: &config)
-    }
-
     /// The attached volume backing a remembered disk, if it is plugged in.
     /// Never one for a network destination: that is what keeps a share out of
     /// every eject.

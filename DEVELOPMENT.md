@@ -83,7 +83,7 @@ rather than at the next hourly run.
   then finds nothing to eject. They only run with a guarded target to act on:
   eject on sleep needs a mounted guarded disk or any guarded network
   destination, ⌘E a mounted guarded disk; `eject-guard --eject-now` always
-  runs. So with only a waiting disk
+  runs, whether the app runs it or the CLI on its own. So with only a waiting disk
   and no guarded network destination nothing runs and the entry stays, and a
   disk still attached after the meeting is mounted again. That is intended:
   a waiting disk was never ejected, so its device cannot have outlived one,
@@ -151,6 +151,55 @@ shows the progress.
   returned 0 and `tmutil status` read `Running = 1`, `BackupPhase = Starting`
   within half a second. `tmutil stopbackup` by hand had ended the backup
   within 3 s.
+
+## The command line tool
+
+`eject-guard` ships inside the bundle at `Contents/Helpers/eject-guard`, so it
+is always the app's version and every update replaces both. `--version` reads
+the version build.sh stamps into the Info.plist linked into the binary, and
+release.sh refuses a helper that reports another one. It is signed before the
+app, with its own identifier and the same calendar entitlement: without the
+app it reads the calendar itself. Helpers and not MacOS, because on a
+case-insensitive volume a lowercase tool beside the app's executable is one
+rename from a clash.
+
+**One actor at a time.** The CLI and the app used to be two writers of one
+config file and two schedulers of one disk: `--eject-now` ran its own pass
+next to the app's, and `--pause` showed in the popover only once something
+else made the app reread its settings. Now, while the app runs, every command
+that acts goes to it over a Unix socket (`Control.swift`), runs through the
+same methods the popover calls, and the CLI prints the app's answer. When
+nothing listens, the CLI acts on its own as before. A real `--run` is refused
+while the app runs, since the app already runs those passes; `--dry-run`
+unmounts nothing, so it runs either way. Settings changes from the CLI write
+the file and then ask the app to reread it.
+
+The socket is `control.sock` in the support folder. The folder is 0700, the
+socket 0600, and the server also checks the peer's user id with
+`getpeereid`. One JSON request per connection, capped at 64 KB, with a version
+field so a CLI and an app of different versions refuse each other, and
+timeouts on both ends: 15 s for most commands, 3 minutes for stop-backup,
+which waits for Time Machine to take the request, and 10 minutes for an eject,
+which may first wait two minutes for Time Machine to stop a backup to a share. A
+crashed app leaves the file behind; a connect that is refused reads as "not
+running", and the next launch replaces it, but never a socket another live
+process still answers on.
+
+The config is written by two processes, so `ConfigStore.mutate` also holds an
+advisory `flock` on `config.lock` next to it. The in-process lock only ever
+serialised threads of one process.
+
+**Getting it on the PATH.** Settings > Advanced shows whether a link to this
+app's helper exists in `/opt/homebrew/bin`, `/usr/local/bin` or
+`~/.local/bin`, and otherwise offers Install…: one administrator prompt that
+links it into `/usr/local/bin`, which is on the default PATH. A link to
+another copy of the app, or one that leads nowhere, is replaced; anything else
+at that name is left alone and named. A copy run from a disk image, Downloads
+or App Translocation is asked to move to Applications first, since a link to
+it would break. `CommandLineLink.decide` is the pure, tested decision;
+osascript only runs the prompt, with both paths passed as arguments through
+`quoted form of`. `install.sh` links `~/.local/bin/eject-guard` to the
+installed helper instead.
 
 ## How a disk is connected
 
@@ -345,7 +394,7 @@ fetched as "latest".
 Sources/Core/     the engine: no UI, compiled into both binaries and the tests
 Sources/Icon/     the menu bar icon and its animator, compiled into the app and the tests
 Sources/App/      the SwiftUI menu bar app
-Sources/CLI/      the command line tool
+Sources/CLI/      the command line tool, shipped at Contents/Helpers/eject-guard
 Sources/Preview/  renders the popover to PNG so the layout can be reviewed
 Resources/        en, sk, cs and de translations, copied into the bundle
 Tests/            unit tests over Sources/Core and Sources/Icon
@@ -394,8 +443,9 @@ triangle, a thin bar for armed, playing on an eject that ejected nothing, and
 ignoring Reduce Motion were each caught.
 
 CI runs the tests, builds the app and CLI, and enforces two rules that are
-easier to state than to remember: no shell is ever invoked, and `waitUntilExit`
-is banned.
+easier to state than to remember: no shell is ever invoked (the one exception,
+the administrator prompt that links the CLI, is under "Getting it on the
+PATH"), and `waitUntilExit` is banned.
 
 ## Safety notes
 
@@ -439,8 +489,8 @@ is banned.
 ## Build
 
 ```sh
-./build.sh      # build/Eject Guard.app and build/eject-guard, ad-hoc signed
-./install.sh    # build, install to /Applications and ~/.local/bin, launch
+./build.sh      # build/Eject Guard.app with the CLI in Contents/Helpers, ad-hoc signed
+./install.sh    # build, install to /Applications, link the CLI into ~/.local/bin, launch
 ./uninstall.sh  # stop and remove, keeping config and log
 ```
 
