@@ -56,7 +56,7 @@ for strings in Resources/*.lproj; do
 done
 
 # Stamp the real version rather than leaving 1.0 in the plist forever: the
-# About tab is the only place you can check what is actually installed, and
+# About tab and `eject-guard --version` are where you check what is installed, and
 # Sparkle compares CFBundleVersion to decide whether an update is newer.
 VERSION="$(tr -d ' \n' < VERSION)"
 # Not BUILD: that already names the output directory further up.
