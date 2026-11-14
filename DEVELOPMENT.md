@@ -443,8 +443,9 @@ triangle, a thin bar for armed, playing on an eject that ejected nothing, and
 ignoring Reduce Motion were each caught.
 
 CI runs the tests, builds the app and CLI, and enforces two rules that are
-easier to state than to remember: no shell is ever invoked, and `waitUntilExit`
-is banned.
+easier to state than to remember: no shell is ever invoked (the one exception,
+the administrator prompt that links the CLI, is under "Getting it on the
+PATH"), and `waitUntilExit` is banned.
 
 ## Safety notes
 
