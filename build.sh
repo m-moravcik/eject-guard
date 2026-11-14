@@ -18,7 +18,10 @@
 # rather than incidental: a development build downloading and running a binary
 # from the internet is remote code execution with extra steps.
 set -euo pipefail
-cd "$(dirname "$0")"
+# -P: the compiler records sources by their real path, and the metadata
+# processor below matches the absolute paths built from $PWD against them, so
+# a checkout reached through a symlink (/tmp is one) would match nothing.
+cd -P "$(dirname "$0")"
 source ./sparkle.sh
 
 APP_NAME="Eject Guard"
