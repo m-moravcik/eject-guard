@@ -8,7 +8,7 @@
 "about.description" = "Wirft externe Laufwerke einige Minuten vor Besprechungsbeginn aus, damit eine laufende Festplatte nie im eingebundenen Zustand abgezogen wird.";
 "about.developmentBuild" = "Entwicklungsversion";
 "about.openLog" = "Protokoll öffnen";
-"about.showConfig" = "Konfiguration anzeigen";
+"about.showConfig" = "Konfiguration";
 "about.sourceCode" = "Quellcode";
 "about.updatesUnavailable" = "Diese Version kann sich nicht selbst aktualisieren.";
 "about.version" = "Version %@";
