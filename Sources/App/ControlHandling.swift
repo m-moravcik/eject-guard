@@ -63,6 +63,10 @@ extension GuardController {
             reply(Reports.resumed)
 
         case .skipNext:
+            guard calendarAccess != .denied else {
+                reply(Reports.calendarAccessDenied)
+                return
+            }
             // Today only, as the popover's Skip this meeting.
             guard let meeting = nextMeeting, Calendar.current.isDateInToday(meeting.startDate) else {
                 reply(Reports.nothingToSkip)
@@ -72,13 +76,20 @@ extension GuardController {
             reply(Reports.skipped(title: meeting.title, start: meeting.startDate))
 
         case .stopBackup:
-            guard canStopBackup else {
+            guard isBackupRunning else {
                 reply(Reports.noBackupRunning)
                 return
             }
+            guard !isStoppingBackup else {
+                reply(Reports.stopAlreadyRequested)
+                return
+            }
+            guard canStopBackup else {
+                reply(Reports.busy)
+                return
+            }
             let names = backingUpNames.joined(separator: ", ")
-            stopBackup()
-            reply(Reports.stopRequested(names))
+            stopBackup { taken in reply(taken ? Reports.stopRequested(names) : Reports.stopNotTaken) }
         }
     }
 }

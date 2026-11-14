@@ -67,8 +67,9 @@ enum GuardRunner {
     /// the app's timer. Spawns processes, so never call it on the main thread.
     @discardableResult
     static func tick(store: EKEventStore, dryRun: Bool = false) -> Outcome {
+        let snapshot = Disks.scan()
         let config = ConfigStore.mutate { config -> GuardConfig in
-            Disks.refreshKnownDisks(in: &config)
+            Disks.merge(snapshot, into: &config)
             return config
         }
 

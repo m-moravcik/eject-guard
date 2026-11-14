@@ -121,11 +121,6 @@ func printDisks() {
     }
 }
 
-func printBackupStops(_ outcome: GuardRunner.Outcome) {
-    for name in outcome.stoppedBackups { print("stopped backup: \(name)") }
-    for name in outcome.unstoppedBackups { print("FAILED: the backup to \(name) is still running") }
-}
-
 var arguments = Array(CommandLine.arguments.dropFirst())
 var action = "status"
 var pendingValue: String?
@@ -356,23 +351,23 @@ case "run", "dry-run":
     }
     let dryRun = action == "dry-run"
     let outcome = GuardRunner.tick(store: store, dryRun: dryRun)
+    var lines: [String] = []
+    var errors: [String] = []
     if let meeting = outcome.meeting {
         let minutes = Int(meeting.startDate.timeIntervalSinceNow / 60)
-        print("meeting: \"\(meeting.title ?? "?")\" in \(minutes) min")
+        lines.append("meeting: \"\(meeting.title ?? "?")\" in \(minutes) min")
     } else {
-        print("no qualifying meeting within \(Int(config.leadMinutes)) min - nothing to do")
+        lines.append("no qualifying meeting within \(Int(config.leadMinutes)) min - nothing to do")
     }
     if !outcome.unmounted.isEmpty {
-        print("\(dryRun ? "would unmount" : "unmounted") until the meeting ends: \(outcome.unmounted.joined(separator: ", "))")
+        lines.append("\(dryRun ? "would unmount" : "unmounted") until the meeting ends: \(outcome.unmounted.joined(separator: ", "))")
     }
-    for name in outcome.ejected { print("\(dryRun ? "would eject" : "ejected") (no volume UUID to find it again): \(name)") }
-    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
-    for name in outcome.reconnect.reconnected { print("\(dryRun ? "would reconnect" : "reconnected"): \(name)") }
-    for name in outcome.reconnect.failed { print("FAILED to reconnect: \(name) - unplug it and plug it back in") }
-    printBackupStops(outcome)
-    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty || !outcome.reconnect.failed.isEmpty {
-        exit(1)
-    }
+    for name in outcome.ejected { lines.append("\(dryRun ? "would eject" : "ejected") (no volume UUID to find it again): \(name)") }
+    for failure in outcome.failed { errors.append("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
+    for name in outcome.reconnect.reconnected { lines.append("\(dryRun ? "would reconnect" : "reconnected"): \(name)") }
+    for name in outcome.reconnect.failed { errors.append("FAILED to reconnect: \(name) - unplug it and plug it back in") }
+    Reports.appendBackupStops(outcome, lines: &lines, errors: &errors)
+    finish(Control.Response(exitCode: errors.isEmpty ? 0 : 1, lines: lines, errors: errors))
 
 case "eject-now":
     if let answer = askApp(Control.Request(command: .ejectNow)) { finish(answer) }
@@ -393,10 +388,7 @@ case "resume":
 case "skip-next":
     if let answer = askApp(Control.Request(command: .skipNext)) { finish(answer) }
     let store = EKEventStore()
-    guard Meetings.requestAccess(store) else {
-        FileHandle.standardError.write("calendar access denied\n".data(using: .utf8)!)
-        exit(3)
-    }
+    guard Meetings.requestAccess(store) else { finish(Reports.calendarAccessDenied) }
     // Today only, as the popover's Skip this meeting.
     let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))!
     guard let meeting = Meetings.nextMeeting(store, within: endOfDay.timeIntervalSinceNow / 60, config: config),

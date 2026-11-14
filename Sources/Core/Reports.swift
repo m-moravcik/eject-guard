@@ -41,11 +41,17 @@ enum Reports {
 
     static let noBackupRunning = Control.Response.ok("Time Machine is not backing up - nothing to stop")
 
+    static let stopAlreadyRequested = Control.Response.ok(
+        "already asked Time Machine to stop; a backup to a share can take two minutes to end")
+
     static func stopRequested(_ names: String) -> Control.Response {
         .ok("asked Time Machine to stop the backup to \(names); a backup to a share can take two minutes to end")
     }
 
     static let stopNotTaken = Control.Response.failure("Time Machine did not take the request to stop - see the log")
+
+    static let calendarAccessDenied = Control.Response(
+        exitCode: 3, lines: [], errors: ["calendar access denied"])
 
     static let busy = Control.Response.failure("a pass is already running - try again in a moment")
 

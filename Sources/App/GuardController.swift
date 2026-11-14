@@ -774,12 +774,13 @@ final class GuardController {
 
     /// Stops whatever Time Machine is writing, guarded or not. Not
     /// remembered: nothing starts it again after a meeting, and Time Machine
-    /// carries on at its next backup.
-    func stopBackup() {
+    /// carries on at its next backup. `taken` hears whether Time Machine
+    /// took the request; the caller checks `canStopBackup` first.
+    func stopBackup(taken: (@MainActor (Bool) -> Void)? = nil) {
         guard canStopBackup else { return }
         let request = BackupRequest(kind: .stop, name: backingUpNames.joined(separator: ", "),
                                     deadline: Date().addingTimeInterval(BackupControl.stopBudget))
-        send(request) { BackupControl.stop() }
+        send(request, taken: taken) { BackupControl.stop() }
     }
 
     /// Starts a backup to `disk` now, guarded or not.
@@ -795,13 +796,15 @@ final class GuardController {
     /// process runs. Whether it took is read off the status polls that follow
     /// rather than waited out there: a stop to a share takes most of a
     /// minute, and an eject pass may need the queue in the meantime.
-    private func send(_ request: BackupRequest, _ ask: @escaping @Sendable () -> Bool) {
+    private func send(_ request: BackupRequest, taken done: (@MainActor (Bool) -> Void)? = nil,
+                      _ ask: @escaping @Sendable () -> Bool) {
         backupRequest = request
         failedBackupRequest = nil
         updateBackupWatch()
         work.async { [weak self] in
             let taken = ask()
             Task { @MainActor in
+                defer { done?(taken) }
                 guard let self, self.backupRequest == request else { return }
                 if taken {
                     self.refreshBackupStatus()
