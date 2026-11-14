@@ -24,7 +24,9 @@ final class LocalizationTests: XCTestCase {
     private func keysUsedInSource() throws -> Set<String> {
         let sources = Self.root.appendingPathComponent("Sources")
         var keys: Set<String> = []
-        let pattern = try NSRegularExpression(pattern: #"Loc\.t\(\s*"([^"]+)""#)
+        // Loc.t for the interface, LocalizedStringResource for the Shortcuts
+        // actions, which App Intents resolves against the same tables.
+        let pattern = try NSRegularExpression(pattern: #"(?:Loc\.t|LocalizedStringResource)\(\s*"([^"]+)""#)
 
         let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
         while let url = files?.nextObject() as? URL {

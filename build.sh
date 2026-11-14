@@ -36,11 +36,44 @@ CLI="$APP/Contents/Helpers/eject-guard"
 ditto "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
 
 echo "building app..."
-swiftc -O -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
+APP_SOURCES=(Sources/Core/*.swift Sources/Icon/*.swift Sources/App/*.swift)
+INTENTS="$BUILD/intents"
+mkdir -p "$INTENTS"
+# Shortcuts finds the app's actions in Metadata.appintents, which Xcode writes
+# with appintentsmetadataprocessor from the compiler's const values. Without an
+# Xcode project, the same two steps run here: the compiler records the values
+# of every type conforming to the App Intents protocols below, and the
+# processor turns them into the metadata. Without it the actions compile and
+# never appear.
+printf '%s' '["AppIntent","AppEntity","TransientEntity","AppEnum","EntityQuery","AppShortcutsProvider","AppShortcutProviding","DynamicOptionsProvider","AppIntentsPackage","AnyResolverProviding","_IntentValueRepresentable"]' \
+    > "$INTENTS/protocols.json"
+swiftc -O -wmo -warnings-as-errors -swift-version 6 -target arm64-apple-macos14.0 \
+    -module-name EjectGuard \
     -F "$SPARKLE_ROOT" -framework Sparkle \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
-    Sources/Core/*.swift Sources/Icon/*.swift Sources/App/*.swift \
+    -emit-const-values -emit-const-values-path "$INTENTS/EjectGuard.swiftconstvalues" \
+    -Xfrontend -const-gather-protocols-file -Xfrontend "$INTENTS/protocols.json" \
+    "${APP_SOURCES[@]}" \
     -o "$APP/Contents/MacOS/EjectGuard"
+
+printf "$PWD/%s\n" "${APP_SOURCES[@]}" > "$INTENTS/sources.txt"
+echo "$PWD/$INTENTS/EjectGuard.swiftconstvalues" > "$INTENTS/constvalues.txt"
+xcrun appintentsmetadataprocessor \
+    --output "$APP/Contents/Resources" \
+    --toolchain-dir "$(dirname "$(dirname "$(xcrun --find swiftc)")")" \
+    --module-name EjectGuard \
+    --sdk-root "$(xcrun --show-sdk-path --sdk macosx)" \
+    --xcode-version "$(xcodebuild -version | awk '/Build version/ { print $3 }')" \
+    --platform-family macOS --deployment-target 14.0 --target-triple arm64-apple-macos14.0 \
+    --source-file-list "$INTENTS/sources.txt" \
+    --swift-const-vals-list "$INTENTS/constvalues.txt" \
+    --binary-file "$APP/Contents/MacOS/EjectGuard" \
+    --quiet-warnings > "$INTENTS/processor.log" 2>&1 \
+    || { cat "$INTENTS/processor.log" >&2; exit 1; }
+# A processor that ran but found nothing would ship an app with no actions.
+grep -q '"EjectNowIntent"' "$APP/Contents/Resources/Metadata.appintents/extract.actionsdata" \
+    || { echo "Metadata.appintents lists no actions" >&2; exit 1; }
+rm -rf "$INTENTS"
 
 cp App/Info.plist "$APP/Contents/Info.plist"
 # Compiled by make-icon.sh and checked in, so a build does not depend on which

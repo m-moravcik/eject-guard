@@ -10,6 +10,10 @@
 import Foundation
 
 extension GuardController {
+    /// The app's one controller, for Shortcuts actions, which App Intents
+    /// creates on its own with no way to hand them one. Set by AppMain.
+    static var shared: GuardController?
+
     /// Starts listening. A failure is logged, never fatal: without the socket
     /// the CLI still works, it just acts on its own.
     func startControlServer() -> ControlServer? {

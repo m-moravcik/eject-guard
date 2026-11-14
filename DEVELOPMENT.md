@@ -201,6 +201,27 @@ osascript only runs the prompt, with both paths passed as arguments through
 `quoted form of`. `install.sh` links `~/.local/bin/eject-guard` to the
 installed helper instead.
 
+## Shortcuts actions
+
+`Sources/App/Intents.swift` holds five App Intents and an
+`AppShortcutsProvider`. Each action builds a `Control.Request` and runs it
+through `GuardController.handle`, the same path a CLI request takes, so the
+popover shows the change and only one pass runs. A response with a non-zero
+exit code is thrown, which makes Shortcuts stop the shortcut and show the
+reason; success returns the CLI's line as the action's output. The app owns no
+trigger: VISION.md leaves those to the user.
+
+Shortcuts does not read the binary. It reads `Contents/Resources/Metadata.appintents`,
+which Xcode writes with `appintentsmetadataprocessor` from the compiler's
+const values. build.sh does the same two steps without a project: the app is
+compiled whole-module with `-emit-const-values` and a list of the App Intents
+protocols, then the processor turns those values into the metadata, and the
+build fails if the result lists no actions. Titles and descriptions are
+`LocalizedStringResource(key, defaultValue:)`, resolved against the same
+`Localizable.strings` as the interface, and LocalizationTests reads those keys
+too. Values the processor reads must be compile-time literals: `1440`, not
+`24 * 60`.
+
 ## How a disk is connected
 
 The popover names the interface DiskArbitration reports
