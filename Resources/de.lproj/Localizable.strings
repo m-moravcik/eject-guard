@@ -163,8 +163,8 @@
 "settings.watchAllCalendars" = "Alle Kalender beobachten";
 "settings.whatCountsFooter" = "Teilnehmer unterscheiden eine echte Besprechung von Blöcken wie Focus oder Homeoffice, ohne auf Titel zu raten.";
 "settings.withAttendees" = "Ereignisse mit weiteren Teilnehmern";
-"status.backingUp" = "Sicherung von %@ läuft";
-"status.backingUpPercent" = "Sicherung von %1$@ - %2$@";
+"status.backingUp" = "Backup auf %@ läuft";
+"status.backingUpPercent" = "Backup auf %1$@ - %2$@";
 "status.ejecting" = "Wird ausgeworfen";
 "status.guarding" = "Überwacht %@";
 "status.idle" = "Kein überwachtes Laufwerk verbunden";

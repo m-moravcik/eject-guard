@@ -163,8 +163,8 @@
 "settings.watchAllCalendars" = "Sledovat všechny kalendáře";
 "settings.whatCountsFooter" = "Účastníci jsou to, co odliší skutečnou schůzku od bloků jako Focus či Home-office, bez hádání podle názvu.";
 "settings.withAttendees" = "Události s dalšími účastníky";
-"status.backingUp" = "Zálohuje se %@";
-"status.backingUpPercent" = "Zálohuje se %1$@ - %2$@";
+"status.backingUp" = "Zálohuje se na %@";
+"status.backingUpPercent" = "Zálohuje se na %1$@ - %2$@";
 "status.ejecting" = "Vysouvá se";
 "status.guarding" = "Hlídá %@";
 "status.idle" = "Není připojený hlídaný disk";
