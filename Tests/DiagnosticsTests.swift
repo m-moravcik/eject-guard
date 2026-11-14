@@ -62,6 +62,35 @@ final class DiagnosticsTests: XCTestCase {
                        "2026-11-12 10:00:00  forgot \"[disk]\" - not guarded and unplugged for 30 days")
     }
 
+    /// macOS allows a double quote in a volume name; such a name must still go
+    /// whole, not be split at its quotes.
+    func testAKnownDiskNameWithAQuoteInItIsReplacedWhole() {
+        let name = "Bob's \"Work\" SSD"
+        XCTAssertEqual(
+            Diagnostics.redact("2026-11-13 15:02:00  reconnected Bob's \"Work\" SSD",
+                               diskNames: [name], labels: [name: "disk 3"], home: home),
+            "2026-11-13 15:02:00  reconnected disk 3")
+    }
+
+    func testAForgottenDiskNameWithAQuoteInItIsReplacedWhole() {
+        let facts = Diagnostics.Facts(
+            appVersion: "1.7", build: "200", developerIDSigned: true,
+            bundlePath: "/Applications/Eject Guard.app", macOS: "Version 27.0", model: "Mac16,1",
+            calendarAccess: "granted", notifications: "on", controlSocket: true,
+            commandLine: "not installed", config: GuardConfig(), attached: [],
+            logLines: [
+                "2026-11-13 14:25:09  ejected Bob's \"Work\" SSD via disk4 on attempt 1",
+                "2026-11-13 16:40:12  forgot \"Bob's \"Work\" SSD\" - by hand",
+            ],
+            home: home)
+        let report = Diagnostics.report(facts)
+        for part in ["Bob", "Work", "SSD"] {
+            XCTAssertFalse(report.contains(part), "the report contains \(part)")
+        }
+        XCTAssertTrue(report.contains("  2026-11-13 14:25:09  ejected [disk] via disk4 on attempt 1\n"))
+        XCTAssertTrue(report.contains("  2026-11-13 16:40:12  forgot \"[disk]\" - by hand\n"))
+    }
+
     func testALineCutShortIsLeftOutWholeSoACutTitleCannotSlipThrough() {
         let title = String(repeating: "Quarterly planning with the board ", count: 20)
         let line = "2026-11-12 10:00:00  " + Sanitize.oneLine("\(title) in 5 min -> unmounting Sync", max: 500)

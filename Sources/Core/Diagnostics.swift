@@ -139,10 +139,6 @@ enum Diagnostics {
         }
         let range = NSRange(text.startIndex..., in: text)
         text = meetingLine.stringByReplacingMatches(in: text, range: range, withTemplate: "$1[meeting]$3")
-        // A quoted name is a disk the app may no longer remember, such as one
-        // it forgot or the user hid: "forgot \"Old Backup\" - by hand".
-        text = quoted.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text),
-                                               withTemplate: "\"[disk]\"")
         // Longest first, so "Time Machine WD" is not half replaced by "Time".
         // Whole names only: a disk called "Sync" must not eat "Syncthing".
         for name in Set(diskNames).sorted(by: { $0.count > $1.count }) where !name.isEmpty {
@@ -152,6 +148,10 @@ enum Diagnostics {
             text = expression.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text),
                                                        withTemplate: template)
         }
+        // A quoted name left is a disk the app never knew, such as one the
+        // user hid before it was remembered.
+        text = quoted.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text),
+                                               withTemplate: "\"[disk]\"")
         return self.home(text, home)
     }
 
