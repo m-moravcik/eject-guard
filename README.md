@@ -118,6 +118,15 @@ get a notification to plug it in again. macOS unlocks an encrypted Time Machine
 disk only for an app with Full Disk Access; without it the notification says
 so, and clicking it opens that setting.
 
+## Shortcuts
+
+Eject Guard adds actions to the Shortcuts app: **Eject Guarded Disks**,
+**Pause Eject Guard**, **Resume Eject Guard**, **Skip Next Meeting** and
+**Stop Time Machine Backup**. Use them in a personal automation, for example at
+6 pm on weekdays or when a Focus mode turns on, or ask Siri to "Pause Eject
+Guard". The app decides nothing new: each action does what the matching menu
+item does, and says why when it cannot.
+
 ## Command line
 
 The app ships with a command line tool, `eject-guard`, for scripts and your

@@ -10,6 +10,10 @@
 import Foundation
 
 extension GuardController {
+    /// The app's one controller, for Shortcuts actions, which App Intents
+    /// creates on its own with no way to hand them one. Set by AppMain.
+    static var shared: GuardController?
+
     /// Starts listening. A failure is logged, never fatal: without the socket
     /// the CLI still works, it just acts on its own.
     func startControlServer() -> ControlServer? {
@@ -63,6 +67,16 @@ extension GuardController {
             reply(Reports.resumed)
 
         case .skipNext:
+            guard calendarAccess != .pending else {
+                whenCalendarAccessDecided(timeout: .seconds(10)) { decided in
+                    guard decided else {
+                        reply(Reports.calendarAccessUndecided)
+                        return
+                    }
+                    self.handle(request, reply: reply)
+                }
+                return
+            }
             guard calendarAccess == .granted else {
                 reply(Reports.calendarAccessDenied)
                 return

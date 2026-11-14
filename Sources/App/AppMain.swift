@@ -24,6 +24,7 @@ struct EjectGuardApp: App {
         if intent != storedIntent { controller.update { $0.launchAtLoginIntent = intent } }
         _controller = State(initialValue: controller)
         controlServer = controller.startControlServer()
+        GuardController.shared = controller
         // Returns the no-op updater unless this is an installed, Developer ID
         // signed bundle. See UpdaterGate.
         updater = makeUpdaterController()
