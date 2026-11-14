@@ -6,23 +6,24 @@
     <description>Ejects external disks before a meeting starts.</description>
     <language>en</language>
     <item>
-      <title>Version 1.6</title>
-      <pubDate>Sat, 24 Oct 2026 11:19:53 +0000</pubDate>
-      <sparkle:version>95</sparkle:version>
-      <sparkle:shortVersionString>1.6</sparkle:shortVersionString>
+      <title>Version 1.7</title>
+      <pubDate>Sat, 14 Nov 2026 20:28:32 +0000</pubDate>
+      <sparkle:version>140</sparkle:version>
+      <sparkle:shortVersionString>1.7</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
-<p>You can stop a Time Machine backup from the menu. While Time Machine is backing up, the popover offers Stop backup, whichever disk it writes to and whether or not you ticked it, say when a backup slows the Mac down. Time Machine carries on at its next backup.</p>
-<p>You can start one too. Right-click a Time Machine disk that is plugged in, or a network share, and choose Back up now. The row says Starting backup… until Time Machine picks it up. If a stop or a start does not take, the popover says so, and the warning goes away once the backup is in the state you asked for or the disk is gone.</p>
-<p>⌘E only ejects now. Stopping a backup has its own row.</p>
-<p>The popover moves the way VibeRes does. A disk gives under the click, and its checkmark bounces once when you guard it. A row that comes or goes, such as a warning, a banner, Stop backup or Undo skip, appears only after the rows around it have made room, so no text runs over another. The backup percentage and the minutes to the meeting roll to their new value, and the countdown now keeps time while the popover is open, where before it showed the minute you opened it on. With Reduce Motion on, rows simply appear and the digits change without rolling.</p>
-<p>The welcome tour slides in from the side a step comes from, and no longer jumps in height between steps.</p>
-<p>Signed with Developer ID, notarized and stapled. Requires macOS 14.</p>
+<p>The command line tool now comes with the app. Open Settings &gt; Advanced and click Install… to put <code>eject-guard</code> on your PATH, then wire up your own triggers: <code>eject-guard --eject-now</code> at the end of the workday, from a Focus mode, a Stream Deck button or a Shortcuts Run Shell Script action. It updates together with the app.</p>
+<p>While Eject Guard is running, the tool asks the app to act, so the popover shows the change at once and two passes never race for the same disk. New commands mirror the menu: <code>--pause MINUTES</code>, <code>--resume</code>, <code>--skip-next</code>, <code>--stop-backup</code>, plus <code>--json</code> for scripts and <code>--version</code>.</p>
+<p>Eject Guard adds actions to the Shortcuts app: Eject Guarded Disks, Pause Eject Guard, Resume Eject Guard, Skip Next Meeting and Stop Time Machine Backup. Run them from a personal automation, such as at 6 pm on weekdays or when a Focus mode turns on, or ask Siri to pause Eject Guard.</p>
+<p>Settings has a new Advanced tab with the command line tool, Open log, Show config and Copy diagnostics. Eject Guard still sends nothing anywhere; to report a bug, Copy diagnostics puts the app's state and recent log on the clipboard, with meeting titles and disk names left out, for you to paste into an issue.</p>
+<p>Eject Guard now also speaks Spanish and French.</p>
+<p>While Time Machine backs up, the menu bar tooltip now says which disk it is backing up to, in every language; it used to read as if that disk were the one being backed up.</p>
+<p>Signed with an Apple Developer ID and notarized by Apple. Requires macOS 14.</p>
       ]]></description>
       <sparkle:fullReleaseNotesLink>https://github.com/m-moravcik/eject-guard/releases</sparkle:fullReleaseNotesLink>
-      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.6/Eject-Guard-1.6.zip"
-                 sparkle:edSignature="k7+ZmlF97ILomHwRGLadyJXDB4ZtpRX+DupmfYw2xCgPpDPIT1bYvEe9CtagKctBblDC77MbkzpaaS5Rg6PWBg=="
-                 length="3163596"
+      <enclosure url="https://github.com/m-moravcik/eject-guard/releases/download/v1.7/Eject-Guard-1.7.zip"
+                 sparkle:edSignature="X+zm+QPh6qnVMxPghz9qEfUAA+kEQUQko4jjJVSUj0qSfB0TLi0/K1VDg4LFkafDLM/03aeW2OEmPL1tdyXGDQ=="
+                 length="3484868"
                  type="application/octet-stream" />
     </item>
   </channel>
