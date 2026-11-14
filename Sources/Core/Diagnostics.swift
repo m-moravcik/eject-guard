@@ -77,6 +77,7 @@ enum Diagnostics {
         lines.append("")
         lines.append("log, last \(facts.logLines.count) lines, meeting titles and disk names replaced:")
         let names = config.knownDisks.map(\.name) + facts.attached.map(\.name)
+            + config.pendingReconnects.map(\.name)
         for line in facts.logLines {
             lines.append("  " + redact(line, diskNames: names, labels: labels, home: facts.home))
         }
@@ -101,8 +102,17 @@ enum Diagnostics {
 
     private static let quoted = try! NSRegularExpression(pattern: #""[^"]*""#)
 
+    /// A log line Sanitize cut short ends in "…". A meeting line cut before
+    /// " in N min ->" no longer matches `meetingLine`, so its title would pass
+    /// through; such a line is left out whole rather than guessed at.
+    private static let truncated = try! NSRegularExpression(pattern: #"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d  ).*…$"#)
+
     static func redact(_ line: String, diskNames: [String], labels: [String: String], home: String) -> String {
         var text = line
+        let whole = NSRange(text.startIndex..., in: text)
+        if truncated.firstMatch(in: text, range: whole) != nil {
+            return truncated.stringByReplacingMatches(in: text, range: whole, withTemplate: "$1[long line left out]")
+        }
         let range = NSRange(text.startIndex..., in: text)
         text = meetingLine.stringByReplacingMatches(in: text, range: range, withTemplate: "$1[meeting]$3")
         // A quoted name is a disk the app may no longer remember, such as one

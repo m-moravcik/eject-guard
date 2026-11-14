@@ -39,6 +39,12 @@ final class DiagnosticsTests: XCTestCase {
                        "2026-11-12 10:00:00  forgot \"[disk]\" - not guarded and unplugged for 30 days")
     }
 
+    func testALineCutShortIsLeftOutWholeSoACutTitleCannotSlipThrough() {
+        let title = String(repeating: "Quarterly planning with the board ", count: 20)
+        let line = "2026-11-12 10:00:00  " + Sanitize.oneLine("\(title) in 5 min -> unmounting Sync", max: 500)
+        XCTAssertEqual(redact(line), "2026-11-12 10:00:00  [long line left out]")
+    }
+
     func testTheHomeFolderIsShortened() {
         XCTAssertEqual(redact("2026-11-12 10:00:00  config unreadable at /Users/someone/Library/x"),
                        "2026-11-12 10:00:00  config unreadable at ~/Library/x")

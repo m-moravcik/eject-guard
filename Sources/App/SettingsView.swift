@@ -176,8 +176,8 @@ private struct AdvancedSettings: View {
                 }
             } footer: {
                 SectionNote(text: diagnosticsCopied
-                    ? Loc.t("diagnostics.copied", "Copied. Paste it into a GitHub issue; meeting titles and disk names are left out.")
-                    : Loc.t("diagnostics.footer", "Nothing is sent anywhere. Copy diagnostics puts the app's state and recent log on the clipboard, without meeting titles or disk names, for a bug report."))
+                    ? Loc.t("diagnostics.copied", "Copied. Read it before you paste it into a GitHub issue: meeting titles and the names of disks the app knows are replaced.")
+                    : Loc.t("diagnostics.footer", "Nothing is sent anywhere. Copy diagnostics puts the app's state and recent log on the clipboard for a bug report, with meeting titles and the names of disks the app knows replaced."))
             }
         }
         .formStyle(.grouped)
