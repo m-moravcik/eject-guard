@@ -502,6 +502,16 @@ PATH"), and `waitUntilExit` is banned.
   otherwise only that volume is mounted. After ⌘E or eject on sleep, unplug
   and replug it: an encrypted Time Machine volume unlocks from the keychain
   when the disk is reattached.
+- Every log entry also goes to the unified log under the subsystem
+  `sk.moravcik.tmejectguard` (category `app` or `cli`), marked private, so
+  `log show --predicate 'subsystem == "sk.moravcik.tmejectguard"'` puts it
+  next to what macOS logged at the same moment.
+- Copy diagnostics (Settings > Advanced) is the only way anything about the app
+  leaves the Mac, and only by the user's paste. `Diagnostics.report` replaces
+  meeting titles (the meeting line, from the app or the CLI), the names of
+  disks the app knows or the log says it forgot, whole words only, and any
+  other quoted name; it leaves out log lines cut short and shortens the home
+  folder. DiagnosticsTests holds it to that against real log line shapes.
 - The log names your meetings, so it is created `0600`, as is the config file.
   At 512 KB it rolls over to `.log.1` rather than being deleted, because the
   entry you want is usually the one just before the rollover.

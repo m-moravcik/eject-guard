@@ -1,6 +1,7 @@
 // The on-disk log. One line per entry, 0600, serialised across threads.
 
 import Foundation
+import os
 
 enum Log {
     // Under `swift test` the log goes to a temporary file: tests drive Shell
@@ -18,16 +19,30 @@ enum Log {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var permissionsChecked = false
 
+    // POSIX, so a 12-hour or non-Latin-digit system setting cannot rewrite
+    // the stamp: it is grepped and Copy diagnostics parses it (QA1480).
     private static let stamp: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return f
     }()
 
+    /// The same entries in the unified log, under the app's bundle id, where
+    /// `log show --predicate 'subsystem == "sk.moravcik.tmejectguard"'` and
+    /// Console find them next to what macOS itself logged at that moment. The
+    /// text is private there: it names meetings and disks, so macOS shows it
+    /// only to an admin on this Mac who asks for private data.
+    private static let system = Logger(
+        subsystem: "sk.moravcik.tmejectguard",
+        category: ProcessInfo.processInfo.processName == "eject-guard" ? "cli" : "app")
+
     static func write(_ message: String) {
         // One entry per line, always: a newline from a meeting title would
         // otherwise let anyone forge a log record.
-        let line = "\(stamp.string(from: Date()))  \(Sanitize.oneLine(message, max: 500))\n"
+        let oneLine = Sanitize.oneLine(message, max: 500)
+        system.log("\(oneLine, privacy: .private)")
+        let line = "\(stamp.string(from: Date()))  \(oneLine)\n"
         guard let data = line.data(using: .utf8) else { return }
         lock.lock(); defer { lock.unlock() }
         if isatty(STDERR_FILENO) == 1 {

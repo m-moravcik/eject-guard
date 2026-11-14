@@ -8,7 +8,7 @@
 "about.description" = "Wirft externe Laufwerke einige Minuten vor Besprechungsbeginn aus, damit eine laufende Festplatte nie im eingebundenen Zustand abgezogen wird.";
 "about.developmentBuild" = "Entwicklungsversion";
 "about.openLog" = "Protokoll öffnen";
-"about.showConfig" = "Konfiguration anzeigen";
+"about.showConfig" = "Konfiguration";
 "about.sourceCode" = "Quellcode";
 "about.updatesUnavailable" = "Diese Version kann sich nicht selbst aktualisieren.";
 "about.version" = "Version %@";
@@ -33,6 +33,9 @@
 "cli.occupied" = "%@ gibt es schon und ist kein Link auf Eject Guard, daher bleibt es unangetastet.";
 "cli.relink" = "%@ zeigt auf eine andere Kopie von Eject Guard. Installieren… richtet ihn auf diese aus.";
 "cli.title" = "Befehlszeile";
+"diagnostics.copied" = "Kopiert. Lies es, bevor du es in ein GitHub-Issue einfügst: Besprechungstitel und die Namen der Laufwerke, die die App kennt, sind ersetzt.";
+"diagnostics.copy" = "Diagnose kopieren";
+"diagnostics.footer" = "Es wird nichts gesendet. „Diagnose kopieren“ legt den Zustand der App und die letzten Protokollzeilen für einen Fehlerbericht in die Zwischenablage, mit ersetzten Besprechungstiteln und Namen der Laufwerke, die die App kennt.";
 "disk.backUpNow" = "Backup jetzt erstellen";
 "disk.backingUp" = "Sicherung läuft…";
 "disk.backingUpPercent" = "Sicherung läuft… %@";
