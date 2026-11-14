@@ -38,10 +38,13 @@ enum Control {
 
         /// How long the CLI waits for the answer. An eject may first wait for
         /// Time Machine to stop a backup to a share, which alone can take two
-        /// minutes, and then retry a busy disk.
+        /// minutes, and then retry a busy disk. A stop waits for `tmutil
+        /// stopbackup`, which may take up to two minutes, behind whatever else
+        /// is on the app's work queue.
         var timeout: TimeInterval {
             switch self {
             case .ejectNow: return 600
+            case .stopBackup: return 180
             default: return 15
             }
         }

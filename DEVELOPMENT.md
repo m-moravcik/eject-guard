@@ -178,8 +178,9 @@ The socket is `control.sock` in the support folder. The folder is 0700, the
 socket 0600, and the server also checks the peer's user id with
 `getpeereid`. One JSON request per connection, capped at 64 KB, with a version
 field so a CLI and an app of different versions refuse each other, and
-timeouts on both ends: 15 s for most commands, 10 minutes for an eject, which
-may first wait two minutes for Time Machine to stop a backup to a share. A
+timeouts on both ends: 15 s for most commands, 3 minutes for stop-backup,
+which waits for Time Machine to take the request, and 10 minutes for an eject,
+which may first wait two minutes for Time Machine to stop a backup to a share. A
 crashed app leaves the file behind; a connect that is refused reads as "not
 running", and the next launch replaces it, but never a socket another live
 process still answers on.
