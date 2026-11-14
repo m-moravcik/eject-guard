@@ -3,7 +3,8 @@ import XCTest
 
 /// Copy diagnostics must be enough to triage a report and must not carry the
 /// two things the log deliberately keeps: meeting titles and disk names. The
-/// log lines below have the exact shape GuardRunner and Ejector write.
+/// log lines below have the exact shapes the app, GuardRunner and Ejector
+/// write.
 final class DiagnosticsTests: XCTestCase {
     private let home = "/Users/someone"
     private let labels = ["Time Machine WD": "disk 1", "Sync": "disk 2"]
@@ -23,6 +24,28 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertEqual(
             redact("2026-11-13 09:55:02  Standup in 5 min sharp in 5 min -> unmounting Sync (/Volumes/Sync)"),
             "2026-11-13 09:55:02  [meeting] in 5 min -> unmounting disk 2 (/Volumes/disk 2)")
+    }
+
+    func testTheCommandLineTriggerFormIsReplacedWholeEvenWithAQuoteInTheTitle() {
+        XCTAssertEqual(
+            redact("2026-11-13 14:25:07  trigger: \"Q4 \"final\" review\" in 5 min -> unmounting Sync (/Volumes/Sync)"),
+            "2026-11-13 14:25:07  [meeting] in 5 min -> unmounting disk 2 (/Volumes/disk 2)")
+    }
+
+    func testATitleWithALineSeparatorAnOlderVersionLoggedIsStillReplaced() {
+        XCTAssertEqual(
+            redact("2026-11-13 14:25:07  Board\u{2028}Q4 cuts in 5 min -> unmounting Sync (/Volumes/Sync)"),
+            "2026-11-13 14:25:07  [meeting] in 5 min -> unmounting disk 2 (/Volumes/disk 2)")
+    }
+
+    func testAStampA12HourSettingRewroteStillHidesTheTitle() {
+        XCTAssertEqual(
+            redact("2026-11-13 2:25:07 PM  1on1 Anna in 5 min -> unmounting Sync"),
+            "2026-11-13 2:25:07 PM  [meeting] in 5 min -> unmounting disk 2")
+    }
+
+    func testLineAndParagraphSeparatorsNeverReachTheLog() {
+        XCTAssertEqual(Sanitize.oneLine("Board\u{2028}Q4\u{2029}cuts\u{85}now"), "Board Q4 cuts now")
     }
 
     func testDiskNamesAreReplacedWholeAndLongestFirst() {
@@ -72,5 +95,27 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertTrue(report.contains("disk 1: guarded, not attached, Time Machine"))
         XCTAssertTrue(report.contains("disk 2: not guarded, attached, USB"))
         XCTAssertTrue(report.contains("command line:  ~/.local/bin/eject-guard"))
+    }
+
+    /// Unmounted for a meeting, unplugged, then forgotten by hand: the app no
+    /// longer remembers "Old Backup", but older lines still name it unquoted.
+    func testADiskForgottenAfterItWasLoggedIsReplacedInTheOlderLines() {
+        let facts = Diagnostics.Facts(
+            appVersion: "1.7", build: "200", developerIDSigned: true,
+            bundlePath: "/Applications/Eject Guard.app", macOS: "Version 27.0", model: "Mac16,1",
+            calendarAccess: "granted", notifications: "on", controlSocket: true,
+            commandLine: "not installed", config: GuardConfig(), attached: [],
+            logLines: [
+                "2026-11-13 14:25:07  Weekly in 5 min -> unmounting Old Backup (/Volumes/Old Backup)",
+                "2026-11-13 14:25:09  ejected Old Backup via disk4 on attempt 1",
+                "2026-11-13 15:02:00  reconnected Old Backup",
+                "2026-11-13 16:40:12  forgot \"Old Backup\" - by hand",
+            ],
+            home: home)
+        let report = Diagnostics.report(facts)
+        XCTAssertFalse(report.contains("Old Backup"))
+        XCTAssertTrue(report.contains("  2026-11-13 14:25:07  [meeting] in 5 min -> unmounting [disk] (/Volumes/[disk])\n"))
+        XCTAssertTrue(report.contains("  2026-11-13 14:25:09  ejected [disk] via disk4 on attempt 1\n"))
+        XCTAssertTrue(report.contains("  2026-11-13 16:40:12  forgot \"[disk]\" - by hand\n"))
     }
 }

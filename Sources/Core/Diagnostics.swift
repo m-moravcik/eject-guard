@@ -77,7 +77,7 @@ enum Diagnostics {
         lines.append("")
         lines.append("log, last \(facts.logLines.count) lines, meeting titles and disk names replaced:")
         let names = config.knownDisks.map(\.name) + facts.attached.map(\.name)
-            + config.pendingReconnects.map(\.name)
+            + config.pendingReconnects.map(\.name) + forgottenNames(in: facts.logLines)
         for line in facts.logLines {
             lines.append("  " + redact(line, diskNames: names, labels: labels, home: facts.home))
         }
@@ -95,17 +95,41 @@ enum Diagnostics {
     }
 
     /// The pattern of the one log line that names a meeting:
-    /// `<stamp>  <title> in <n> min -> <action>`. Greedy, so a title that
-    /// itself contains " in 5 min" is still replaced whole.
+    /// `<stamp>  <title> in <n> min -> <action>`, or
+    /// `<stamp>  trigger: "<title>" in <n> min -> <action>` from the command
+    /// line. Greedy, so a title that itself contains " in 5 min" or a quote is
+    /// still replaced whole.
+    ///
+    /// Both patterns fail open (a line they miss keeps its title), so they lean
+    /// on as little as possible: the stamp is whatever comes before the first
+    /// two spaces, since an older log may carry a stamp a 12-hour setting
+    /// rewrote, and `.` crosses the line separators an older version left in
+    /// titles.
     private static let meetingLine = try! NSRegularExpression(
-        pattern: #"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d  )(.+)( in -?\d+ min -> )"#)
+        pattern: #"^(.*?  )(.+)( in -?\d+ min -> )"#, options: .dotMatchesLineSeparators)
 
     private static let quoted = try! NSRegularExpression(pattern: #""[^"]*""#)
 
     /// A log line Sanitize cut short ends in "…". A meeting line cut before
     /// " in N min ->" no longer matches `meetingLine`, so its title would pass
     /// through; such a line is left out whole rather than guessed at.
-    private static let truncated = try! NSRegularExpression(pattern: #"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d  ).*…$"#)
+    private static let truncated = try! NSRegularExpression(
+        pattern: #"^(.*?  ).*…$"#, options: .dotMatchesLineSeparators)
+
+    /// `forgot "<name>" - ...` and `merged "<name>" by name ...`: a disk the
+    /// app no longer remembers, whose name still sits unquoted in the older
+    /// lines about unmounting and ejecting it.
+    private static let forgotten = try! NSRegularExpression(
+        pattern: #"  (?:forgot|merged) "(.+)" (?:- |by name)"#, options: .dotMatchesLineSeparators)
+
+    static func forgottenNames(in lines: [String]) -> [String] {
+        lines.compactMap { line in
+            let range = NSRange(line.startIndex..., in: line)
+            guard let match = forgotten.firstMatch(in: line, range: range),
+                  let name = Range(match.range(at: 1), in: line) else { return nil }
+            return String(line[name])
+        }
+    }
 
     static func redact(_ line: String, diskNames: [String], labels: [String: String], home: String) -> String {
         var text = line

@@ -19,8 +19,11 @@ enum Log {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var permissionsChecked = false
 
+    // POSIX, so a 12-hour or non-Latin-digit system setting cannot rewrite
+    // the stamp: it is grepped and Copy diagnostics parses it (QA1480).
     private static let stamp: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return f
     }()

@@ -13,8 +13,8 @@ labels: bug
 **Diagnostics**
 
 Open Settings > Advanced, click Copy diagnostics and paste the text below. It
-holds the app's state and its recent log, with meeting titles and disk names
-replaced; read it before posting.
+holds the app's state and its recent log, with meeting titles and the names of
+disks the app knows replaced; read it before posting.
 
 ```
 paste here
