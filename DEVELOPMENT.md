@@ -216,11 +216,13 @@ which Xcode writes with `appintentsmetadataprocessor` from the compiler's
 const values. build.sh does the same two steps without a project: the app is
 compiled whole-module with `-emit-const-values` and a list of the App Intents
 protocols, then the processor turns those values into the metadata, and the
-build fails if the result lists no actions. Titles and descriptions are
-`LocalizedStringResource(key, defaultValue:)`, resolved against the same
-`Localizable.strings` as the interface, and LocalizationTests reads those keys
-too. Values the processor reads must be compile-time literals: `1440`, not
-`24 * 60`.
+build fails if the result is missing any of the five actions. Titles and
+descriptions are `LocalizedStringResource(key, defaultValue:)`, resolved
+against the same `Localizable.strings` as the interface. The Pause action's
+parameter summary is a key too, with the parameter in the processor's form:
+`Pause Eject Guard for ${minutes} minutes`. LocalizationTests reads both kinds
+of key, turning `\(\.$minutes)` into `${minutes}`. Values the processor reads
+must be compile-time literals: `1440`, not `24 * 60`.
 
 ## How a disk is connected
 
