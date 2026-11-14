@@ -40,12 +40,15 @@ jobs:
           test -x "$CLI"
           codesign -dv "$CLI" 2>&1 | grep -q "Identifier=sk.moravcik.tmejectguard.cli"
           test "$("$CLI" --version)" = "$(tr -d ' \n' < VERSION)"
-          # All four interface languages must reach the bundle, or the app
+          # All six interface languages must reach the bundle, or the app
           # silently falls back to the English in the source.
-          for lang in en sk cs de; do
+          for lang in en sk cs de es fr; do
             test -f "$APP/Contents/Resources/$lang.lproj/Localizable.strings"
             test -f "$APP/Contents/Resources/$lang.lproj/Localizable.stringsdict"
           done
+          # Without this metadata the Shortcuts actions compile and never
+          # appear in Shortcuts.
+          test -d "$APP/Contents/Resources/Metadata.appintents"
           # Sparkle has to be embedded and reachable through the rpath, or the
           # app fails to launch rather than failing to update.
           test -d "$APP/Contents/Frameworks/Sparkle.framework"
