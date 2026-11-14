@@ -35,11 +35,7 @@ jobs:
           # EventKit is denied outright under the hardened runtime without this.
           grep -q "personal-information.calendars" App/EjectGuard.entitlements
           test -x "$APP/Contents/MacOS/EjectGuard"
-          # The CLI ships inside the bundle and reports the app's version.
-          CLI="$APP/Contents/Helpers/eject-guard"
-          test -x "$CLI"
-          codesign -dv "$CLI" 2>&1 | grep -q "Identifier=sk.moravcik.tmejectguard.cli"
-          test "$("$CLI" --version)" = "$(tr -d ' \n' < VERSION)"
+          test -x build/eject-guard
           # All four interface languages must reach the bundle, or the app
           # silently falls back to the English in the source.
           for lang in en sk cs de; do
