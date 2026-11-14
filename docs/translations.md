@@ -38,7 +38,7 @@ in the running app.
   Trash, Settings, Full Disk Access, Focus, Time Machine.
 - A guarded disk is one the user ticked: strážený, hlídaný, überwacht, vigilado,
   surveillé.
-- Non-breaking space before `: ? !` and inside guillemets in French.
+- Non-breaking space before `; : ? !` and inside guillemets in French.
 - Quotation marks per language; no em dash anywhere.
 - One ellipsis character `…`, never three dots.
 
