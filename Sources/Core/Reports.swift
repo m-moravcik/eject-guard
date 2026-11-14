@@ -57,6 +57,9 @@ enum Reports {
     static let calendarAccessDenied = Control.Response(
         exitCode: 3, lines: [], errors: ["calendar access denied"])
 
+    static let calendarAccessUndecided = Control.Response.failure(
+        "calendar access is not decided yet - answer the macOS prompt, then try again")
+
     static let busy = Control.Response.failure("a pass is already running - try again in a moment")
 
     static func badMinutes(_ value: Int?) -> Control.Response {

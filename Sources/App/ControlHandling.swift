@@ -67,6 +67,16 @@ extension GuardController {
             reply(Reports.resumed)
 
         case .skipNext:
+            guard calendarAccess != .pending else {
+                whenCalendarAccessDecided(timeout: .seconds(10)) { decided in
+                    guard decided else {
+                        reply(Reports.calendarAccessUndecided)
+                        return
+                    }
+                    self.handle(request, reply: reply)
+                }
+                return
+            }
             guard calendarAccess == .granted else {
                 reply(Reports.calendarAccessDenied)
                 return

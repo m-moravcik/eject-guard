@@ -24,9 +24,11 @@ final class LocalizationTests: XCTestCase {
     private func keysUsedInSource() throws -> Set<String> {
         let sources = Self.root.appendingPathComponent("Sources")
         var keys: Set<String> = []
-        // Loc.t for the interface, LocalizedStringResource for the Shortcuts
-        // actions, which App Intents resolves against the same tables.
-        let pattern = try NSRegularExpression(pattern: #"(?:Loc\.t|LocalizedStringResource)\(\s*"([^"]+)""#)
+        // Loc.t for the interface; LocalizedStringResource and Summary for the
+        // Shortcuts actions, which App Intents resolves against the same
+        // tables, with a parameter `\(\.$name)` looked up as `${name}`.
+        let pattern = try NSRegularExpression(pattern: #"(?:Loc\.t|LocalizedStringResource|Summary)\(\s*"([^"]+)""#)
+        let parameter = try NSRegularExpression(pattern: #"\\\(\\\.\$(\w+)\)"#)
 
         let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
         while let url = files?.nextObject() as? URL {
@@ -35,7 +37,9 @@ final class LocalizationTests: XCTestCase {
             let range = NSRange(text.startIndex..., in: text)
             for match in pattern.matches(in: text, range: range) {
                 if let r = Range(match.range(at: 1), in: text) {
-                    keys.insert(String(text[r]))
+                    let key = String(text[r])
+                    keys.insert(parameter.stringByReplacingMatches(
+                        in: key, range: NSRange(key.startIndex..., in: key), withTemplate: "\\${$1}"))
                 }
             }
         }

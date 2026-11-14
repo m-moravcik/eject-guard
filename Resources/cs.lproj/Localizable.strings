@@ -79,6 +79,7 @@
 "intent.pause.minutes" = "Minuty";
 "intent.pause.short" = "Pozastavit";
 "intent.pause.title" = "Pozastavit Eject Guard";
+"Pause Eject Guard for ${minutes} minutes" = "Pozastavit Eject Guard na ${minutes} minut";
 "intent.resume.description" = "Ukončí pozastavení.";
 "intent.resume.short" = "Obnovit";
 "intent.resume.title" = "Obnovit Eject Guard";

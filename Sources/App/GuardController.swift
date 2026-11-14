@@ -25,6 +25,9 @@ final class GuardController {
     private(set) var nextMeeting: EKEvent?
     private(set) var ejectDate: Date?
     private(set) var calendarAccess: CalendarAccess = .pending
+    /// Work waiting for `calendarAccess` to leave `.pending`, such as a
+    /// Shortcuts action that launched the app before macOS answered.
+    @ObservationIgnored private var calendarAccessWaiters: [UUID: () -> Void] = [:]
     private(set) var isBusy = false
     /// Mounting a disk back, which can take a minute and a half for a locked
     /// Time Machine volume. Kept apart from `isBusy`, which the menu bar and
@@ -359,6 +362,22 @@ final class GuardController {
         !isBusy && !isReconnecting && !guardedVolumes.isEmpty
     }
 
+    /// Runs `body(true)` once calendar access is decided, at once if it
+    /// already is, or `body(false)` if it is still pending after `timeout`.
+    func whenCalendarAccessDecided(timeout: Duration, _ body: @escaping (_ decided: Bool) -> Void) {
+        guard calendarAccess == .pending else {
+            body(true)
+            return
+        }
+        let id = UUID()
+        calendarAccessWaiters[id] = { body(true) }
+        Task { @MainActor in
+            try? await Task.sleep(for: timeout)
+            guard self.calendarAccessWaiters.removeValue(forKey: id) != nil else { return }
+            body(false)
+        }
+    }
+
     // MARK: - Lifecycle
 
     func start() {
@@ -373,6 +392,9 @@ final class GuardController {
                 self.calendarAccess = granted ? .granted : .denied
                 if granted { self.calendars = self.store.calendars(for: .event) }
                 self.reschedule()
+                let waiters = self.calendarAccessWaiters.values
+                self.calendarAccessWaiters = [:]
+                waiters.forEach { $0() }
             }
         }
 

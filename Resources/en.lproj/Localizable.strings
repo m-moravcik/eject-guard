@@ -79,6 +79,7 @@
 "intent.pause.minutes" = "Minutes";
 "intent.pause.short" = "Pause";
 "intent.pause.title" = "Pause Eject Guard";
+"Pause Eject Guard for ${minutes} minutes" = "Pause Eject Guard for ${minutes} minutes";
 "intent.resume.description" = "Ends a pause.";
 "intent.resume.short" = "Resume";
 "intent.resume.title" = "Resume Eject Guard";

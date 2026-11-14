@@ -70,9 +70,12 @@ xcrun appintentsmetadataprocessor \
     --binary-file "$APP/Contents/MacOS/EjectGuard" \
     --quiet-warnings > "$INTENTS/processor.log" 2>&1 \
     || { cat "$INTENTS/processor.log" >&2; exit 1; }
-# A processor that ran but found nothing would ship an app with no actions.
-grep -q '"EjectNowIntent"' "$APP/Contents/Resources/Metadata.appintents/extract.actionsdata" \
-    || { echo "Metadata.appintents lists no actions" >&2; exit 1; }
+# A processor that ran but dropped an action, for one with a parameter that is
+# not a literal, would ship an app without it.
+for intent in EjectNowIntent PauseGuardIntent ResumeGuardIntent SkipNextMeetingIntent StopBackupIntent; do
+    grep -q "\"$intent\"" "$APP/Contents/Resources/Metadata.appintents/extract.actionsdata" \
+        || { echo "Metadata.appintents is missing $intent" >&2; exit 1; }
+done
 rm -rf "$INTENTS"
 
 cp App/Info.plist "$APP/Contents/Info.plist"

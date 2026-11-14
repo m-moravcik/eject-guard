@@ -79,13 +79,14 @@
 "intent.pause.minutes" = "Minuten";
 "intent.pause.short" = "Pausieren";
 "intent.pause.title" = "Eject Guard pausieren";
+"Pause Eject Guard for ${minutes} minutes" = "Eject Guard für ${minutes} Minuten pausieren";
 "intent.resume.description" = "Beendet eine Pause.";
 "intent.resume.short" = "Fortsetzen";
 "intent.resume.title" = "Eject Guard fortsetzen";
 "intent.skipNext.description" = "Lässt deine Laufwerke bei der nächsten Besprechung heute in Ruhe.";
 "intent.skipNext.short" = "Nächste Besprechung überspringen";
 "intent.skipNext.title" = "Nächste Besprechung überspringen";
-"intent.stopBackup.description" = "Stoppt die laufende Time Machine-Backup, egal auf welches Laufwerk sie schreibt.";
+"intent.stopBackup.description" = "Stoppt das laufende Time Machine-Backup, egal auf welches Laufwerk es schreibt.";
 "intent.stopBackup.title" = "Time Machine-Backup stoppen";
 "meeting.checking" = "Kalender wird geprüft…";
 "meeting.ejectsAt" = "Wirft um %@ aus";
