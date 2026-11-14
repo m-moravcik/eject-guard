@@ -21,7 +21,7 @@
 "banner.pausedDetail" = "No se expulsará nada hasta entonces.";
 "banner.pausedUntil" = "En pausa hasta %@";
 "banner.updateReady" = "Actualización lista";
-"banner.updateReadyDetail" = "Haz clic para reiniciar con la nueva versión";
+"banner.updateReadyDetail" = "Haz clic para usar la nueva versión";
 "banner.updateReadyHelp" = "Instala la actualización descargada y vuelve a abrir Eject Guard.";
 "calendar.accessDetail" = "Sin él, la vigilancia no puede ver tus reuniones.";
 "calendar.accessNeeded" = "Se necesita acceso a Calendario";

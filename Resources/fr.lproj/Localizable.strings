@@ -21,7 +21,7 @@
 "banner.pausedDetail" = "Rien ne sera éjecté d’ici là.";
 "banner.pausedUntil" = "En pause jusqu’à %@";
 "banner.updateReady" = "Mise à jour prête";
-"banner.updateReadyDetail" = "Cliquez pour redémarrer avec la nouvelle version";
+"banner.updateReadyDetail" = "Cliquez pour lancer la nouvelle version";
 "banner.updateReadyHelp" = "Installe la mise à jour téléchargée et relance Eject Guard.";
 "calendar.accessDetail" = "Sans cet accès, la surveillance ne peut pas voir vos réunions.";
 "calendar.accessNeeded" = "Accès à Calendrier requis";

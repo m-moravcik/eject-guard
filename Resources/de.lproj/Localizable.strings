@@ -20,7 +20,7 @@
 "banner.pausedDetail" = "Bis dahin wird nichts ausgeworfen.";
 "banner.pausedUntil" = "Pausiert bis %@";
 "banner.updateReady" = "Update bereit";
-"banner.updateReadyDetail" = "Klicken für Neustart in die neue Version";
+"banner.updateReadyDetail" = "Klicken startet die neue Version";
 "banner.updateReadyHelp" = "Installiert das geladene Update und startet Eject Guard neu.";
 "calendar.accessDetail" = "Ohne ihn sieht die Überwachung deine Besprechungen nicht.";
 "calendar.accessNeeded" = "Kalenderzugriff erforderlich";
