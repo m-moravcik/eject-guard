@@ -163,8 +163,8 @@
 "settings.watchAllCalendars" = "Sledovať všetky kalendáre";
 "settings.whatCountsFooter" = "Účastníci sú to, čo odlíši skutočné stretnutie od blokov ako Focus či Home-office, bez hádania podľa názvu.";
 "settings.withAttendees" = "Udalosti s ďalšími účastníkmi";
-"status.backingUp" = "Zálohuje sa %@";
-"status.backingUpPercent" = "Zálohuje sa %1$@ - %2$@";
+"status.backingUp" = "Zálohuje sa na %@";
+"status.backingUpPercent" = "Zálohuje sa na %1$@ - %2$@";
 "status.ejecting" = "Vysúva sa";
 "status.guarding" = "Stráži %@";
 "status.idle" = "Nie je pripojený strážený disk";

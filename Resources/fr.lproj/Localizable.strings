@@ -17,7 +17,7 @@
 "banner.guardingOff" = "La surveillance est désactivée";
 "banner.guardingOffDetail" = "Réactivez-la dans les Réglages.";
 "banner.notificationsOff" = "Les notifications sont désactivées";
-"banner.notificationsOffDetail" = "Les disques seront quand même éjectés, mais sans bruit.";
+"banner.notificationsOffDetail" = "Les disques seront quand même éjectés, mais en silence.";
 "banner.pausedDetail" = "Rien ne sera éjecté d’ici là.";
 "banner.pausedUntil" = "En pause jusqu’à %@";
 "banner.updateReady" = "Mise à jour prête";
@@ -26,7 +26,7 @@
 "calendar.accessDetail" = "Sans cet accès, la surveillance ne peut pas voir vos réunions.";
 "calendar.accessNeeded" = "Accès à Calendrier requis";
 "cli.failed" = "Le lien n’a pas pu être créé : %@";
-"cli.footer" = "Branchez vos propres déclencheurs, par exemple eject-guard --eject-now à la fin de la journée de travail. eject-guard --help liste le reste.";
+"cli.footer" = "Créez vos propres déclencheurs, par exemple eject-guard --eject-now en fin de journée. eject-guard --help affiche le reste.";
 "cli.install" = "Installer…";
 "cli.linked" = "eject-guard est installé dans %@.";
 "cli.moveFirst" = "Déplacez d’abord Eject Guard dans le dossier Applications.";
@@ -46,9 +46,9 @@
 "disk.forgetCancel" = "Annuler";
 "disk.forgetConfirm" = "Oublier « %@ » ?";
 "disk.forgetConfirmButton" = "Oublier";
-"disk.forgetConfirmDetail" = "Il est surveillé. L’oublier arrête sa surveillance, et la prochaine fois que vous le brancherez, il sera listé comme non surveillé.";
+"disk.forgetConfirmDetail" = "Il est surveillé. L’oublier arrête sa surveillance, et la prochaine fois que vous le brancherez, il apparaîtra comme non surveillé.";
 "disk.forgetConfirmReconnect" = "Il ne sera pas non plus reconnecté après la réunion.";
-"disk.forgetHint" = "Listé à nouveau quand vous le branchez";
+"disk.forgetHint" = "Réapparaît quand vous le branchez";
 "disk.guarded" = "Surveillé";
 "disk.hide" = "Masquer ce disque";
 "disk.hideHint" = "Restaurez-le plus tard dans les Réglages";
@@ -65,7 +65,7 @@
 "failure.backupNotStopped" = "%@ : la sauvegarde n’a pas pu être arrêtée";
 "failure.heldBy" = "%1$@ : utilisé par %2$@";
 "footer.about" = "À propos d’Eject Guard";
-"footer.ejectHelp" = "Éjecte %@. Les disques que vous n’avez pas cochés sont laissés tranquilles.";
+"footer.ejectHelp" = "Éjecte %@. Les disques que vous n’avez pas cochés ne sont pas touchés.";
 "footer.ejectHelpNone" = "Aucun disque surveillé n’est connecté.";
 "footer.ejectNow" = "Éjecter maintenant";
 "footer.ejectOne" = "Éjecter %@";
@@ -148,7 +148,7 @@
 "settings.ejectOnSleepFooter" = "macOS ne laisse qu’un instant avant la mise en veille ; une seule tentative est donc faite, sans nouvel essai.";
 "settings.everyCalendarCounts" = "Tous les calendriers comptent. Décochez-en un ci-dessous pour affiner.";
 "settings.ignoreFree" = "Ignorer les événements marqués comme Disponible";
-"settings.launchAtLogin" = "Ouvrir au démarrage de la session";
+"settings.launchAtLogin" = "Ouvrir à la connexion";
 "settings.pauseFor" = "Pause pendant";
 "settings.replayTour" = "Revoir la visite de bienvenue";
 "settings.restoreHidden" = "Restaurer les disques masqués (%d)";
@@ -163,8 +163,8 @@
 "settings.watchAllCalendars" = "Surveiller tous les calendriers";
 "settings.whatCountsFooter" = "Ce sont les participants qui distinguent une vraie réunion de blocs comme Concentration ou Télétravail, sans se fier aux titres.";
 "settings.withAttendees" = "Événements avec d’autres participants";
-"status.backingUp" = "Sauvegarde de %@";
-"status.backingUpPercent" = "Sauvegarde de %1$@ - %2$@";
+"status.backingUp" = "Sauvegarde vers %@";
+"status.backingUpPercent" = "Sauvegarde vers %1$@ - %2$@";
 "status.ejecting" = "Éjection";
 "status.guarding" = "Surveillance de %@";
 "status.idle" = "Aucun disque surveillé connecté";

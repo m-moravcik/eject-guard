@@ -23,8 +23,8 @@ pasted into issues.
 | sk | Shipped since 1.2, reviewer not recorded | | |
 | cs | Shipped since 1.2, reviewer not recorded | | |
 | de | Shipped since 1.2, reviewer not recorded | | |
-| es | Machine-assisted draft, awaiting a native reader | | |
-| fr | Machine-assisted draft, awaiting a native reader | | |
+| es | Machine-assisted draft, proofread by an agent, awaiting a native reader | | |
+| fr | Machine-assisted draft, proofread by an agent, awaiting a native reader | | |
 
 Fill in the reviewer and date when a native speaker has read a language through
 in the running app.

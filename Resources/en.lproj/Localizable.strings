@@ -163,8 +163,8 @@
 "settings.watchAllCalendars" = "Watch all calendars";
 "settings.whatCountsFooter" = "Attendees are what separate a real meeting from blocks like Focus or Home-office, without matching on titles.";
 "settings.withAttendees" = "Events with other attendees";
-"status.backingUp" = "Backing up %@";
-"status.backingUpPercent" = "Backing up %1$@ - %2$@";
+"status.backingUp" = "Backing up to %@";
+"status.backingUpPercent" = "Backing up to %1$@ - %2$@";
 "status.ejecting" = "Ejecting";
 "status.guarding" = "Guarding %@";
 "status.idle" = "No guarded disk connected";
