@@ -33,6 +33,9 @@
 "cli.occupied" = "%@ already exists and is not a link to Eject Guard, so it is left alone.";
 "cli.relink" = "%@ points to another copy of Eject Guard. Install… points it to this one.";
 "cli.title" = "Command line";
+"diagnostics.copied" = "Copied. Paste it into a GitHub issue; meeting titles and disk names are left out.";
+"diagnostics.copy" = "Copy diagnostics";
+"diagnostics.footer" = "Nothing is sent anywhere. Copy diagnostics puts the app's state and recent log on the clipboard, without meeting titles or disk names, for a bug report.";
 "disk.backUpNow" = "Back up now";
 "disk.backingUp" = "Backing up…";
 "disk.backingUpPercent" = "Backing up… %@";

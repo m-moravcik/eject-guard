@@ -104,7 +104,9 @@ on sleep.
   not tick is stopped or started only when you ask.
 - Disks are recognised by their volume UUID, not by name.
 - Nothing leaves your Mac. The calendar is read locally, and the app talks to
-  the network only to check for updates.
+  the network only to check for updates. There is no telemetry: to report a
+  bug, Settings > Advanced > Copy diagnostics puts the app's state and recent
+  log on the clipboard, without meeting titles or disk names, for you to paste.
 - The log names your meetings, so it is readable by you alone.
 
 Good to know: like Finder, it takes down the whole physical disk, including its

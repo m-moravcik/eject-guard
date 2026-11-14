@@ -130,7 +130,9 @@ private struct GeneralSettings: View {
 
 /// The command line tool, and what helps when something goes wrong.
 private struct AdvancedSettings: View {
+    @Environment(GuardController.self) private var controller
     @State private var decision: CommandLineLink.Decision?
+    @State private var diagnosticsCopied = false
     @State private var installing = false
     @State private var installError: String?
 
@@ -166,11 +168,16 @@ private struct AdvancedSettings: View {
 
             Section {
                 HStack(spacing: Design.Spacing.m) {
+                    Button(Loc.t("diagnostics.copy", "Copy diagnostics"), action: copyDiagnostics)
                     Button(Loc.t("about.openLog", "Open log")) { NSWorkspace.shared.open(Log.url) }
                     Button(Loc.t("about.showConfig", "Show config")) {
                         NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.url])
                     }
                 }
+            } footer: {
+                SectionNote(text: diagnosticsCopied
+                    ? Loc.t("diagnostics.copied", "Copied. Paste it into a GitHub issue; meeting titles and disk names are left out.")
+                    : Loc.t("diagnostics.footer", "Nothing is sent anywhere. Copy diagnostics puts the app's state and recent log on the clipboard, without meeting titles or disk names, for a bug report."))
             }
         }
         .formStyle(.grouped)
@@ -199,6 +206,53 @@ private struct AdvancedSettings: View {
         case .create?: return { install(relink: false) }
         case .relink?: return { install(relink: true) }
         default: return nil
+        }
+    }
+
+    /// The facts are read here, the log off the main thread, and the text
+    /// built by `Diagnostics.report`, which is what the tests check.
+    private func copyDiagnostics() {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "development build"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let calendar: String
+        switch controller.calendarAccess {
+        case .granted: calendar = "granted"
+        case .denied: calendar = "denied"
+        case .pending: calendar = "not asked yet"
+        }
+        let notifications = controller.notificationsEnabled.map { $0 ? "on" : "off" } ?? "unknown"
+        let commandLine: String
+        switch decision {
+        case .linked(let path)?: commandLine = "linked at \(path)"
+        case .refuse(.occupied(let path))?: commandLine = "\(path) is something else"
+        default: commandLine = "not installed"
+        }
+        let bundleURL = Bundle.main.bundleURL
+        let config = controller.config
+        let attached = controller.attached
+        DispatchQueue.global(qos: .userInitiated).async {
+            let facts = Diagnostics.Facts(
+                appVersion: version,
+                build: build,
+                developerIDSigned: isDeveloperIDSigned(bundleURL: bundleURL),
+                bundlePath: bundleURL.path,
+                macOS: ProcessInfo.processInfo.operatingSystemVersionString,
+                model: Diagnostics.hardwareModel(),
+                calendarAccess: calendar,
+                notifications: notifications,
+                controlSocket: { if case .success = Control.send(Control.Request(command: .ping)) { return true }; return false }(),
+                commandLine: commandLine,
+                config: config,
+                attached: attached,
+                logLines: Diagnostics.logTail(),
+                home: FileManager.default.homeDirectoryForCurrentUser.path)
+            let text = Diagnostics.report(facts)
+            Task { @MainActor in
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                diagnosticsCopied = true
+            }
         }
     }
 

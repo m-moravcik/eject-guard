@@ -33,6 +33,9 @@
 "cli.occupied" = "%@ už existuje a není to odkaz na Eject Guard, proto ho nechávám být.";
 "cli.relink" = "%@ ukazuje na jinou kopii Eject Guard. Instalovat… ho přesměruje na tuto.";
 "cli.title" = "Příkazový řádek";
+"diagnostics.copied" = "Zkopírováno. Vlož to do issue na GitHubu; názvy schůzek a disků jsou vynechané.";
+"diagnostics.copy" = "Kopírovat diagnostiku";
+"diagnostics.footer" = "Nic se nikam neposílá. Kopírovat diagnostiku vloží stav aplikace a poslední řádky logu do schránky, bez názvů schůzek a disků, pro nahlášení chyby.";
 "disk.backUpNow" = "Zálohovat nyní";
 "disk.backingUp" = "Zálohuje se…";
 "disk.backingUpPercent" = "Zálohuje se… %@";

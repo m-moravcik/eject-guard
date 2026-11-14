@@ -33,6 +33,9 @@
 "cli.occupied" = "%@ gibt es schon und ist kein Link auf Eject Guard, daher bleibt es unangetastet.";
 "cli.relink" = "%@ zeigt auf eine andere Kopie von Eject Guard. Installieren… richtet ihn auf diese aus.";
 "cli.title" = "Befehlszeile";
+"diagnostics.copied" = "Kopiert. Füge es in ein GitHub-Issue ein; Besprechungs- und Laufwerksnamen sind ausgelassen.";
+"diagnostics.copy" = "Diagnose kopieren";
+"diagnostics.footer" = "Es wird nichts gesendet. „Diagnose kopieren“ legt den Zustand der App und die letzten Protokollzeilen in die Zwischenablage, ohne Besprechungs- und Laufwerksnamen, für einen Fehlerbericht.";
 "disk.backUpNow" = "Backup jetzt erstellen";
 "disk.backingUp" = "Sicherung läuft…";
 "disk.backingUpPercent" = "Sicherung läuft… %@";
