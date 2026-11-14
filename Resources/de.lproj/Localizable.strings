@@ -8,7 +8,7 @@
 "about.description" = "Wirft externe Laufwerke einige Minuten vor Besprechungsbeginn aus, damit eine laufende Festplatte nie im eingebundenen Zustand abgezogen wird.";
 "about.developmentBuild" = "Entwicklungsversion";
 "about.openLog" = "Protokoll öffnen";
-"about.showConfig" = "Konfiguration";
+"about.showConfig" = "Konfiguration anzeigen";
 "about.sourceCode" = "Quellcode";
 "about.updatesUnavailable" = "Diese Version kann sich nicht selbst aktualisieren.";
 "about.version" = "Version %@";
@@ -20,7 +20,7 @@
 "banner.pausedDetail" = "Bis dahin wird nichts ausgeworfen.";
 "banner.pausedUntil" = "Pausiert bis %@";
 "banner.updateReady" = "Update bereit";
-"banner.updateReadyDetail" = "Klicken für Neustart in die neue Version";
+"banner.updateReadyDetail" = "Klicken startet die neue Version";
 "banner.updateReadyHelp" = "Installiert das geladene Update und startet Eject Guard neu.";
 "calendar.accessDetail" = "Ohne ihn sieht die Überwachung deine Besprechungen nicht.";
 "calendar.accessNeeded" = "Kalenderzugriff erforderlich";

@@ -167,8 +167,10 @@ private struct AdvancedSettings: View {
             }
 
             Section {
+                // Its own row: three buttons on one line did not fit in
+                // French at 470 pt.
+                Button(Loc.t("diagnostics.copy", "Copy diagnostics"), action: copyDiagnostics)
                 HStack(spacing: Design.Spacing.m) {
-                    Button(Loc.t("diagnostics.copy", "Copy diagnostics"), action: copyDiagnostics)
                     Button(Loc.t("about.openLog", "Open log")) { NSWorkspace.shared.open(Log.url) }
                     Button(Loc.t("about.showConfig", "Show config")) {
                         NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.url])

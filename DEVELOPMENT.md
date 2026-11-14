@@ -330,15 +330,18 @@ smaller than its neighbours is the regression these exist for.
 
 ## Languages
 
-English, Slovak, Czech and German; the app follows the system language and falls
-back to English. Translations live in `Resources/<lang>.lproj/`, keyed
-explicitly (`footer.ejectNow`) rather than by their English sentence, so
-rewording the English does not silently orphan three translations.
+English, Slovak, Czech, German, Spanish and French; the app follows the system
+language and falls back to English. Who reviewed which language, and the
+conventions each follows, are in [docs/translations.md](docs/translations.md).
+Translations live in `Resources/<lang>.lproj/`, keyed explicitly
+(`footer.ejectNow`) rather than by their English sentence, so rewording the
+English does not silently orphan five translations.
 
 Slovak and Czech need a separate plural form for 2-4 ("2 disky" but "5 diskov"),
-which `Localizable.stringsdict` provides and `LocalizationTests` insists on.
-Those tests also check that every key the source uses exists in all four
-languages, that no language carries a key nothing uses, and that the format
+which `Localizable.stringsdict` provides and `LocalizationTests` insists on;
+Spanish and French must define CLDR's "many" as well.
+Those tests also check that every key the source uses exists in every
+language, that no language carries a key nothing uses, and that the format
 specifiers match English - a `%@` translated as `%d` does not render wrong text,
 it reads whatever happens to be at that address.
 
@@ -419,7 +422,7 @@ Sources/Icon/     the menu bar icon and its animator, compiled into the app and 
 Sources/App/      the SwiftUI menu bar app
 Sources/CLI/      the command line tool, shipped at Contents/Helpers/eject-guard
 Sources/Preview/  renders the popover to PNG so the layout can be reviewed
-Resources/        en, sk, cs and de translations, copied into the bundle
+Resources/        en, sk, cs, de, es and fr translations, copied into the bundle
 Tests/            unit tests over Sources/Core and Sources/Icon
 ```
 

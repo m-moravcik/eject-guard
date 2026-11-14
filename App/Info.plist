@@ -51,7 +51,7 @@
          every working day is longer than it needs to be. -->
     <key>SUScheduledCheckInterval</key>
     <integer>86400</integer>
-    <!-- The four interface languages. Without this macOS reports only the
+    <!-- The six interface languages. Without this macOS reports only the
          development region and Sparkle's own windows ignore the rest. -->
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
@@ -61,6 +61,8 @@
         <string>sk</string>
         <string>cs</string>
         <string>de</string>
+        <string>es</string>
+        <string>fr</string>
     </array>
     <key>NSSupportsAutomaticTermination</key>
     <false/>

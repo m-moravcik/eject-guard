@@ -11,7 +11,7 @@ import XCTest
 /// and the format specifiers match - a "%@" translated as "%d" does not show
 /// wrong text, it reads whatever is at that address.
 final class LocalizationTests: XCTestCase {
-    private static let languages = ["en", "sk", "cs", "de"]
+    private static let languages = ["en", "sk", "cs", "de", "es", "fr"]
 
     /// The repository, found from this file rather than from a bundle: these
     /// are source files, and SwiftPM does not copy them into the test bundle.
@@ -170,6 +170,20 @@ final class LocalizationTests: XCTestCase {
                     XCTAssertEqual(
                         specifiers(in: text), specifiers(in: reference),
                         "\(language): \(key)/\(name) does not take the same arguments as English")
+                }
+            }
+        }
+    }
+
+    /// Spanish and French use "many" for large round numbers ("1 000 000 de
+    /// minutes"), and CLDR lists it for both. A plural without it falls back
+    /// to "other", which is right today, but a missing category is how a
+    /// wrong form slips in later, so every one is required.
+    func testSpanishAndFrenchDefineEveryCLDRCategory() {
+        for language in ["es", "fr"] {
+            for (key, cases) in pluralForms(for: language) {
+                for category in ["one", "many", "other"] {
+                    XCTAssertNotNil(cases[category], "\(language): \(key) has no '\(category)' form")
                 }
             }
         }

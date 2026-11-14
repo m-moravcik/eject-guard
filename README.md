@@ -46,7 +46,7 @@ mid-backup, that is how backups get corrupted. Eject Guard remembers for you.
 - **Tells you when it cannot eject**, and names the app holding the disk, so
   you know not to pull the cable.
 
-It works in English, Slovak, Czech and German, and updates itself.
+It works in English, Slovak, Czech, German, Spanish and French, and updates itself.
 
 ## Install
 

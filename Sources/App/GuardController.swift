@@ -933,6 +933,8 @@ extension GuardController {
             "sk": ("Porada k návrhu", "Práca"),
             "cs": ("Porada k návrhu", "Práce"),
             "de": ("Design-Review", "Arbeit"),
+            "es": ("Revisión de diseño", "Trabajo"),
+            "fr": ("Revue de design", "Travail"),
         ]
         let language = Bundle.main.preferredLocalizations.first ?? "en"
         let demoNames = names[language] ?? ("Design review", "Work")

@@ -1,0 +1,3 @@
+/* Shown by macOS in the Calendar permission prompt, before the app has any UI. */
+"NSCalendarsUsageDescription" = "Lee tus próximas reuniones para que el disco externo pueda expulsarse antes de que lo desconectes.";
+"NSCalendarsFullAccessUsageDescription" = "Lee tus próximas reuniones para que el disco externo pueda expulsarse antes de que lo desconectes.";
