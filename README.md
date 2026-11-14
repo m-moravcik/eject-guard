@@ -120,17 +120,28 @@ so, and clicking it opens that setting.
 
 ## Command line
 
-An optional CLI, `eject-guard`, is installed to `~/.local/bin` by `./install.sh` from source.
-If that folder is not on your PATH, add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc`.
-It is handy for setup and debugging:
+The app ships with a command line tool, `eject-guard`, for scripts and your
+own triggers: eject at the end of the workday, from a Focus mode, a Stream Deck
+button or a Shortcuts *Run Shell Script* action. To put it on your PATH, open
+Settings > Advanced and click **Install…**; it links the tool into
+`/usr/local/bin` and asks for your password once. To do it by hand:
 
 ```sh
-eject-guard                     # disks, selection, next meeting
-eject-guard --watch "WD"        # guard a disk
-eject-guard --dry-run           # run a pass without unmounting or mounting
+sudo ln -s "/Applications/Eject Guard.app/Contents/Helpers/eject-guard" /usr/local/bin/eject-guard
+```
+
+While the app is running, the tool asks the app to act, so the popover shows
+the change at once and only one pass ever runs. Without the app it acts on its
+own.
+
+```sh
+eject-guard                     # disks, selection, next meeting (--json for scripts)
 eject-guard --eject-now         # eject guarded disks now
-eject-guard --hide "WD"         # hide a disk for good (--unhide brings it back)
-eject-guard --forget-disk "WD"  # forget an unplugged disk until it is plugged in again
+eject-guard --pause 60          # pause the guard for an hour (--resume ends it)
+eject-guard --skip-next         # leave the disks alone for today's next meeting
+eject-guard --stop-backup       # stop the running Time Machine backup
+eject-guard --watch "WD"        # guard a disk
+eject-guard --dry-run           # show what a pass would do, unmounting nothing
 eject-guard --help              # everything else
 ```
 
@@ -143,7 +154,7 @@ settings: they move to the new folder on first launch.
 ## Building from source
 
 ```sh
-./install.sh     # build, install to /Applications and ~/.local/bin, launch
+./install.sh     # build, install to /Applications, link the CLI into ~/.local/bin, launch
 ./uninstall.sh   # remove, keeping config and log
 ```
 

@@ -24,6 +24,15 @@
 "banner.updateReadyHelp" = "Nainštaluje stiahnutú aktualizáciu a znova spustí Eject Guard.";
 "calendar.accessDetail" = "Bez neho stráž nevidí tvoje stretnutia.";
 "calendar.accessNeeded" = "Treba prístup ku kalendáru";
+"cli.failed" = "Odkaz sa nepodarilo vytvoriť: %@";
+"cli.footer" = "Nastav si vlastné spúšťače, napríklad eject-guard --eject-now na konci pracovného dňa. Zvyšok vypíše eject-guard --help.";
+"cli.install" = "Inštalovať…";
+"cli.linked" = "eject-guard je nainštalovaný v %@.";
+"cli.moveFirst" = "Najprv presuň Eject Guard do priečinka Aplikácie.";
+"cli.notInstalled" = "Nie je nainštalovaný. Inštalovať… vytvorí odkaz v /usr/local/bin a vypýta si tvoje heslo.";
+"cli.occupied" = "%@ už existuje a nie je to odkaz na Eject Guard, preto ho nechávam tak.";
+"cli.relink" = "%@ ukazuje na inú kópiu Eject Guard. Inštalovať… ho presmeruje na túto.";
+"cli.title" = "Príkazový riadok";
 "disk.backUpNow" = "Zálohovať teraz";
 "disk.backingUp" = "Zálohuje sa…";
 "disk.backingUpPercent" = "Zálohuje sa… %@";
@@ -51,12 +60,12 @@
 "failure.backupNotStarted" = "%@: zálohu sa nepodarilo spustiť";
 "failure.backupNotStopped" = "%@: zálohu sa nepodarilo zastaviť";
 "failure.heldBy" = "%1$@: drží ho %2$@";
+"footer.about" = "O aplikácii Eject Guard";
 "footer.ejectHelp" = "Vysunie %@. Nezaškrtnutých diskov sa nedotkne.";
 "footer.ejectHelpNone" = "Nie je pripojený žiadny strážený disk.";
 "footer.ejectNow" = "Vysunúť teraz";
 "footer.ejectOne" = "Vysunúť %@";
 "footer.ejecting" = "Vysúva sa…";
-"footer.about" = "O aplikácii Eject Guard";
 "footer.quit" = "Ukončiť";
 "footer.resume" = "Obnoviť stráženie";
 "footer.settings" = "Nastavenia…";
@@ -125,6 +134,7 @@
 "settings.replayTour" = "Znova ukázať úvodnú prehliadku";
 "settings.restoreHidden" = "Obnoviť skryté disky (%d)";
 "settings.tab.about" = "O aplikácii";
+"settings.tab.advanced" = "Pokročilé";
 "settings.tab.calendars" = "Kalendáre";
 "settings.tab.general" = "Všeobecné";
 "settings.tab.meetings" = "Stretnutia";

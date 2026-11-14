@@ -2,7 +2,7 @@ import EventKit
 import SwiftUI
 
 struct SettingsView: View {
-    enum Tab: Hashable { case general, meetings, calendars, about }
+    enum Tab: Hashable { case general, meetings, calendars, advanced, about }
 
     /// SwiftUI keeps this view alive between opens, so without a reset the
     /// window reopens on whichever tab was left - as VibeRes found. Every
@@ -27,6 +27,9 @@ struct SettingsView: View {
             CalendarSettings()
                 .tabItem { Label(Loc.t("settings.tab.calendars", "Calendars"), systemImage: "calendar") }
                 .tag(Tab.calendars)
+            AdvancedSettings()
+                .tabItem { Label(Loc.t("settings.tab.advanced", "Advanced"), systemImage: "terminal") }
+                .tag(Tab.advanced)
             AboutSettings()
                 .tabItem { Label(Loc.t("settings.tab.about", "About"), systemImage: "info.circle") }
                 .tag(Tab.about)
@@ -120,6 +123,119 @@ private struct GeneralSettings: View {
                 launchAtLogin = LoginItem.isEnabled
             }
         })
+    }
+}
+
+// MARK: - Advanced
+
+/// The command line tool, and what helps when something goes wrong.
+private struct AdvancedSettings: View {
+    @State private var decision: CommandLineLink.Decision?
+    @State private var installing = false
+    @State private var installError: String?
+
+    private var helperPath: String {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/\(CommandLineLink.toolName)")
+            .resolvingSymlinksInPath().path
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent(Loc.t("cli.title", "Command line")) {
+                    if let action = installAction {
+                        Button(Loc.t("cli.install", "Install…"), action: action)
+                            .disabled(installing)
+                    }
+                }
+                if let status = statusText {
+                    Text(status)
+                        .font(Design.Typography.note)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let installError {
+                    Text(installError)
+                        .font(Design.Typography.note)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } footer: {
+                SectionNote(text: Loc.t("cli.footer", "Wire up your own triggers, such as eject-guard --eject-now at the end of the workday. eject-guard --help lists the rest."))
+            }
+
+            Section {
+                HStack(spacing: Design.Spacing.m) {
+                    Button(Loc.t("about.openLog", "Open log")) { NSWorkspace.shared.open(Log.url) }
+                    Button(Loc.t("about.showConfig", "Show config")) {
+                        NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.url])
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear(perform: refresh)
+    }
+
+    private var statusText: String? {
+        switch decision {
+        case .linked(let path)?:
+            return Loc.t("cli.linked", "eject-guard is installed at %@.", path)
+        case .create?:
+            return Loc.t("cli.notInstalled", "Not installed. Install… puts a link to it in /usr/local/bin and asks for your password.")
+        case .relink(let path)?:
+            return Loc.t("cli.relink", "%@ points to another copy of Eject Guard. Install… points it to this one.", path)
+        case .refuse(.translocated)?, .refuse(.notInstalled)?:
+            return Loc.t("cli.moveFirst", "Move Eject Guard to the Applications folder first.")
+        case .refuse(.occupied(let path))?:
+            return Loc.t("cli.occupied", "%@ already exists and is not a link to Eject Guard, so it is left alone.", path)
+        case nil:
+            return nil
+        }
+    }
+
+    private var installAction: (() -> Void)? {
+        switch decision {
+        case .create?: return { install(relink: false) }
+        case .relink?: return { install(relink: true) }
+        default: return nil
+        }
+    }
+
+    private func refresh() {
+        #if PREVIEW
+        // The harness shows the offer, never what this Mac has installed.
+        if PreviewDemo.isActive {
+            decision = .create(at: CommandLineLink.installPath)
+            return
+        }
+        #endif
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        decision = CommandLineLink.decide(
+            helperPath: helperPath, bundlePath: Bundle.main.bundleURL.path, home: home,
+            entries: CommandLineLink.currentEntries(home: home))
+    }
+
+    /// One administrator prompt, run by osascript off the main thread: the
+    /// prompt can stay open for as long as the user takes.
+    private func install(relink: Bool) {
+        installing = true
+        installError = nil
+        let arguments = CommandLineLink.installScript(relink: relink) + [helperPath, CommandLineLink.installPath]
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Shell.run("/usr/bin/osascript", arguments, timeout: 600)
+            Task { @MainActor in
+                installing = false
+                // -128 is the user pressing Cancel: not an error to show.
+                if result.status != 0 && !result.output.contains("(-128)") {
+                    Log.write("cli install failed: \(result.output)")
+                    installError = Loc.t("cli.failed", "The link could not be created: %@", result.output)
+                } else if result.status == 0 {
+                    Log.write("cli linked at \(CommandLineLink.installPath)")
+                }
+                refresh()
+            }
+        }
     }
 }
 
@@ -302,14 +418,8 @@ private struct AboutSettings: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: Design.Spacing.m) {
-                Button(Loc.t("about.sourceCode", "Source code")) {
-                    if let url = URL(string: repository) { NSWorkspace.shared.open(url) }
-                }
-                Button(Loc.t("about.openLog", "Open log")) { NSWorkspace.shared.open(Log.url) }
-                Button(Loc.t("about.showConfig", "Show config")) {
-                    NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.url])
-                }
+            Button(Loc.t("about.sourceCode", "Source code")) {
+                if let url = URL(string: repository) { NSWorkspace.shared.open(url) }
             }
 
             Spacer(minLength: 0)

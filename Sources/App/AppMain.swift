@@ -7,6 +7,8 @@ struct EjectGuardApp: App {
     /// Not @State: the updater is created once and never replaced, and the
     /// thing views observe is its `updateStatus`, not the controller itself.
     private let updater: any UpdaterProviding
+    /// Held for the life of the app; the CLI talks to it. See Control.swift.
+    private let controlServer: ControlServer?
 
     init() {
         // Must happen before anything can eject: the notification path is set up
@@ -21,6 +23,7 @@ struct EjectGuardApp: App {
         let intent = LoginItem.reconcile(storedIntent: storedIntent)
         if intent != storedIntent { controller.update { $0.launchAtLoginIntent = intent } }
         _controller = State(initialValue: controller)
+        controlServer = controller.startControlServer()
         // Returns the no-op updater unless this is an installed, Developer ID
         // signed bundle. See UpdaterGate.
         updater = makeUpdaterController()

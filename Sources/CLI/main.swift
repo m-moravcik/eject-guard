@@ -1,6 +1,11 @@
-// Command line face of eject-guard: inspect state, pick disks, force a pass.
+// Command line face of eject-guard: inspect state, pick disks, act now.
 // The menu bar app is the normal way to use this; the CLI exists for setup,
-// scripting and debugging.
+// scripting, your own triggers and debugging.
+//
+// It ships inside the app at Contents/Helpers/eject-guard. While the app runs,
+// anything that acts on a disk or changes the guard goes through the app over
+// the control socket (see Control.swift), so there is one pass at a time and
+// the popover shows the change at once. Without the app it acts on its own.
 
 import EventKit
 import Foundation
@@ -23,12 +28,21 @@ func usage() -> Never {
       eject-guard --run            run one pass now (unmounts before a meeting, reconnects after)
       eject-guard --dry-run        same, but never unmount or mount
       eject-guard --eject-now      eject every guarded disk regardless of calendar
+      eject-guard --pause MINUTES  pause the guard
+      eject-guard --resume         resume a paused guard
+      eject-guard --skip-next      leave the disks alone for today's next meeting
+      eject-guard --stop-backup    stop the running Time Machine backup, guarded or not
       eject-guard --calendars      list calendars and which ones are watched
       eject-guard --watch-cal NAME   watch this calendar (repeatable)
       eject-guard --unwatch-cal NAME stop watching it
       eject-guard --lead MINUTES   set how long before a meeting to eject
       eject-guard --enable         turn the guard on
       eject-guard --disable        turn the guard off
+      eject-guard --json           print the state as JSON (with no other command)
+      eject-guard --version        print the version
+
+    While Eject Guard is running, actions go through the app. Exit codes: 0 done,
+    1 failed, 3 calendar access denied, 64 bad usage.
 
     Config: \(ConfigStore.url.path)
     Log:    \(Log.url.path)
@@ -39,6 +53,37 @@ func usage() -> Never {
 // Before anything reads the config: help should never have side effects, and
 // the first read of the config can move its folder (see ConfigStore.migrate).
 if CommandLine.arguments.contains(where: { $0 == "--help" || $0 == "-h" }) { usage() }
+if CommandLine.arguments.contains("--version") {
+    // Stamped by build.sh into the plist embedded in this binary, so it is
+    // always the version of the app it shipped in.
+    print(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")
+    exit(0)
+}
+
+/// Prints a response the way every action ends, and exits with its code.
+func finish(_ response: Control.Response) -> Never {
+    for line in response.lines { print(line) }
+    for line in response.errors { FileHandle.standardError.write("\(line)\n".data(using: .utf8)!) }
+    exit(response.exitCode)
+}
+
+/// The running app's answer, or nil when it is not running and this tool
+/// should act on its own. Any other failure is an answer too: falling back to
+/// acting alone while the app may be acting as well is the race this avoids.
+func askApp(_ request: Control.Request) -> Control.Response? {
+    switch Control.send(request) {
+    case .success(let response): return response
+    case .failure(.notRunning): return nil
+    case .failure(.timedOut): return .failure("Eject Guard did not answer in time - see the log")
+    case .failure(.refused(let why)), .failure(.io(let why)): return .failure("could not reach Eject Guard: \(why)")
+    }
+}
+
+/// After a change to the config file: the app rereads it now rather than at
+/// its next pass. Nothing to do when it is not running.
+func tellAppToReload() {
+    _ = Control.send(Control.Request(command: .reload))
+}
 
 // Kept, so --forget-disk asks the same question of it as the menu item asks
 // of the app's last scan.
@@ -86,6 +131,8 @@ var action = "status"
 var pendingValue: String?
 /// --yes: forget a guarded disk without asking.
 var confirmed = false
+var json = false
+var pauseMinutes: Int?
 
 while !arguments.isEmpty {
     let argument = arguments.removeFirst()
@@ -102,6 +149,18 @@ while !arguments.isEmpty {
     case "--run": action = "run"
     case "--dry-run": action = "dry-run"
     case "--eject-now": action = "eject-now"
+    case "--pause":
+        action = "pause"
+        let text = value()
+        guard let minutes = Int(text), minutes > 0 else {
+            FileHandle.standardError.write("--pause needs a positive number of minutes\n".data(using: .utf8)!)
+            exit(64)
+        }
+        pauseMinutes = minutes
+    case "--resume": action = "resume"
+    case "--skip-next": action = "skip-next"
+    case "--stop-backup": action = "stop-backup"
+    case "--json": json = true
     case "--watch": action = "watch"; pendingValue = value()
     case "--unwatch": action = "unwatch"; pendingValue = value()
     case "--hide": action = "hide"; pendingValue = value()
@@ -118,12 +177,19 @@ while !arguments.isEmpty {
             FileHandle.standardError.write("--lead needs a positive number\n".data(using: .utf8)!)
             exit(64)
         }
-        config.leadMinutes = minutes
-        ConfigStore.save(config)
+        config = ConfigStore.mutate { config -> GuardConfig in
+            config.leadMinutes = minutes
+            return config
+        }
+        tellAppToReload()
         print("lead time: \(Int(minutes)) min")
     case "--enable", "--disable":
-        config.enabled = (argument == "--enable")
-        ConfigStore.save(config)
+        let enabled = argument == "--enable"
+        config = ConfigStore.mutate { config -> GuardConfig in
+            config.enabled = enabled
+            return config
+        }
+        tellAppToReload()
         print("guard \(config.enabled ? "enabled" : "disabled")")
     default:
         FileHandle.standardError.write("unknown argument: \(argument)\n".data(using: .utf8)!)
@@ -155,6 +221,7 @@ case "watch", "unwatch", "hide":
             config.watchedDiskIDs.removeAll { $0 == disk.id }
         }
     }
+    tellAppToReload()
     switch action {
     case "watch": print("guarding: \(disk.name)")
     case "hide": print("hidden: \(disk.name)")
@@ -199,6 +266,7 @@ case "forget-disk":
         }
     }
     ConfigStore.mutate { $0.forget(disk) }
+    tellAppToReload()
     Log.write("forgot \"\(disk.name)\" - by hand, from the command line")
     print("forgotten: \(disk.name) - listed again when it is plugged in")
 
@@ -208,6 +276,7 @@ case "unhide":
         config.dismissedDiskIDs = []
         return count
     }
+    tellAppToReload()
     print(restored == 0 ? "no hidden disks" : "restored \(restored) hidden disk(s)")
 
 case "unskip", "unskip-all":
@@ -221,6 +290,7 @@ case "unskip", "unskip-all":
         config.skippedEventIDs.removeLast()
         return 1
     }
+    tellAppToReload()
     print(removed == 0 ? "nothing was skipped" : "un-skipped \(removed) meeting(s)")
 
 case "calendars", "watch-cal", "unwatch-cal":
@@ -259,6 +329,7 @@ case "calendars", "watch-cal", "unwatch-cal":
             }
             return config
         }
+        tellAppToReload()
     }
     if config.watchAllCalendars {
         print("watching ALL calendars")
@@ -270,6 +341,13 @@ case "calendars", "watch-cal", "unwatch-cal":
     }
 
 case "run", "dry-run":
+    // A real pass next to the app's own would be two schedulers acting on one
+    // disk. A dry run unmounts nothing, so it may run either way.
+    if action == "run", askApp(Control.Request(command: .ping)) != nil {
+        finish(.failure("Eject Guard is running and runs these passes itself. "
+                        + "Use --eject-now to act now, --dry-run to see what a pass would do, "
+                        + "or quit the app to run a pass from here."))
+    }
     let store = EKEventStore()
     guard Meetings.requestAccess(store) else {
         FileHandle.standardError.write(
@@ -297,16 +375,71 @@ case "run", "dry-run":
     }
 
 case "eject-now":
+    if let answer = askApp(Control.Request(command: .ejectNow)) { finish(answer) }
     let outcome = GuardRunner.ejectGuarded(reason: .manual(), config: config, notifyOnSuccess: false)
-    if outcome.didNothing {
-        print("no guarded disk is attached, and no backup to a guarded share is running")
+    finish(Reports.eject(outcome))
+
+case "pause":
+    if let answer = askApp(Control.Request(command: .pause, minutes: pauseMinutes)) { finish(answer) }
+    let until = Date().addingTimeInterval(TimeInterval(pauseMinutes ?? 0) * 60)
+    ConfigStore.mutate { $0.pausedUntil = until }
+    finish(Reports.paused(until: until))
+
+case "resume":
+    if let answer = askApp(Control.Request(command: .resume)) { finish(answer) }
+    ConfigStore.mutate { $0.pausedUntil = nil }
+    finish(Reports.resumed)
+
+case "skip-next":
+    if let answer = askApp(Control.Request(command: .skipNext)) { finish(answer) }
+    let store = EKEventStore()
+    guard Meetings.requestAccess(store) else {
+        FileHandle.standardError.write("calendar access denied\n".data(using: .utf8)!)
+        exit(3)
     }
-    for name in outcome.ejected { print("ejected: \(name)") }
-    for failure in outcome.failed { print("FAILED: \(failure.name) - held by \(GuardRunner.holder(failure.detail))") }
-    printBackupStops(outcome)
-    if !outcome.failed.isEmpty || !outcome.unstoppedBackups.isEmpty { exit(1) }
+    // Today only, as the popover's Skip this meeting.
+    let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))!
+    guard let meeting = Meetings.nextMeeting(store, within: endOfDay.timeIntervalSinceNow / 60, config: config),
+          let id = meeting.eventIdentifier
+    else { finish(Reports.nothingToSkip) }
+    ConfigStore.mutate { $0.skip(id) }
+    finish(Reports.skipped(title: meeting.title, start: meeting.startDate))
+
+case "stop-backup":
+    if let answer = askApp(Control.Request(command: .stopBackup)) { finish(answer) }
+    guard BackupStatus.current().running else { finish(Reports.noBackupRunning) }
+    finish(BackupControl.stop() ? Reports.stopRequested("its destination") : Reports.stopNotTaken)
 
 default:
+    if json {
+        let attached = snapshot.attached
+        let store = EKEventStore()
+        let access = Meetings.requestAccess(store)
+        let meeting = access ? Meetings.nextMeeting(store, within: 24 * 60, config: config) : nil
+        let paused = config.pausedUntil.flatMap { $0 > Date() ? $0 : nil }
+        print(StatusReport.json(StatusReport(
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+            enabled: config.enabled,
+            pausedUntil: paused,
+            leadMinutes: config.leadMinutes,
+            appRunning: askApp(Control.Request(command: .ping)) != nil,
+            disks: config.knownDisks.map { disk in
+                StatusReport.Disk(
+                    id: disk.id, name: disk.name,
+                    guarded: config.watchedDiskIDs.contains(disk.id),
+                    attached: Disks.attachedVolume(for: disk, among: attached) != nil,
+                    timeMachine: disk.isTimeMachineDestination,
+                    network: disk.isNetworkDestination)
+            },
+            pendingReconnects: config.pendingReconnects.map {
+                StatusReport.Reconnect(name: $0.name, notBefore: $0.notBefore)
+            },
+            nextMeeting: meeting.map {
+                StatusReport.Meeting(title: $0.title ?? "", start: $0.startDate, calendar: $0.calendar.title)
+            },
+            calendarAccess: access)))
+        exit(0)
+    }
     printDisks()
     print("")
     var state = config.enabled ? "enabled" : "disabled"

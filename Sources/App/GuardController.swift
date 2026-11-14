@@ -612,11 +612,21 @@ final class GuardController {
         runEject(reason: reason, notifyOnSuccess: true, reconnectAfter: meeting.endDate)
     }
 
-    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool, reconnectAfter: Date? = nil) {
+    /// - Parameter completion: on the main actor once the pass is over; with an
+    ///   empty outcome when there was nothing to take off.
+    ///   `always` runs the pass even with nothing guarded in sight, as
+    ///   `eject-guard --eject-now` always has: it still clears every pending
+    ///   reconnect (see DEVELOPMENT.md, Reconnecting after a meeting).
+    private func runEject(reason: GuardRunner.Reason, notifyOnSuccess: Bool, reconnectAfter: Date? = nil,
+                          always: Bool = false,
+                          completion: (@MainActor (GuardRunner.Outcome) -> Void)? = nil) {
         let config = self.config
         // Check against the snapshot we already have; the eject itself rescans
         // on the work queue.
-        guard hasGuardedTargets else { return }
+        guard always || hasGuardedTargets else {
+            completion?(GuardRunner.Outcome())
+            return
+        }
         isBusy = true
         // The pass stops a backup to a guarded disk itself; a request still
         // waiting on Time Machine would only end up reading as a failure.
@@ -640,6 +650,7 @@ final class GuardController {
                 }
                 self.reloadDisks()
                 self.reschedule()
+                completion?(outcome)
             }
         }
     }
@@ -753,6 +764,12 @@ final class GuardController {
         guard !isBusy, !isReconnecting else { return }
         reloadConfig()
         runEject(reason: .menu(), notifyOnSuccess: false)
+    }
+
+    /// Eject now, asked from the command line: what ⌘E does, and the caller
+    /// hears the outcome. The caller checks `isBusy` first.
+    func ejectFromCommandLine(completion: @escaping @MainActor (GuardRunner.Outcome) -> Void) {
+        runEject(reason: .manual(), notifyOnSuccess: false, always: true, completion: completion)
     }
 
     /// Stops whatever Time Machine is writing, guarded or not. Not

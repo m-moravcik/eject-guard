@@ -372,7 +372,8 @@ struct HeroScene<Popover: View>: View {
 @MainActor
 func renderSettings(controller: GuardController, output: String) {
     let tabs: [(SettingsView.Tab, String)] = [(.general, "general"), (.meetings, "meetings"),
-                                              (.calendars, "calendars"), (.about, "about")]
+                                              (.calendars, "calendars"), (.advanced, "advanced"),
+                                              (.about, "about")]
     for (tab, tabName) in tabs {
     for scheme in [ColorScheme.light, .dark] {
         let root = SettingsView(initialTab: tab)

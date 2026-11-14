@@ -10,7 +10,7 @@
 #   ./preview.sh hero            # the same, open under the menu bar: README
 #   ./preview.sh banner          # 1920x1080, for the web.pexelo portfolio
 #   ./preview.sh icons           # every menu bar icon state
-#   ./preview.sh settings        # the Settings window, General tab
+#   ./preview.sh settings        # every Settings tab, light and dark
 #   ./preview.sh motion [dark]   # README hero animation frames (readme-motion.sh)
 #   PREVIEW_LANG=sk ./preview.sh demo
 #
