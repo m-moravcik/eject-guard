@@ -67,6 +67,7 @@ extension GuardController {
                 reply(Reports.calendarAccessDenied)
                 return
             }
+            reschedule()
             // Today only, as the popover's Skip this meeting.
             guard let meeting = nextMeeting, Calendar.current.isDateInToday(meeting.startDate) else {
                 reply(Reports.nothingToSkip)
@@ -76,20 +77,34 @@ extension GuardController {
             reply(Reports.skipped(title: meeting.title, start: meeting.startDate))
 
         case .stopBackup:
-            guard isBackupRunning else {
-                reply(Reports.noBackupRunning)
-                return
+            if isBackupRunning {
+                answerStopBackup(reply)
+            } else {
+                refreshBackupStatus { [weak self] in
+                    guard let self else {
+                        reply(.failure("Eject Guard is quitting"))
+                        return
+                    }
+                    self.answerStopBackup(reply)
+                }
             }
-            guard !isStoppingBackup else {
-                reply(Reports.stopAlreadyRequested)
-                return
-            }
-            guard canStopBackup else {
-                reply(Reports.busy)
-                return
-            }
-            let names = backingUpNames.joined(separator: ", ")
-            stopBackup { taken in reply(taken ? Reports.stopRequested(names) : Reports.stopNotTaken) }
         }
+    }
+
+    private func answerStopBackup(_ reply: @escaping @Sendable (Control.Response) -> Void) {
+        guard isBackupRunning else {
+            reply(Reports.noBackupRunning)
+            return
+        }
+        guard !isStoppingBackup else {
+            reply(Reports.stopAlreadyRequested)
+            return
+        }
+        guard canStopBackup else {
+            reply(Reports.busy)
+            return
+        }
+        let names = backingUpNames.joined(separator: ", ")
+        stopBackup { taken in reply(taken ? Reports.stopRequested(names) : Reports.stopNotTaken) }
     }
 }

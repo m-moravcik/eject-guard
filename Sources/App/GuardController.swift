@@ -238,19 +238,26 @@ final class GuardController {
     /// Called both by the popover while it is open and, since the menu bar icon
     /// shows backup progress, by `backupTimer`. That timer only runs while a
     /// Time Machine destination is reachable, which is the only time the
-    /// answer can be anything but "no".
-    func refreshBackupStatus() {
+    /// answer can be anything but "no". `then` runs once this read has
+    /// landed; a caller that passes it always gets a read of its own.
+    func refreshBackupStatus(then done: (@MainActor () -> Void)? = nil) {
         #if PREVIEW
         // Demo state is what the harness renders; a real tmutil read must
         // never overwrite it, and the harness reads nothing from this Mac.
-        if PreviewDemo.isActive { return }
+        if PreviewDemo.isActive {
+            done?()
+            return
+        }
         #endif
-        guard !isBackupRefreshQueued else { return }
+        guard done != nil || !isBackupRefreshQueued else { return }
         isBackupRefreshQueued = true
         work.async { [weak self] in
             let status = BackupStatus.current()
             Task { @MainActor in
-                guard let self else { return }
+                guard let self else {
+                    done?()
+                    return
+                }
                 self.isBackupRefreshQueued = false
                 self.backup = status
                 self.settleBackupRequest()
@@ -258,6 +265,7 @@ final class GuardController {
                 // answer, so every answer re-evaluates them. The call is cheap:
                 // it rebuilds a timer only when the interval actually changed.
                 self.updateBackupWatch()
+                done?()
             }
         }
     }
