@@ -181,4 +181,4 @@ you can [buy me a coffee](https://buymeacoffee.com/pexelo).
 
 [MIT](LICENSE)
 
-Built by [Michal Moravčík](https://github.com/m-moravcik). [More projects](https://web.pexelo.com/portfolio).
+Built by [Michal Moravčík](https://github.com/m-moravcik). [More projects](https://build.pexelo.com/portfolio).
