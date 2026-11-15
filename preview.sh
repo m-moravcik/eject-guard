@@ -8,7 +8,7 @@
 #   ./preview.sh disks           # disks sharing a name, a row's context menu
 #   ./preview.sh many            # ten disks: the list scrolls
 #   ./preview.sh hero            # the same, open under the menu bar: README
-#   ./preview.sh banner          # 1920x1080, for the web.pexelo portfolio
+#   ./preview.sh banner          # 1920x1080, for the build.pexelo portfolio
 #   ./preview.sh icons           # every menu bar icon state
 #   ./preview.sh settings        # every Settings tab, light and dark
 #   ./preview.sh motion [dark]   # README hero animation frames (readme-motion.sh)
