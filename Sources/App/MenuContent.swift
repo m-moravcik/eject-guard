@@ -490,9 +490,12 @@ private struct DiskCard: View {
     var body: some View {
         Button { controller.toggleGuard(disk) } label: {
             HStack(spacing: Design.Spacing.m) {
+                // Label colour, not the accent, while guarded: a thin accent
+                // outline on the accent-tinted fill all but vanished in dark
+                // mode. The checkmark alone carries the accent.
                 Image(systemName: symbol)
                     .font(.system(size: 18))
-                    .foregroundStyle(guarded ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(guarded ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                     .frame(width: 26)
                     .accessibilityHidden(true)
 
